@@ -1,0 +1,31 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/goride
+    username: goride
+    password: goride
+  jpa:
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        format_sql: true
+  data:
+    redis:
+      host: localhost
+      port: 6379
+
+app:
+  jwt:
+    secret: ${JWT_SECRET:local-dev-secret-change-me}
+    access-token-minutes: 15
+    refresh-token-days: 7
+  service-area:
+    city: Ho Chi Minh City
+    min-lat: 10.3919
+    max-lat: 11.1600
+    min-lng: 106.3634
+    max-lng: 107.0312
+  matching:
+    radius-km: 5
+    max-attempts: 3
+    offer-timeout-seconds: 30
