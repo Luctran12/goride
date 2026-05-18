@@ -17,6 +17,7 @@ public enum ErrorCode {
     LICENSE_NUMBER_ALREADY_EXISTS(HttpStatus.CONFLICT, "License number is already registered"),
     ID_CARD_ALREADY_EXISTS(HttpStatus.CONFLICT, "ID card number is already registered"),
     VEHICLE_PLATE_ALREADY_EXISTS(HttpStatus.CONFLICT, "Vehicle plate is already registered"),
+    PRICING_CONFIG_NOT_FOUND(HttpStatus.UNPROCESSABLE_ENTITY, "Pricing is not configured for this vehicle type"),
     TRIP_ALREADY_RATED(HttpStatus.CONFLICT, "Trip has already been rated"),
     REFRESH_TOKEN_EXPIRED(HttpStatus.UNAUTHORIZED, "Refresh token has expired, please log in again"),
     DRIVER_NOT_APPROVED(HttpStatus.UNPROCESSABLE_ENTITY, "Driver has not been approved"),
