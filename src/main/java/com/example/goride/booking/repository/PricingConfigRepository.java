@@ -8,6 +8,8 @@ import java.time.Instant;
 import java.util.Optional;
 
 public interface PricingConfigRepository extends JpaRepository<PricingConfig, Long> {
+    boolean existsByVehicleTypeAndActiveTrue(VehicleType vehicleType);
+
     Optional<PricingConfig> findFirstByVehicleTypeAndActiveTrueAndEffectiveFromLessThanEqualOrderByEffectiveFromDesc(
             VehicleType vehicleType,
             Instant effectiveAt
