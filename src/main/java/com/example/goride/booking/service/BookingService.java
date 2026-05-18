@@ -4,6 +4,7 @@ import com.example.goride.booking.domain.PricingConfig;
 import com.example.goride.booking.domain.Trip;
 import com.example.goride.booking.domain.TripStatus;
 import com.example.goride.booking.domain.TripStatusHistory;
+import com.example.goride.booking.dto.BookingCancelRequest;
 import com.example.goride.booking.dto.BookingCreateRequest;
 import com.example.goride.booking.dto.BookingEstimateRequest;
 import com.example.goride.booking.dto.BookingLocationRequest;
@@ -32,6 +33,12 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 
 @Service
 public class BookingService {
@@ -109,6 +116,58 @@ public class BookingService {
         return TripResponse.from(savedTrip);
     }
 
+    @Transactional(readOnly = true)
+    public TripResponse getMyBooking(Long currentUserId, Long tripId) {
+        User user = getActiveUser(currentUserId);
+        Trip trip = getActiveTrip(tripId);
+        assertCanAccessTrip(user, trip);
+        return TripResponse.from(trip);
+    }
+
+    @Transactional(readOnly = true)
+    public List<TripResponse> listMyBookings(Long currentUserId) {
+        User user = getActiveUser(currentUserId);
+        Map<Long, Trip> tripsById = new LinkedHashMap<>();
+
+        if (user.hasRole(UserRole.PASSENGER)) {
+            tripRepository.findByPassengerIdAndDeletedAtIsNullOrderByRequestedAtDesc(currentUserId)
+                    .forEach(trip -> tripsById.put(trip.getId(), trip));
+        }
+        if (user.hasRole(UserRole.DRIVER)) {
+            tripRepository.findByDriverIdAndDeletedAtIsNullOrderByRequestedAtDesc(currentUserId)
+                    .forEach(trip -> tripsById.put(trip.getId(), trip));
+        }
+        if (tripsById.isEmpty() && !user.hasRole(UserRole.PASSENGER) && !user.hasRole(UserRole.DRIVER)) {
+            throw new BusinessException(ErrorCode.FORBIDDEN);
+        }
+
+        List<Trip> trips = new ArrayList<>(tripsById.values());
+        trips.sort(Comparator.comparing(Trip::getRequestedAt, Comparator.nullsLast(Comparator.reverseOrder())));
+        return trips.stream().map(TripResponse::from).toList();
+    }
+
+    @Transactional
+    public TripResponse cancelBooking(Long currentUserId, Long tripId, BookingCancelRequest request) {
+        User user = getActiveUser(currentUserId);
+        Trip trip = getActiveTrip(tripId);
+        assertCanAccessTrip(user, trip);
+        if (!trip.getStatus().canBeCancelled()) {
+            throw new BusinessException(ErrorCode.TRIP_CANNOT_BE_CANCELLED);
+        }
+
+        TripStatus previousStatus = trip.getStatus();
+        trip.cancel(request.reason());
+        Trip savedTrip = tripRepository.save(trip);
+        tripStatusHistoryRepository.save(TripStatusHistory.record(
+                savedTrip,
+                previousStatus,
+                TripStatus.CANCELLED,
+                user,
+                savedTrip.getCancelReason()
+        ));
+        return TripResponse.from(savedTrip);
+    }
+
     private FareCalculation calculateFare(BookingEstimateRequest request) {
         PricingConfig pricingConfig = pricingConfigRepository
                 .findFirstByVehicleTypeAndActiveTrueAndEffectiveFromLessThanEqualOrderByEffectiveFromDesc(
@@ -125,6 +184,25 @@ public class BookingService {
                 distanceEstimate.durationMinutes()
         );
         return new FareCalculation(pricingConfig, distanceEstimate, estimatedFare);
+    }
+
+    private User getActiveUser(Long userId) {
+        return userRepository.findByIdAndDeletedAtIsNull(userId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+    }
+
+    private Trip getActiveTrip(Long tripId) {
+        return tripRepository.findByIdAndDeletedAtIsNull(tripId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.TRIP_NOT_FOUND));
+    }
+
+    private void assertCanAccessTrip(User user, Trip trip) {
+        if (user.hasRole(UserRole.ADMIN)
+                || Objects.equals(user.getId(), trip.getPassenger().getId())
+                || (trip.getDriver() != null && Objects.equals(user.getId(), trip.getDriver().getId()))) {
+            return;
+        }
+        throw new BusinessException(ErrorCode.FORBIDDEN);
     }
 
     private Point toPoint(BookingLocationRequest location) {
