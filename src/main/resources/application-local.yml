@@ -16,7 +16,7 @@ spring:
 
 app:
   jwt:
-    secret: ${JWT_SECRET:local-dev-secret-change-me}
+    secret: ${JWT_SECRET:local-dev-secret-change-me-please-change}
     access-token-minutes: 15
     refresh-token-days: 7
   service-area:
