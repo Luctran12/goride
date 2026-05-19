@@ -156,7 +156,9 @@ public class DriverProfile {
 
     public void goOffline(Point lastKnownLocation) {
         this.online = false;
-        updateLastKnownLocation(lastKnownLocation);
+        if (lastKnownLocation != null) {
+            updateLastKnownLocation(lastKnownLocation);
+        }
     }
 
     public void updateLastKnownLocation(Point location) {

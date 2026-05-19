@@ -4,8 +4,10 @@ import com.example.goride.common.error.BusinessException;
 import com.example.goride.common.error.ErrorCode;
 import com.example.goride.driver.domain.DriverProfile;
 import com.example.goride.driver.domain.VehicleType;
+import com.example.goride.driver.dto.DriverStatusUpdateRequest;
 import com.example.goride.driver.dto.DriverProfileUpsertRequest;
 import com.example.goride.driver.repository.DriverProfileRepository;
+import com.example.goride.driver.service.availability.DriverAvailabilityStore;
 import com.example.goride.user.domain.User;
 import com.example.goride.user.domain.UserRole;
 import com.example.goride.user.repository.UserRepository;
@@ -17,6 +19,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.Optional;
 import java.util.Set;
@@ -35,6 +38,9 @@ class DriverProfileServiceTests {
 
     @Mock
     private UserRepository userRepository;
+
+    @Mock
+    private DriverAvailabilityStore driverAvailabilityStore;
 
     @InjectMocks
     private DriverProfileService driverProfileService;
@@ -107,8 +113,95 @@ class DriverProfileServiceTests {
         assertThat(response.licenseNumber()).isEqualTo("GPLX123456");
     }
 
+    @Test
+    void updateMyStatusMarksApprovedDriverOnlineInDatabaseAndRedis() {
+        User driver = withUserId(User.create("Driver", "0901234567", null, "hash", Set.of(UserRole.DRIVER)), 10L);
+        DriverProfile profile = withProfileId(sampleProfile(driver), 20L);
+        profile.approve();
+        when(driverProfileRepository.findByUserIdAndUserDeletedAtIsNull(10L)).thenReturn(Optional.of(profile));
+        when(driverProfileRepository.save(any(DriverProfile.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        var response = driverProfileService.updateMyStatus(
+                10L,
+                new DriverStatusUpdateRequest(true, BigDecimal.valueOf(10.7769), BigDecimal.valueOf(106.7009))
+        );
+
+        ArgumentCaptor<DriverAvailabilityStore.DriverAvailability> availabilityCaptor =
+                ArgumentCaptor.forClass(DriverAvailabilityStore.DriverAvailability.class);
+        verify(driverAvailabilityStore).markAvailable(availabilityCaptor.capture());
+        assertThat(response.online()).isTrue();
+        assertThat(profile.getLastKnownLocation()).isNotNull();
+        assertThat(availabilityCaptor.getValue().driverId()).isEqualTo(10L);
+        assertThat(availabilityCaptor.getValue().vehicleType()).isEqualTo(VehicleType.CAR_4_SEAT);
+    }
+
+    @Test
+    void updateMyStatusRejectsPendingDriverGoingOnline() {
+        User driver = withUserId(User.create("Driver", "0901234567", null, "hash", Set.of(UserRole.DRIVER)), 10L);
+        DriverProfile profile = withProfileId(sampleProfile(driver), 20L);
+        when(driverProfileRepository.findByUserIdAndUserDeletedAtIsNull(10L)).thenReturn(Optional.of(profile));
+
+        assertThatThrownBy(() -> driverProfileService.updateMyStatus(
+                10L,
+                new DriverStatusUpdateRequest(true, BigDecimal.valueOf(10.7769), BigDecimal.valueOf(106.7009))
+        ))
+                .isInstanceOfSatisfying(BusinessException.class, exception ->
+                        assertThat(exception.errorCode()).isEqualTo(ErrorCode.DRIVER_NOT_APPROVED)
+                );
+        verify(driverAvailabilityStore, never()).markAvailable(any());
+    }
+
+    @Test
+    void updateMyStatusMarksDriverOfflineInDatabaseAndRedis() {
+        User driver = withUserId(User.create("Driver", "0901234567", null, "hash", Set.of(UserRole.DRIVER)), 10L);
+        DriverProfile profile = withProfileId(sampleProfile(driver), 20L);
+        profile.approve();
+        profile.goOnline();
+        when(driverProfileRepository.findByUserIdAndUserDeletedAtIsNull(10L)).thenReturn(Optional.of(profile));
+        when(driverProfileRepository.save(any(DriverProfile.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        var response = driverProfileService.updateMyStatus(
+                10L,
+                new DriverStatusUpdateRequest(false, BigDecimal.valueOf(10.7769), BigDecimal.valueOf(106.7009))
+        );
+
+        verify(driverAvailabilityStore).markOffline(10L);
+        assertThat(response.online()).isFalse();
+        assertThat(profile.getLastKnownLocation()).isNotNull();
+    }
+
+    @Test
+    void updateMyStatusRequiresLocationWhenGoingOnline() {
+        User driver = withUserId(User.create("Driver", "0901234567", null, "hash", Set.of(UserRole.DRIVER)), 10L);
+        DriverProfile profile = withProfileId(sampleProfile(driver), 20L);
+        profile.approve();
+        when(driverProfileRepository.findByUserIdAndUserDeletedAtIsNull(10L)).thenReturn(Optional.of(profile));
+
+        assertThatThrownBy(() -> driverProfileService.updateMyStatus(10L, new DriverStatusUpdateRequest(true, null, null)))
+                .isInstanceOfSatisfying(BusinessException.class, exception ->
+                        assertThat(exception.errorCode()).isEqualTo(ErrorCode.VALIDATION_ERROR)
+                );
+        verify(driverAvailabilityStore, never()).markAvailable(any());
+    }
+
     private DriverProfileUpsertRequest request() {
         return new DriverProfileUpsertRequest(
+                "GPLX123456",
+                LocalDate.now().plusYears(2),
+                "012345678901",
+                "https://example.com/portrait.jpg",
+                "51A-123.45",
+                VehicleType.CAR_4_SEAT,
+                "Toyota",
+                "Vios",
+                "White",
+                (short) 2022
+        );
+    }
+
+    private DriverProfile sampleProfile(User driver) {
+        return DriverProfile.create(
+                driver,
                 "GPLX123456",
                 LocalDate.now().plusYears(2),
                 "012345678901",
