@@ -5,6 +5,7 @@ import com.example.goride.booking.domain.PricingConfig;
 import com.example.goride.booking.domain.Trip;
 import com.example.goride.booking.domain.TripStatus;
 import com.example.goride.booking.domain.TripStatusHistory;
+import com.example.goride.booking.dto.BookingCancelRequest;
 import com.example.goride.booking.dto.BookingCreateRequest;
 import com.example.goride.booking.dto.BookingEstimateRequest;
 import com.example.goride.booking.dto.BookingLocationRequest;
@@ -32,6 +33,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 
@@ -169,6 +171,116 @@ class BookingServiceTests {
                 );
     }
 
+    @Test
+    void getMyBookingReturnsTripForPassengerOwner() {
+        User passenger = withUserId(
+                User.create("Passenger", "0900000000", null, "hash", Set.of(UserRole.PASSENGER)),
+                10L
+        );
+        Trip trip = withTripId(sampleTrip(passenger), 99L);
+        when(userRepository.findByIdAndDeletedAtIsNull(10L)).thenReturn(Optional.of(passenger));
+        when(tripRepository.findByIdAndDeletedAtIsNull(99L)).thenReturn(Optional.of(trip));
+
+        var response = bookingService.getMyBooking(10L, 99L);
+
+        assertThat(response.id()).isEqualTo(99L);
+        assertThat(response.passengerId()).isEqualTo(10L);
+        assertThat(response.status()).isEqualTo(TripStatus.SEARCHING);
+    }
+
+    @Test
+    void getMyBookingRejectsUnrelatedUser() {
+        User passenger = withUserId(
+                User.create("Passenger", "0900000000", null, "hash", Set.of(UserRole.PASSENGER)),
+                10L
+        );
+        User otherPassenger = withUserId(
+                User.create("Other", "0900000002", null, "hash", Set.of(UserRole.PASSENGER)),
+                20L
+        );
+        Trip trip = withTripId(sampleTrip(otherPassenger), 99L);
+        when(userRepository.findByIdAndDeletedAtIsNull(10L)).thenReturn(Optional.of(passenger));
+        when(tripRepository.findByIdAndDeletedAtIsNull(99L)).thenReturn(Optional.of(trip));
+
+        assertThatThrownBy(() -> bookingService.getMyBooking(10L, 99L))
+                .isInstanceOfSatisfying(BusinessException.class, exception ->
+                        assertThat(exception.errorCode()).isEqualTo(ErrorCode.FORBIDDEN)
+                );
+    }
+
+    @Test
+    void listMyBookingsCombinesPassengerAndDriverTripsNewestFirst() {
+        User riderDriver = withUserId(
+                User.create("Rider Driver", "0900000000", null, "hash", Set.of(UserRole.PASSENGER, UserRole.DRIVER)),
+                10L
+        );
+        User passenger = withUserId(
+                User.create("Passenger", "0900000002", null, "hash", Set.of(UserRole.PASSENGER)),
+                20L
+        );
+        Trip passengerTrip = withTripId(sampleTrip(riderDriver), 99L);
+        ReflectionTestUtils.setField(passengerTrip, "requestedAt", Instant.parse("2026-05-18T08:00:00Z"));
+        Trip driverTrip = withTripId(sampleTrip(passenger), 100L);
+        driverTrip.accept(riderDriver);
+        ReflectionTestUtils.setField(driverTrip, "requestedAt", Instant.parse("2026-05-18T09:00:00Z"));
+        when(userRepository.findByIdAndDeletedAtIsNull(10L)).thenReturn(Optional.of(riderDriver));
+        when(tripRepository.findByPassengerIdAndDeletedAtIsNullOrderByRequestedAtDesc(10L))
+                .thenReturn(List.of(passengerTrip));
+        when(tripRepository.findByDriverIdAndDeletedAtIsNullOrderByRequestedAtDesc(10L))
+                .thenReturn(List.of(driverTrip));
+
+        var response = bookingService.listMyBookings(10L);
+
+        assertThat(response).extracting("id").containsExactly(100L, 99L);
+    }
+
+    @Test
+    void cancelBookingStoresCancelledStatusHistory() {
+        User passenger = withUserId(
+                User.create("Passenger", "0900000000", null, "hash", Set.of(UserRole.PASSENGER)),
+                10L
+        );
+        Trip trip = withTripId(sampleTrip(passenger), 99L);
+        when(userRepository.findByIdAndDeletedAtIsNull(10L)).thenReturn(Optional.of(passenger));
+        when(tripRepository.findByIdAndDeletedAtIsNull(99L)).thenReturn(Optional.of(trip));
+        when(tripRepository.save(any(Trip.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        var response = bookingService.cancelBooking(10L, 99L, new BookingCancelRequest(" Changed plan "));
+
+        ArgumentCaptor<TripStatusHistory> historyCaptor = ArgumentCaptor.forClass(TripStatusHistory.class);
+        verify(tripStatusHistoryRepository).save(historyCaptor.capture());
+        assertThat(response.status()).isEqualTo(TripStatus.CANCELLED);
+        assertThat(response.cancelReason()).isEqualTo("Changed plan");
+        assertThat(historyCaptor.getValue().getFromStatus()).isEqualTo(TripStatus.SEARCHING);
+        assertThat(historyCaptor.getValue().getToStatus()).isEqualTo(TripStatus.CANCELLED);
+        assertThat(historyCaptor.getValue().getChangedBy()).isSameAs(passenger);
+    }
+
+    @Test
+    void cancelBookingRejectsTripAlreadyInProgress() {
+        User passenger = withUserId(
+                User.create("Passenger", "0900000000", null, "hash", Set.of(UserRole.PASSENGER)),
+                10L
+        );
+        User driver = withUserId(
+                User.create("Driver", "0900000001", null, "hash", Set.of(UserRole.DRIVER)),
+                20L
+        );
+        Trip trip = withTripId(sampleTrip(passenger), 99L);
+        trip.accept(driver);
+        trip.markArrived();
+        trip.startTrip();
+        when(userRepository.findByIdAndDeletedAtIsNull(10L)).thenReturn(Optional.of(passenger));
+        when(tripRepository.findByIdAndDeletedAtIsNull(99L)).thenReturn(Optional.of(trip));
+
+        assertThatThrownBy(() -> bookingService.cancelBooking(10L, 99L, new BookingCancelRequest("Too late")))
+                .isInstanceOfSatisfying(BusinessException.class, exception ->
+                        assertThat(exception.errorCode()).isEqualTo(ErrorCode.TRIP_CANNOT_BE_CANCELLED)
+                );
+        verify(tripRepository, never()).save(any(Trip.class));
+        verify(tripStatusHistoryRepository, never()).save(any(TripStatusHistory.class));
+    }
+
     private BookingEstimateRequest estimateRequest() {
         return new BookingEstimateRequest(
                 new BookingLocationRequest(
@@ -203,6 +315,26 @@ class BookingServiceTests {
                 BigDecimal.valueOf(15000),
                 BigDecimal.ONE,
                 Instant.parse("2026-01-01T00:00:00Z")
+        );
+    }
+
+    private Trip sampleTrip(User passenger) {
+        org.locationtech.jts.geom.GeometryFactory geometryFactory = new org.locationtech.jts.geom.GeometryFactory(
+                new org.locationtech.jts.geom.PrecisionModel(),
+                4326
+        );
+        return Trip.create(
+                passenger,
+                VehicleType.MOTORBIKE,
+                PaymentMethod.CASH,
+                "123 Le Loi, Q1",
+                geometryFactory.createPoint(new org.locationtech.jts.geom.Coordinate(106.7009, 10.7769)),
+                "456 CMT8, Q3",
+                geometryFactory.createPoint(new org.locationtech.jts.geom.Coordinate(106.6800, 10.7850)),
+                BigDecimal.valueOf(5.5),
+                20,
+                BigDecimal.valueOf(38000),
+                pricingConfig()
         );
     }
 
