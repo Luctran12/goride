@@ -3,6 +3,9 @@ package com.example.goride.driver.domain;
 import com.example.goride.user.domain.User;
 import com.example.goride.user.domain.UserRole;
 import org.junit.jupiter.api.Test;
+import org.locationtech.jts.geom.Coordinate;
+import org.locationtech.jts.geom.GeometryFactory;
+import org.locationtech.jts.geom.PrecisionModel;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -12,6 +15,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class DriverProfileTests {
+    private static final GeometryFactory GEOMETRY_FACTORY = new GeometryFactory(new PrecisionModel(), 4326);
+
     @Test
     void createStartsPendingAndOffline() {
         DriverProfile profile = sampleProfile();
@@ -50,6 +55,19 @@ class DriverProfileTests {
         assertThatThrownBy(() -> profile.updateAverageRating(BigDecimal.valueOf(4.8), -1))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("totalRatings must not be negative");
+    }
+
+    @Test
+    void goOfflineWithoutLocationKeepsLastKnownLocation() {
+        DriverProfile profile = sampleProfile();
+        profile.approve();
+        profile.goOnline();
+        profile.updateLastKnownLocation(GEOMETRY_FACTORY.createPoint(new Coordinate(106.7009, 10.7769)));
+
+        profile.goOffline(null);
+
+        assertThat(profile.isOnline()).isFalse();
+        assertThat(profile.getLastKnownLocation()).isNotNull();
     }
 
     private DriverProfile sampleProfile() {
