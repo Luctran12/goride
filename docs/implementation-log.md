@@ -6,6 +6,59 @@
 
 ---
 
+## Commit: `feat: dispatch matching offers`
+
+Branch: `feature/matching-offer-dispatch`
+
+Phase: Phase 4 - Matching
+
+### Muc tieu
+
+Noi `BookingCreatedEvent` voi matching flow de khi passenger tao booking, he thong tu tim va lock driver gan nhat, sau do gui offer den user queue cua driver.
+
+Commit nay chua xu ly driver accept/reject va timeout retry. Cac phan do se duoc tach commit rieng.
+
+### Noi dung da trien khai
+
+- Them WebSocket/STOMP config toi thieu:
+  - Endpoint `/ws`.
+  - Application prefix `/app`.
+  - Simple broker `/topic`, `/queue`.
+  - User destination prefix `/user`.
+- Them listener:
+  - `BookingCreatedMatchingListener` lang nghe `BookingCreatedEvent`.
+  - Tao `MatchingRequest` tu booking event.
+  - Goi `MatchingService.findAndLockDriver(...)`.
+  - Neu lock duoc driver thi tao notification va gui offer.
+- Them notification layer:
+  - `DriverOfferNotification`: payload gui den driver, gom trip, passenger, pickup/dropoff, vehicle type, fare, distance, expiresAt.
+  - `DriverOfferNotifier`: interface de tach kenh gui.
+  - `WebSocketDriverOfferNotifier`: gui qua `SimpMessagingTemplate.convertAndSendToUser(driverId, "/queue/trip-requests", payload)`.
+
+### Review truoc commit
+
+- Xac nhan WebSocket config khong lam fail Spring context.
+- Xac nhan listener khong notify khi matching khong lock duoc driver.
+- Xac nhan queue dung voi tai lieu: `/user/queue/trip-requests`.
+- Da chay `./mvnw.cmd test`: pass 56 tests.
+
+### Files chinh
+
+- `src/main/java/com/example/goride/common/config/WebSocketConfig.java`
+- `src/main/java/com/example/goride/matching/service/BookingCreatedMatchingListener.java`
+- `src/main/java/com/example/goride/matching/notification/*`
+- `src/test/java/com/example/goride/matching/service/BookingCreatedMatchingListenerTests.java`
+- `src/test/java/com/example/goride/matching/notification/WebSocketDriverOfferNotifierTests.java`
+
+### Viec tiep theo
+
+- Them API driver accept/reject offer.
+- Validate driver dung la `offeredDriverId` trong `trip:{id}:matching`.
+- Khi accept, cap nhat trip sang `ACCEPTED`, set driver status `BUSY`, va notify passenger.
+- Khi reject/timeout, release lock va retry driver tiep theo.
+
+---
+
 ## Commit: `feat: add matching driver search`
 
 Branch: `feature/matching-driver-search`
