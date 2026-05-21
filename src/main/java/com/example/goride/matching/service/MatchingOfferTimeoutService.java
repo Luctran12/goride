@@ -10,8 +10,13 @@ import com.example.goride.matching.domain.MatchingRequest;
 import com.example.goride.matching.domain.TripMatchingState;
 import com.example.goride.matching.notification.DriverOfferNotification;
 import com.example.goride.matching.notification.DriverOfferNotifier;
+import com.example.goride.notification.dto.TripStatusNotification;
+import com.example.goride.notification.dto.UserNotification;
+import com.example.goride.notification.service.TripRealtimeNotifier;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.Instant;
 import java.util.LinkedHashSet;
@@ -27,19 +32,22 @@ public class MatchingOfferTimeoutService {
     private final DriverCandidateStore candidateStore;
     private final MatchingService matchingService;
     private final DriverOfferNotifier driverOfferNotifier;
+    private final TripRealtimeNotifier tripRealtimeNotifier;
 
     public MatchingOfferTimeoutService(
             TripRepository tripRepository,
             TripStatusHistoryRepository tripStatusHistoryRepository,
             DriverCandidateStore candidateStore,
             MatchingService matchingService,
-            DriverOfferNotifier driverOfferNotifier
+            DriverOfferNotifier driverOfferNotifier,
+            TripRealtimeNotifier tripRealtimeNotifier
     ) {
         this.tripRepository = tripRepository;
         this.tripStatusHistoryRepository = tripStatusHistoryRepository;
         this.candidateStore = candidateStore;
         this.matchingService = matchingService;
         this.driverOfferNotifier = driverOfferNotifier;
+        this.tripRealtimeNotifier = tripRealtimeNotifier;
     }
 
     @Transactional
@@ -100,5 +108,31 @@ public class MatchingOfferTimeoutService {
                 note
         ));
         candidateStore.clearTripMatching(savedTrip.getId());
+        notifyPassengerNoDriver(savedTrip);
+    }
+
+    private void notifyPassengerNoDriver(Trip trip) {
+        Long tripId = trip.getId();
+        Long passengerId = trip.getPassenger().getId();
+        UserNotification notification = UserNotification.noDriverFound(trip);
+        TripStatusNotification statusNotification = TripStatusNotification.from(trip);
+        runAfterCommit(() -> {
+            tripRealtimeNotifier.notifyPassenger(passengerId, notification);
+            tripRealtimeNotifier.broadcastTripStatus(tripId, statusNotification);
+        });
+    }
+
+    private void runAfterCommit(Runnable action) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            action.run();
+            return;
+        }
+
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                action.run();
+            }
+        });
     }
 }

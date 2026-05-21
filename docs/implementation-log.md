@@ -6,6 +6,59 @@
 
 ---
 
+## Commit: `feat: notify passengers about matching results`
+
+Branch: `feature/matching-passenger-notifications`
+
+Phase: Phase 4 - Matching va Phase 6 - Notification, theo `docs/TDD.md` muc 4.13, 4.14 va 5.6
+
+### Muc tieu
+
+Thong bao realtime cho passenger khi matching co ket qua cuoi: driver accept trip hoac he thong khong tim duoc driver.
+
+Commit nay chua xu ly cac trang thai sau do nhu `ARRIVED`, `IN_PROGRESS`, `COMPLETED`. Cac trang thai do se di chung voi commit driver trip status/tracking sau.
+
+### Noi dung da trien khai
+
+- Them notification payload:
+  - `NotificationType`: `TRIP_ACCEPTED`, `NO_DRIVER_FOUND`.
+  - `UserNotification`: payload gui qua `/user/queue/notifications`.
+  - `TripStatusNotification`: payload broadcast qua `/topic/trip/{tripId}/status`.
+- Them `TripRealtimeNotifier` interface de tach matching service khoi WebSocket implementation.
+- Them `WebSocketTripRealtimeNotifier`:
+  - Gui notification ca nhan den passenger bang `convertAndSendToUser(passengerId, "/queue/notifications", payload)`.
+  - Broadcast status trip bang `convertAndSend("/topic/trip/{tripId}/status", payload)`.
+- Noi notification vao matching flow:
+  - Khi driver `ACCEPT`: gui `TRIP_ACCEPTED` cho passenger va broadcast `ACCEPTED`.
+  - Khi reject/timeout dan den `NO_DRIVER`: gui `NO_DRIVER_FOUND` cho passenger va broadcast `NO_DRIVER`.
+- Tat ca notification duoc dang ky gui sau transaction commit de tranh push status khi DB rollback.
+
+### Review truoc commit
+
+- Da xac nhan accept tao notification `TRIP_ACCEPTED` va status topic `ACCEPTED`.
+- Da xac nhan reject/timeout dan den `NO_DRIVER` tao notification `NO_DRIVER_FOUND` va status topic `NO_DRIVER`.
+- Da xac nhan retry sang driver tiep theo khong notify passenger som.
+- Da xac nhan WebSocket destination dung voi TDD: `/user/queue/notifications` va `/topic/trip/{tripId}/status`.
+- Da chay `./mvnw.cmd test`: pass 78 tests.
+
+### Files chinh
+
+- `src/main/java/com/example/goride/notification/domain/NotificationType.java`
+- `src/main/java/com/example/goride/notification/dto/UserNotification.java`
+- `src/main/java/com/example/goride/notification/dto/TripStatusNotification.java`
+- `src/main/java/com/example/goride/notification/service/TripRealtimeNotifier.java`
+- `src/main/java/com/example/goride/notification/service/WebSocketTripRealtimeNotifier.java`
+- `src/main/java/com/example/goride/matching/service/DriverOfferResponseService.java`
+- `src/main/java/com/example/goride/matching/service/MatchingOfferTimeoutService.java`
+
+### Viec tiep theo
+
+- Them API driver cap nhat trip status: `ARRIVED`, `IN_PROGRESS`, `COMPLETED`.
+- Reuse `TripRealtimeNotifier` de notify passenger o cac status tiep theo.
+- Them WebSocket/JWT handshake security.
+
+---
+
 ## Commit: `feat: add matching offer timeout handler`
 
 Branch: `feature/matching-offer-timeout`
