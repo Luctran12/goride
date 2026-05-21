@@ -4,6 +4,7 @@ import com.example.goride.booking.domain.Trip;
 import com.example.goride.notification.domain.NotificationType;
 
 import java.time.Instant;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 public record UserNotification(
@@ -41,6 +42,58 @@ public record UserNotification(
                         "tripId", trip.getId(),
                         "status", trip.getStatus().name()
                 ),
+                Instant.now()
+        );
+    }
+
+    public static UserNotification driverArrived(Trip trip) {
+        return tripStatus(
+                trip,
+                NotificationType.DRIVER_ARRIVED,
+                "Driver arrived",
+                "Your driver has arrived at the pickup point"
+        );
+    }
+
+    public static UserNotification tripStarted(Trip trip) {
+        return tripStatus(
+                trip,
+                NotificationType.TRIP_STARTED,
+                "Trip started",
+                "Your trip has started"
+        );
+    }
+
+    public static UserNotification tripCompleted(Trip trip) {
+        return tripStatus(
+                trip,
+                NotificationType.TRIP_COMPLETED,
+                "Trip completed",
+                "Your trip is completed"
+        );
+    }
+
+    private static UserNotification tripStatus(
+            Trip trip,
+            NotificationType type,
+            String title,
+            String body
+    ) {
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("tripId", trip.getId());
+        data.put("status", trip.getStatus().name());
+        if (trip.getDriver() != null) {
+            data.put("driverId", trip.getDriver().getId());
+        }
+        if (trip.getFinalFare() != null) {
+            data.put("finalFare", trip.getFinalFare());
+        }
+
+        return new UserNotification(
+                type,
+                title,
+                body,
+                data,
                 Instant.now()
         );
     }

@@ -17,9 +17,9 @@ public class WebSocketTripRealtimeNotifier implements TripRealtimeNotifier {
     }
 
     @Override
-    public void notifyPassenger(Long passengerId, UserNotification notification) {
+    public void notifyUser(Long userId, UserNotification notification) {
         messagingTemplate.convertAndSendToUser(
-                String.valueOf(passengerId),
+                String.valueOf(userId),
                 USER_NOTIFICATIONS_QUEUE,
                 notification
         );
