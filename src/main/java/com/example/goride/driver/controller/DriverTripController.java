@@ -4,6 +4,8 @@ import com.example.goride.common.api.ApiResponse;
 import com.example.goride.common.security.CurrentUser;
 import com.example.goride.driver.dto.DriverTripRespondRequest;
 import com.example.goride.driver.dto.DriverTripResponse;
+import com.example.goride.driver.dto.DriverTripStatusUpdateRequest;
+import com.example.goride.driver.service.DriverTripStatusService;
 import com.example.goride.matching.service.DriverOfferResponseService;
 import jakarta.validation.Valid;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -18,10 +20,16 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/v1/drivers/trips")
 public class DriverTripController {
     private final DriverOfferResponseService driverOfferResponseService;
+    private final DriverTripStatusService driverTripStatusService;
     private final CurrentUser currentUser;
 
-    public DriverTripController(DriverOfferResponseService driverOfferResponseService, CurrentUser currentUser) {
+    public DriverTripController(
+            DriverOfferResponseService driverOfferResponseService,
+            DriverTripStatusService driverTripStatusService,
+            CurrentUser currentUser
+    ) {
         this.driverOfferResponseService = driverOfferResponseService;
+        this.driverTripStatusService = driverTripStatusService;
         this.currentUser = currentUser;
     }
 
@@ -36,6 +44,21 @@ public class DriverTripController {
                 currentUser.requireUserId(authentication),
                 tripId,
                 request.action()
+        );
+        return ApiResponse.ok(response);
+    }
+
+    @PatchMapping("/{tripId}/status")
+    @PreAuthorize("hasRole('DRIVER')")
+    public ApiResponse<DriverTripResponse> updateTripStatus(
+            Authentication authentication,
+            @PathVariable Long tripId,
+            @Valid @RequestBody DriverTripStatusUpdateRequest request
+    ) {
+        DriverTripResponse response = driverTripStatusService.updateTripStatus(
+                currentUser.requireUserId(authentication),
+                tripId,
+                request.status()
         );
         return ApiResponse.ok(response);
     }

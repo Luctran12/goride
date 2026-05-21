@@ -6,6 +6,62 @@
 
 ---
 
+## Commit: `feat: add driver trip status API`
+
+Branch: `feature/driver-trip-status-api`
+
+Phase: Phase 4 - Driver API, Phase 5 - Booking lifecycle va Phase 6 - Notification, theo `docs/TDD.md` muc 4.7, 5.2 va 5.6
+
+### Muc tieu
+
+Cho phep driver cap nhat vong doi trip sau khi da accept: den diem don, bat dau chuyen, va ket thuc chuyen. Moi lan doi status phai duoc lock trip, kiem tra driver dang duoc gan vao trip, ghi audit history va push realtime status sau khi transaction commit.
+
+Commit nay chua tinh lai final fare theo tracking thuc te va chua tao payment record. Khi `COMPLETED`, service tam dung estimated fare, estimated distance va estimated duration de dong vong doi trip; phan payment/final fare se tach commit sau.
+
+### Noi dung da trien khai
+
+- Them endpoint `PATCH /api/v1/drivers/trips/{tripId}/status`.
+- Them request `DriverTripStatusUpdateRequest` voi `status` bat buoc.
+- Them `DriverTripStatusService`:
+  - Lock trip bang `findActiveByIdForUpdate`.
+  - Chi cho driver dang duoc assign vao trip cap nhat status.
+  - Chi chap nhan `ARRIVED`, `IN_PROGRESS`, `COMPLETED`.
+  - Reuse domain methods `markArrived`, `startTrip`, `complete` de giu transition rule o aggregate `Trip`.
+  - Ghi `trip_status_history` cho moi transition thanh cong.
+- Mo rong notification:
+  - Them `DRIVER_ARRIVED`, `TRIP_STARTED`, `TRIP_COMPLETED`.
+  - Broadcast `/topic/trip/{tripId}/status` cho moi transition.
+  - Notify passenger khi driver den noi, trip bat dau, trip hoan thanh.
+  - Notify driver ca nhan khi trip hoan thanh.
+- Mo rong `TripRealtimeNotifier` voi `notifyUser(...)`, giu `notifyPassenger(...)` la convenience method de cac flow cu tiep tuc dung duoc.
+
+### Review truoc commit
+
+- Da xac nhan driver khong so huu trip bi chan bang `FORBIDDEN`.
+- Da xac nhan transition sai thu tu, vi du `ACCEPTED -> COMPLETED`, bi chan bang `TRIP_STATUS_INVALID_TRANSITION`.
+- Da xac nhan status ngoai scope driver API, vi du `CANCELLED`, bi chan.
+- Da xac nhan moi transition thanh cong co ghi `trip_status_history`.
+- Da xac nhan realtime notification chi duoc dang ky sau transaction commit va khong giu lazy entity trong callback.
+- Da chay `./mvnw.cmd test`: pass 85 tests.
+
+### Files chinh
+
+- `src/main/java/com/example/goride/driver/controller/DriverTripController.java`
+- `src/main/java/com/example/goride/driver/dto/DriverTripStatusUpdateRequest.java`
+- `src/main/java/com/example/goride/driver/service/DriverTripStatusService.java`
+- `src/main/java/com/example/goride/notification/domain/NotificationType.java`
+- `src/main/java/com/example/goride/notification/dto/UserNotification.java`
+- `src/main/java/com/example/goride/notification/service/TripRealtimeNotifier.java`
+- `src/test/java/com/example/goride/driver/service/DriverTripStatusServiceTests.java`
+
+### Viec tiep theo
+
+- Them tracking location API/WebSocket cho trip dang `IN_PROGRESS`.
+- Tinh final fare theo location history khi `COMPLETED`.
+- Tao payment record va cap nhat driver status ve `AVAILABLE` sau khi chuyen hoan tat.
+
+---
+
 ## Commit: `feat: notify passengers about matching results`
 
 Branch: `feature/matching-passenger-notifications`
