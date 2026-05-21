@@ -3,6 +3,7 @@ package com.example.goride.matching.service;
 import com.example.goride.driver.domain.VehicleType;
 import com.example.goride.matching.domain.DriverCandidate;
 import com.example.goride.matching.domain.MatchingRequest;
+import com.example.goride.matching.domain.TripMatchingState;
 import org.springframework.data.geo.Circle;
 import org.springframework.data.geo.Distance;
 import org.springframework.data.geo.GeoResult;
@@ -17,14 +18,21 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Component
 public class RedisDriverCandidateStore implements DriverCandidateStore {
     private static final String ONLINE_DRIVERS_KEY = "drivers:online";
     private static final String AVAILABLE_STATUS = "AVAILABLE";
+    private static final String BUSY_STATUS = "BUSY";
+    private static final Duration BUSY_STATUS_TTL = Duration.ofHours(12);
 
     private final StringRedisTemplate redisTemplate;
 
@@ -66,13 +74,61 @@ public class RedisDriverCandidateStore implements DriverCandidateStore {
 
     @Override
     public void recordTripMatching(Long tripId, Long driverId, int attempt, Instant offerExpiresAt, Duration ttl) {
+        recordTripMatching(tripId, driverId, attempt, offerExpiresAt, Set.of(), ttl);
+    }
+
+    @Override
+    public void recordTripMatching(
+            Long tripId,
+            Long driverId,
+            int attempt,
+            Instant offerExpiresAt,
+            Collection<Long> rejectedDriverIds,
+            Duration ttl
+    ) {
         String key = tripMatchingKey(tripId);
         redisTemplate.opsForHash().putAll(key, Map.of(
                 "attempt", String.valueOf(attempt),
                 "offeredDriverId", String.valueOf(driverId),
-                "offerExpiresAt", offerExpiresAt.toString()
+                "offerExpiresAt", offerExpiresAt.toString(),
+                "rejectedDriverIds", serializeDriverIds(rejectedDriverIds)
         ));
         redisTemplate.expire(key, ttl);
+    }
+
+    @Override
+    public Optional<TripMatchingState> findTripMatching(Long tripId) {
+        Map<Object, Object> fields = redisTemplate.opsForHash().entries(tripMatchingKey(tripId));
+        if (fields == null || fields.isEmpty()) {
+            return Optional.empty();
+        }
+
+        try {
+            return Optional.of(new TripMatchingState(
+                    tripId,
+                    Long.parseLong(requiredField(fields, "offeredDriverId")),
+                    Integer.parseInt(requiredField(fields, "attempt")),
+                    Instant.parse(requiredField(fields, "offerExpiresAt")),
+                    parseDriverIds(stringValue(fields.get("rejectedDriverIds")))
+            ));
+        } catch (RuntimeException exception) {
+            return Optional.empty();
+        }
+    }
+
+    @Override
+    public void clearTripMatching(Long tripId) {
+        redisTemplate.delete(tripMatchingKey(tripId));
+    }
+
+    @Override
+    public void releaseCandidateLock(Long driverId) {
+        redisTemplate.delete(lockKey(driverId));
+    }
+
+    @Override
+    public void markCandidateBusy(Long driverId) {
+        redisTemplate.opsForValue().set(statusKey(String.valueOf(driverId)), BUSY_STATUS, BUSY_STATUS_TTL);
     }
 
     private Optional<DriverCandidate> toCandidate(
@@ -151,5 +207,33 @@ public class RedisDriverCandidateStore implements DriverCandidateStore {
 
     private String tripMatchingKey(Long tripId) {
         return "trip:" + tripId + ":matching";
+    }
+
+    private String requiredField(Map<Object, Object> fields, String fieldName) {
+        Object value = fields.get(fieldName);
+        if (value == null) {
+            throw new IllegalArgumentException(fieldName + " is missing");
+        }
+        return String.valueOf(value);
+    }
+
+    private String serializeDriverIds(Collection<Long> driverIds) {
+        if (driverIds == null || driverIds.isEmpty()) {
+            return "";
+        }
+        return driverIds.stream()
+                .sorted(Comparator.naturalOrder())
+                .map(String::valueOf)
+                .collect(Collectors.joining(","));
+    }
+
+    private Set<Long> parseDriverIds(String value) {
+        if (value == null || value.isBlank()) {
+            return Set.of();
+        }
+        return Arrays.stream(value.split(","))
+                .filter(driverId -> !driverId.isBlank())
+                .map(Long::parseLong)
+                .collect(Collectors.toUnmodifiableSet());
     }
 }

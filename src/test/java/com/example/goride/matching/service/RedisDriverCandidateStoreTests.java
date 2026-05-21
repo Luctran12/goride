@@ -25,6 +25,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -113,7 +114,66 @@ class RedisDriverCandidateStoreTests {
         assertThat(fieldsCaptor.getValue())
                 .containsEntry("attempt", "1")
                 .containsEntry("offeredDriverId", "10")
-                .containsEntry("offerExpiresAt", "2026-05-19T08:00:00Z");
+                .containsEntry("offerExpiresAt", "2026-05-19T08:00:00Z")
+                .containsEntry("rejectedDriverIds", "");
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void recordTripMatchingStoresRejectedDriversForRetry() {
+        Duration ttl = Duration.ofMinutes(5);
+        Instant expiresAt = Instant.parse("2026-05-19T08:00:00Z");
+        when(redisTemplate.opsForHash()).thenReturn(hashOperations);
+
+        candidateStore.recordTripMatching(99L, 12L, 2, expiresAt, Set.of(11L, 10L), ttl);
+
+        ArgumentCaptor<Map<Object, Object>> fieldsCaptor = ArgumentCaptor.forClass(Map.class);
+        verify(hashOperations).putAll(eq("trip:99:matching"), fieldsCaptor.capture());
+        assertThat(fieldsCaptor.getValue())
+                .containsEntry("attempt", "2")
+                .containsEntry("offeredDriverId", "12")
+                .containsEntry("rejectedDriverIds", "10,11");
+    }
+
+    @Test
+    void findTripMatchingParsesStoredOfferState() {
+        when(redisTemplate.opsForHash()).thenReturn(hashOperations);
+        when(hashOperations.entries("trip:99:matching")).thenReturn(Map.of(
+                "attempt", "2",
+                "offeredDriverId", "12",
+                "offerExpiresAt", "2026-05-19T08:00:00Z",
+                "rejectedDriverIds", "10,11"
+        ));
+
+        var state = candidateStore.findTripMatching(99L);
+
+        assertThat(state).isPresent();
+        assertThat(state.get().offeredDriverId()).isEqualTo(12L);
+        assertThat(state.get().attempt()).isEqualTo(2);
+        assertThat(state.get().rejectedDriverIds()).containsExactlyInAnyOrder(10L, 11L);
+    }
+
+    @Test
+    void releaseCandidateLockDeletesDriverLock() {
+        candidateStore.releaseCandidateLock(10L);
+
+        verify(redisTemplate).delete("driver:10:lock");
+    }
+
+    @Test
+    void clearTripMatchingDeletesMatchingState() {
+        candidateStore.clearTripMatching(99L);
+
+        verify(redisTemplate).delete("trip:99:matching");
+    }
+
+    @Test
+    void markCandidateBusySetsBusyStatusWithTtl() {
+        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
+
+        candidateStore.markCandidateBusy(10L);
+
+        verify(valueOperations).set(eq("driver:10:status"), eq("BUSY"), any(Duration.class));
     }
 
     private MatchingRequest request(VehicleType vehicleType) {

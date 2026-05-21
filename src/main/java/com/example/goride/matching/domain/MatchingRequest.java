@@ -1,7 +1,9 @@
 package com.example.goride.matching.domain;
 
+import com.example.goride.booking.domain.Trip;
 import com.example.goride.booking.event.BookingCreatedEvent;
 import com.example.goride.driver.domain.VehicleType;
+import org.locationtech.jts.geom.Point;
 
 import java.math.BigDecimal;
 
@@ -39,6 +41,18 @@ public record MatchingRequest(
                 event.vehicleType(),
                 event.pickupLatitude(),
                 event.pickupLongitude(),
+                DEFAULT_RADIUS_KM,
+                DEFAULT_LIMIT
+        );
+    }
+
+    public static MatchingRequest from(Trip trip) {
+        Point pickupLocation = trip.getPickupLocation();
+        return new MatchingRequest(
+                trip.getId(),
+                trip.getVehicleType(),
+                BigDecimal.valueOf(pickupLocation.getY()),
+                BigDecimal.valueOf(pickupLocation.getX()),
                 DEFAULT_RADIUS_KM,
                 DEFAULT_LIMIT
         );
