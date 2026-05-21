@@ -11,6 +11,8 @@ import com.example.goride.driver.dto.DriverTripResponse;
 import com.example.goride.notification.dto.TripStatusNotification;
 import com.example.goride.notification.dto.UserNotification;
 import com.example.goride.notification.service.TripRealtimeNotifier;
+import com.example.goride.payment.service.TripCompletionFare;
+import com.example.goride.payment.service.TripCompletionFareService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
@@ -23,15 +25,18 @@ public class DriverTripStatusService {
     private final TripRepository tripRepository;
     private final TripStatusHistoryRepository tripStatusHistoryRepository;
     private final TripRealtimeNotifier tripRealtimeNotifier;
+    private final TripCompletionFareService tripCompletionFareService;
 
     public DriverTripStatusService(
             TripRepository tripRepository,
             TripStatusHistoryRepository tripStatusHistoryRepository,
-            TripRealtimeNotifier tripRealtimeNotifier
+            TripRealtimeNotifier tripRealtimeNotifier,
+            TripCompletionFareService tripCompletionFareService
     ) {
         this.tripRepository = tripRepository;
         this.tripStatusHistoryRepository = tripStatusHistoryRepository;
         this.tripRealtimeNotifier = tripRealtimeNotifier;
+        this.tripCompletionFareService = tripCompletionFareService;
     }
 
     @Transactional
@@ -69,11 +74,7 @@ public class DriverTripStatusService {
             switch (requestedStatus) {
                 case ARRIVED -> trip.markArrived();
                 case IN_PROGRESS -> trip.startTrip();
-                case COMPLETED -> trip.complete(
-                        trip.getEstimatedFare(),
-                        trip.getEstimatedDistanceKm(),
-                        trip.getEstimatedDurationMin()
-                );
+                case COMPLETED -> completeTrip(trip);
                 default -> throw new BusinessException(
                         ErrorCode.TRIP_STATUS_INVALID_TRANSITION,
                         "Driver can only update trip to ARRIVED, IN_PROGRESS, or COMPLETED"
@@ -82,6 +83,15 @@ public class DriverTripStatusService {
         } catch (IllegalStateException | IllegalArgumentException exception) {
             throw new BusinessException(ErrorCode.TRIP_STATUS_INVALID_TRANSITION, exception.getMessage());
         }
+    }
+
+    private void completeTrip(Trip trip) {
+        if (trip.getStatus() != TripStatus.IN_PROGRESS) {
+            throw new IllegalStateException("Trip can only be completed while in progress");
+        }
+
+        TripCompletionFare fare = tripCompletionFareService.calculate(trip);
+        trip.complete(fare.finalFare(), fare.actualDistanceKm(), fare.actualDurationMin());
     }
 
     private void notifyTripStatusChanged(Trip trip) {

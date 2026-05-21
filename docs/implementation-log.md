@@ -6,6 +6,60 @@
 
 ---
 
+## Commit: `feat: calculate trip completion fare`
+
+Branch: `feature/trip-completion-fare`
+
+Phase: Phase 5 - Payment Module va Tracking Module, theo `docs/TDD.md` muc 5.5 va 5.4
+
+### Muc tieu
+
+Khi driver cap nhat trip sang `COMPLETED`, backend khong con dung estimated fare/distance truc tiep nua. Thay vao do, he thong tinh actual distance tu `trip_location_history`, tinh actual duration tu `startedAt` den thoi diem hoan tat, tinh final fare bang pricing config cua trip, roi ghi vao `trips.final_fare`, `actual_distance_km`, `actual_duration_min`.
+
+Commit nay moi xu ly tinh fare va cap nhat trip khi completed. Tao bang/record payment va flow thanh toan tien mat se tach commit sau.
+
+### Noi dung da trien khai
+
+- Them `TripCompletionFareService` trong package `payment.service`:
+  - Doc `trip_location_history` theo thu tu `recorded_at`.
+  - Tinh tong quang duong bang Haversine giua cac diem lien tiep.
+  - Lam tron actual distance ve 2 chu so thap phan.
+  - Tinh actual duration bang chenh lech giua `startedAt` va thoi diem completed, lam tron len theo phut.
+  - Dung `PricingConfig.estimateFare(actualDistanceKm, actualDurationMin)` de tinh final fare theo pricing hien co.
+- Them `TripCompletionFare` record de tra ve `finalFare`, `actualDistanceKm`, `actualDurationMin`.
+- Them `TimeConfig` cung cap `Clock` de logic tinh duration co the test on dinh.
+- Cap nhat `DriverTripStatusService`:
+  - Khi status `COMPLETED`, validate trip dang `IN_PROGRESS`.
+  - Goi `TripCompletionFareService` truoc khi `trip.complete(...)`.
+  - Notification `TRIP_COMPLETED` tiep tuc co `finalFare` trong payload.
+- Co fallback an toan: neu tracking history chua du 2 diem hoac quang duong tinh duoc bang 0, dung `estimatedDistanceKm` de trip van co the hoan tat.
+
+### Review truoc commit
+
+- Da xac nhan `COMPLETED` dung actual fare tu calculator thay vi estimated fare hard-code.
+- Da xac nhan transition sai thu tu khong goi calculator.
+- Da xac nhan calculator tinh distance tu history va fallback khi history thieu diem.
+- Da xac nhan duration partial minute duoc lam tron len de tranh duration 0.
+- Da xac nhan notification completed co `finalFare` moi trong payload.
+- Da chay `./mvnw.cmd test`: pass 98 tests.
+
+### Files chinh
+
+- `src/main/java/com/example/goride/payment/service/TripCompletionFareService.java`
+- `src/main/java/com/example/goride/payment/service/TripCompletionFare.java`
+- `src/main/java/com/example/goride/driver/service/DriverTripStatusService.java`
+- `src/main/java/com/example/goride/common/config/TimeConfig.java`
+- `src/test/java/com/example/goride/payment/service/TripCompletionFareServiceTests.java`
+- `src/test/java/com/example/goride/driver/service/DriverTripStatusServiceTests.java`
+
+### Viec tiep theo
+
+- Tao payment entity/repository cho payment record khi trip completed.
+- Xu ly cash payment MVP va publish/notify payment completed.
+- Dua driver status ve `AVAILABLE` sau khi trip hoan tat.
+
+---
+
 ## Commit: `feat: add trip location tracking`
 
 Branch: `feature/trip-location-tracking`

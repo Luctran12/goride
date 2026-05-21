@@ -14,6 +14,8 @@ import com.example.goride.notification.domain.NotificationType;
 import com.example.goride.notification.dto.TripStatusNotification;
 import com.example.goride.notification.dto.UserNotification;
 import com.example.goride.notification.service.TripRealtimeNotifier;
+import com.example.goride.payment.service.TripCompletionFare;
+import com.example.goride.payment.service.TripCompletionFareService;
 import com.example.goride.user.domain.User;
 import com.example.goride.user.domain.UserRole;
 import org.junit.jupiter.api.BeforeEach;
@@ -54,6 +56,9 @@ class DriverTripStatusServiceTests {
     @Mock
     private TripRealtimeNotifier tripRealtimeNotifier;
 
+    @Mock
+    private TripCompletionFareService tripCompletionFareService;
+
     private DriverTripStatusService service;
 
     @BeforeEach
@@ -61,7 +66,8 @@ class DriverTripStatusServiceTests {
         service = new DriverTripStatusService(
                 tripRepository,
                 tripStatusHistoryRepository,
-                tripRealtimeNotifier
+                tripRealtimeNotifier,
+                tripCompletionFareService
         );
     }
 
@@ -97,20 +103,26 @@ class DriverTripStatusServiceTests {
     }
 
     @Test
-    void completesInProgressTripWithEstimatedFareUntilPaymentIsImplemented() {
+    void completesInProgressTripWithActualFare() {
         User driver = driver(20L);
         Trip trip = acceptedTrip(driver);
         trip.markArrived();
         trip.startTrip();
         stubTripForUpdate(trip);
+        when(tripCompletionFareService.calculate(trip)).thenReturn(new TripCompletionFare(
+                BigDecimal.valueOf(20000),
+                BigDecimal.valueOf(1.00),
+                20
+        ));
 
         var response = service.updateTripStatus(20L, 99L, TripStatus.COMPLETED);
 
         verifyHistory(TripStatus.IN_PROGRESS, TripStatus.COMPLETED, driver);
+        verify(tripCompletionFareService).calculate(trip);
         assertThat(response.status()).isEqualTo(TripStatus.COMPLETED);
-        assertThat(trip.getFinalFare()).isEqualByComparingTo(BigDecimal.valueOf(32000));
-        assertThat(trip.getActualDistanceKm()).isEqualByComparingTo(BigDecimal.valueOf(4.2));
-        assertThat(trip.getActualDurationMin()).isEqualTo(18);
+        assertThat(trip.getFinalFare()).isEqualByComparingTo(BigDecimal.valueOf(20000));
+        assertThat(trip.getActualDistanceKm()).isEqualByComparingTo(BigDecimal.valueOf(1.00));
+        assertThat(trip.getActualDurationMin()).isEqualTo(20);
         assertThat(trip.getCompletedAt()).isNotNull();
         verifyPassengerNotification(NotificationType.TRIP_COMPLETED, TripStatus.COMPLETED);
         verifyDriverCompletionNotification();
@@ -127,7 +139,7 @@ class DriverTripStatusServiceTests {
                 );
 
         verify(tripRepository, never()).save(any());
-        verifyNoInteractions(tripStatusHistoryRepository, tripRealtimeNotifier);
+        verifyNoInteractions(tripStatusHistoryRepository, tripRealtimeNotifier, tripCompletionFareService);
     }
 
     @Test
@@ -141,7 +153,7 @@ class DriverTripStatusServiceTests {
                 );
 
         verify(tripRepository, never()).save(any());
-        verifyNoInteractions(tripStatusHistoryRepository, tripRealtimeNotifier);
+        verifyNoInteractions(tripStatusHistoryRepository, tripRealtimeNotifier, tripCompletionFareService);
     }
 
     @Test
@@ -155,7 +167,7 @@ class DriverTripStatusServiceTests {
                 );
 
         verify(tripRepository, never()).save(any());
-        verifyNoInteractions(tripStatusHistoryRepository, tripRealtimeNotifier);
+        verifyNoInteractions(tripStatusHistoryRepository, tripRealtimeNotifier, tripCompletionFareService);
     }
 
     @Test
@@ -165,7 +177,7 @@ class DriverTripStatusServiceTests {
                         assertThat(exception.errorCode()).isEqualTo(ErrorCode.VALIDATION_ERROR)
                 );
 
-        verifyNoInteractions(tripRepository, tripStatusHistoryRepository, tripRealtimeNotifier);
+        verifyNoInteractions(tripRepository, tripStatusHistoryRepository, tripRealtimeNotifier, tripCompletionFareService);
     }
 
     private void stubTripForUpdate(Trip trip) {
@@ -206,7 +218,7 @@ class DriverTripStatusServiceTests {
                 .containsEntry("tripId", 99L)
                 .containsEntry("status", TripStatus.COMPLETED.name())
                 .containsEntry("driverId", 20L)
-                .containsEntry("finalFare", BigDecimal.valueOf(32000));
+                .containsEntry("finalFare", BigDecimal.valueOf(20000));
     }
 
     private Trip acceptedTrip(User driver) {
