@@ -26,6 +26,7 @@ public enum ErrorCode {
     TRIP_CANNOT_BE_CANCELLED(HttpStatus.UNPROCESSABLE_ENTITY, "Trip cannot be cancelled in its current status"),
     TRIP_STATUS_INVALID_TRANSITION(HttpStatus.UNPROCESSABLE_ENTITY, "Trip status transition is invalid"),
     LOCATION_OUT_OF_SERVICE_AREA(HttpStatus.UNPROCESSABLE_ENTITY, "Location is outside the service area"),
+    DRIVER_LOCATION_NOT_FOUND(HttpStatus.NOT_FOUND, "Driver location not found"),
     NO_DRIVER_AVAILABLE(HttpStatus.UNPROCESSABLE_ENTITY, "No driver is available nearby"),
     MATCHING_OFFER_NOT_FOUND(HttpStatus.NOT_FOUND, "Matching offer not found"),
     MATCHING_OFFER_EXPIRED(HttpStatus.UNPROCESSABLE_ENTITY, "Matching offer has expired"),
