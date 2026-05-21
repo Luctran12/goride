@@ -1,8 +1,8 @@
 spring:
   datasource:
     url: jdbc:postgresql://localhost:5432/goride
-    username: goride
-    password: goride
+    username: postgres
+    password: admin
   jpa:
     hibernate:
       ddl-auto: update
