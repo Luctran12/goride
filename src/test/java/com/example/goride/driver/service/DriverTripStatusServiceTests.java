@@ -16,6 +16,7 @@ import com.example.goride.notification.dto.UserNotification;
 import com.example.goride.notification.service.TripRealtimeNotifier;
 import com.example.goride.payment.service.TripCompletionFare;
 import com.example.goride.payment.service.TripCompletionFareService;
+import com.example.goride.payment.service.TripPaymentService;
 import com.example.goride.user.domain.User;
 import com.example.goride.user.domain.UserRole;
 import org.junit.jupiter.api.BeforeEach;
@@ -59,6 +60,9 @@ class DriverTripStatusServiceTests {
     @Mock
     private TripCompletionFareService tripCompletionFareService;
 
+    @Mock
+    private TripPaymentService tripPaymentService;
+
     private DriverTripStatusService service;
 
     @BeforeEach
@@ -67,7 +71,8 @@ class DriverTripStatusServiceTests {
                 tripRepository,
                 tripStatusHistoryRepository,
                 tripRealtimeNotifier,
-                tripCompletionFareService
+                tripCompletionFareService,
+                tripPaymentService
         );
     }
 
@@ -119,6 +124,7 @@ class DriverTripStatusServiceTests {
 
         verifyHistory(TripStatus.IN_PROGRESS, TripStatus.COMPLETED, driver);
         verify(tripCompletionFareService).calculate(trip);
+        verify(tripPaymentService).createPendingPayment(trip);
         assertThat(response.status()).isEqualTo(TripStatus.COMPLETED);
         assertThat(trip.getFinalFare()).isEqualByComparingTo(BigDecimal.valueOf(20000));
         assertThat(trip.getActualDistanceKm()).isEqualByComparingTo(BigDecimal.valueOf(1.00));
@@ -139,7 +145,7 @@ class DriverTripStatusServiceTests {
                 );
 
         verify(tripRepository, never()).save(any());
-        verifyNoInteractions(tripStatusHistoryRepository, tripRealtimeNotifier, tripCompletionFareService);
+        verifyNoInteractions(tripStatusHistoryRepository, tripRealtimeNotifier, tripCompletionFareService, tripPaymentService);
     }
 
     @Test
@@ -153,7 +159,7 @@ class DriverTripStatusServiceTests {
                 );
 
         verify(tripRepository, never()).save(any());
-        verifyNoInteractions(tripStatusHistoryRepository, tripRealtimeNotifier, tripCompletionFareService);
+        verifyNoInteractions(tripStatusHistoryRepository, tripRealtimeNotifier, tripCompletionFareService, tripPaymentService);
     }
 
     @Test
@@ -167,7 +173,7 @@ class DriverTripStatusServiceTests {
                 );
 
         verify(tripRepository, never()).save(any());
-        verifyNoInteractions(tripStatusHistoryRepository, tripRealtimeNotifier, tripCompletionFareService);
+        verifyNoInteractions(tripStatusHistoryRepository, tripRealtimeNotifier, tripCompletionFareService, tripPaymentService);
     }
 
     @Test
@@ -177,7 +183,7 @@ class DriverTripStatusServiceTests {
                         assertThat(exception.errorCode()).isEqualTo(ErrorCode.VALIDATION_ERROR)
                 );
 
-        verifyNoInteractions(tripRepository, tripStatusHistoryRepository, tripRealtimeNotifier, tripCompletionFareService);
+        verifyNoInteractions(tripRepository, tripStatusHistoryRepository, tripRealtimeNotifier, tripCompletionFareService, tripPaymentService);
     }
 
     private void stubTripForUpdate(Trip trip) {
