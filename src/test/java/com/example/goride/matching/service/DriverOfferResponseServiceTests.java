@@ -17,6 +17,10 @@ import com.example.goride.matching.domain.MatchingRequest;
 import com.example.goride.matching.domain.TripMatchingState;
 import com.example.goride.matching.notification.DriverOfferNotification;
 import com.example.goride.matching.notification.DriverOfferNotifier;
+import com.example.goride.notification.domain.NotificationType;
+import com.example.goride.notification.dto.TripStatusNotification;
+import com.example.goride.notification.dto.UserNotification;
+import com.example.goride.notification.service.TripRealtimeNotifier;
 import com.example.goride.user.domain.User;
 import com.example.goride.user.domain.UserRole;
 import com.example.goride.user.repository.UserRepository;
@@ -68,6 +72,9 @@ class DriverOfferResponseServiceTests {
     @Mock
     private DriverOfferNotifier driverOfferNotifier;
 
+    @Mock
+    private TripRealtimeNotifier tripRealtimeNotifier;
+
     private DriverOfferResponseService service;
 
     @BeforeEach
@@ -78,7 +85,8 @@ class DriverOfferResponseServiceTests {
                 userRepository,
                 candidateStore,
                 matchingService,
-                driverOfferNotifier
+                driverOfferNotifier,
+                tripRealtimeNotifier
         );
     }
 
@@ -98,6 +106,7 @@ class DriverOfferResponseServiceTests {
         verify(candidateStore).markCandidateBusy(20L);
         verify(candidateStore).releaseCandidateLock(20L);
         verify(candidateStore).clearTripMatching(99L);
+        verifyPassengerNotification(NotificationType.TRIP_ACCEPTED, TripStatus.ACCEPTED);
         assertThat(response.tripId()).isEqualTo(99L);
         assertThat(response.status()).isEqualTo(TripStatus.ACCEPTED);
         assertThat(trip.getDriver()).isSameAs(driver);
@@ -150,6 +159,7 @@ class DriverOfferResponseServiceTests {
         ArgumentCaptor<TripStatusHistory> historyCaptor = ArgumentCaptor.forClass(TripStatusHistory.class);
         verify(matchingService, never()).findAndLockDriver(any(), anyInt(), any());
         verify(tripStatusHistoryRepository).save(historyCaptor.capture());
+        verifyPassengerNotification(NotificationType.NO_DRIVER_FOUND, TripStatus.NO_DRIVER);
         assertThat(response.status()).isEqualTo(TripStatus.NO_DRIVER);
         assertThat(historyCaptor.getValue().getFromStatus()).isEqualTo(TripStatus.SEARCHING);
         assertThat(historyCaptor.getValue().getToStatus()).isEqualTo(TripStatus.NO_DRIVER);
@@ -167,6 +177,7 @@ class DriverOfferResponseServiceTests {
         var response = service.respondToOffer(20L, 99L, DriverOfferDecision.REJECT);
 
         verify(driverOfferNotifier, never()).notifyDriver(any(), any());
+        verifyPassengerNotification(NotificationType.NO_DRIVER_FOUND, TripStatus.NO_DRIVER);
         assertThat(response.status()).isEqualTo(TripStatus.NO_DRIVER);
     }
 
@@ -198,6 +209,19 @@ class DriverOfferResponseServiceTests {
         verify(candidateStore).releaseCandidateLock(20L);
         verify(candidateStore).clearTripMatching(99L);
         verifyNoInteractions(tripRepository);
+    }
+
+    private void verifyPassengerNotification(NotificationType type, TripStatus status) {
+        ArgumentCaptor<UserNotification> notificationCaptor = ArgumentCaptor.forClass(UserNotification.class);
+        ArgumentCaptor<TripStatusNotification> statusCaptor = ArgumentCaptor.forClass(TripStatusNotification.class);
+        verify(tripRealtimeNotifier).notifyPassenger(eq(10L), notificationCaptor.capture());
+        verify(tripRealtimeNotifier).broadcastTripStatus(eq(99L), statusCaptor.capture());
+        assertThat(notificationCaptor.getValue().type()).isEqualTo(type);
+        assertThat(notificationCaptor.getValue().data())
+                .containsEntry("tripId", 99L)
+                .containsEntry("status", status.name());
+        assertThat(statusCaptor.getValue().tripId()).isEqualTo(99L);
+        assertThat(statusCaptor.getValue().status()).isEqualTo(status);
     }
 
     private TripMatchingState state(Long driverId, int attempt, Set<Long> rejectedDriverIds) {
