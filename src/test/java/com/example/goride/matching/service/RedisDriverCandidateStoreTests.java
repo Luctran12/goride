@@ -17,6 +17,7 @@ import org.springframework.data.geo.Point;
 import org.springframework.data.redis.connection.RedisGeoCommands;
 import org.springframework.data.redis.core.GeoOperations;
 import org.springframework.data.redis.core.HashOperations;
+import org.springframework.data.redis.core.SetOperations;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
 
@@ -46,6 +47,9 @@ class RedisDriverCandidateStoreTests {
 
     @Mock
     private HashOperations<String, Object, Object> hashOperations;
+
+    @Mock
+    private SetOperations<String, String> setOperations;
 
     private RedisDriverCandidateStore candidateStore;
 
@@ -105,12 +109,14 @@ class RedisDriverCandidateStoreTests {
         Duration ttl = Duration.ofMinutes(5);
         Instant expiresAt = Instant.parse("2026-05-19T08:00:00Z");
         when(redisTemplate.opsForHash()).thenReturn(hashOperations);
+        when(redisTemplate.opsForSet()).thenReturn(setOperations);
 
         candidateStore.recordTripMatching(99L, 10L, 1, expiresAt, ttl);
 
         ArgumentCaptor<Map<Object, Object>> fieldsCaptor = ArgumentCaptor.forClass(Map.class);
         verify(hashOperations).putAll(eq("trip:99:matching"), fieldsCaptor.capture());
         verify(redisTemplate).expire("trip:99:matching", ttl);
+        verify(setOperations).add("matching:activeTrips", "99");
         assertThat(fieldsCaptor.getValue())
                 .containsEntry("attempt", "1")
                 .containsEntry("offeredDriverId", "10")
@@ -124,6 +130,7 @@ class RedisDriverCandidateStoreTests {
         Duration ttl = Duration.ofMinutes(5);
         Instant expiresAt = Instant.parse("2026-05-19T08:00:00Z");
         when(redisTemplate.opsForHash()).thenReturn(hashOperations);
+        when(redisTemplate.opsForSet()).thenReturn(setOperations);
 
         candidateStore.recordTripMatching(99L, 12L, 2, expiresAt, Set.of(11L, 10L), ttl);
 
@@ -133,6 +140,16 @@ class RedisDriverCandidateStoreTests {
                 .containsEntry("attempt", "2")
                 .containsEntry("offeredDriverId", "12")
                 .containsEntry("rejectedDriverIds", "10,11");
+    }
+
+    @Test
+    void findActiveMatchingTripIdsParsesValidIdsAndSkipsInvalidIds() {
+        when(redisTemplate.opsForSet()).thenReturn(setOperations);
+        when(setOperations.members("matching:activeTrips")).thenReturn(Set.of("99", "bad", "100"));
+
+        var tripIds = candidateStore.findActiveMatchingTripIds();
+
+        assertThat(tripIds).containsExactlyInAnyOrder(99L, 100L);
     }
 
     @Test
@@ -162,9 +179,12 @@ class RedisDriverCandidateStoreTests {
 
     @Test
     void clearTripMatchingDeletesMatchingState() {
+        when(redisTemplate.opsForSet()).thenReturn(setOperations);
+
         candidateStore.clearTripMatching(99L);
 
         verify(redisTemplate).delete("trip:99:matching");
+        verify(setOperations).remove("matching:activeTrips", "99");
     }
 
     @Test
