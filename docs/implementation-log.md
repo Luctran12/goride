@@ -6,6 +6,68 @@
 
 ---
 
+## Commit: `feat: add trip location tracking`
+
+Branch: `feature/trip-location-tracking`
+
+Phase: Phase 5 - Tracking Module va Phase 4 - WebSocket, theo `docs/TDD.md` muc 4.8, 4.13, 4.14 va 5.4
+
+### Muc tieu
+
+Them tracking MVP cho chuyen dang chay: driver gui toa do realtime, backend luu location history, cache vi tri moi nhat vao Redis va broadcast vi tri qua topic cua trip. Passenger co REST fallback de lay vi tri driver moi nhat khi mat/reconnect WebSocket.
+
+Commit nay chua xu ly heartbeat/offline timeout va chua tinh actual distance/final fare tu location history. Cac phan do se tach commit rieng sau khi tracking loop co nen tang.
+
+### Noi dung da trien khai
+
+- Them entity `TripLocationHistory` va repository `TripLocationHistoryRepository` cho bang `trip_location_history`.
+- Them DTO tracking:
+  - `DriverLocationUpdateRequest`: `lat`, `lng`, optional `bearing`, `speed`.
+  - `DriverLocationResponse`: payload broadcast/REST fallback.
+- Them `TripLocationTrackingService`:
+  - Driver update location chi duoc chap nhan khi driver co trip `IN_PROGRESS`.
+  - Luu moi diem tracking vao PostgreSQL.
+  - Sau transaction commit moi cache latest location va broadcast topic.
+  - Passenger chi lay duoc latest location cua trip minh so huu.
+- Them Redis latest-location store:
+  - Key `driver:{id}:location`.
+  - TTL 30 giay theo tracking design.
+- Them WebSocket/REST entrypoints:
+  - `SEND /app/driver.location` cho driver gui toa do.
+  - `GET /api/v1/tracking/trips/{tripId}/driver-location` cho passenger lay fallback.
+  - Broadcast `/topic/trip/{tripId}/location`.
+- Mo rong `CurrentUser` de doc user id tu `Principal` trong WebSocket handler.
+- Them `DRIVER_LOCATION_NOT_FOUND` cho truong hop cache location khong co/het TTL.
+
+### Review truoc commit
+
+- Da xac nhan driver khong co trip `IN_PROGRESS` bi chan va khong ghi location history.
+- Da xac nhan passenger khong so huu trip bi chan bang `FORBIDDEN`.
+- Da xac nhan latest location thieu/het TTL tra `DRIVER_LOCATION_NOT_FOUND`.
+- Da xac nhan location history, Redis cache va WebSocket broadcast dung trip/driver id.
+- Da xac nhan callback sau commit chi dung payload/id da capture, khong giu lazy entity.
+- Da chay `./mvnw.cmd test`: pass 95 tests.
+
+### Files chinh
+
+- `src/main/java/com/example/goride/tracking/domain/TripLocationHistory.java`
+- `src/main/java/com/example/goride/tracking/dto/DriverLocationUpdateRequest.java`
+- `src/main/java/com/example/goride/tracking/dto/DriverLocationResponse.java`
+- `src/main/java/com/example/goride/tracking/service/TripLocationTrackingService.java`
+- `src/main/java/com/example/goride/tracking/service/RedisLatestDriverLocationStore.java`
+- `src/main/java/com/example/goride/tracking/service/WebSocketTripLocationNotifier.java`
+- `src/main/java/com/example/goride/tracking/controller/TrackingWebSocketController.java`
+- `src/main/java/com/example/goride/tracking/controller/TrackingController.java`
+- `src/test/java/com/example/goride/tracking/service/*`
+
+### Viec tiep theo
+
+- Tinh actual distance tu `trip_location_history`.
+- Cap nhat `COMPLETED` de dung actual distance/fare thay vi estimated data.
+- Tao payment record va dua driver ve `AVAILABLE` sau khi trip hoan tat.
+
+---
+
 ## Commit: `feat: add driver trip status API`
 
 Branch: `feature/driver-trip-status-api`
