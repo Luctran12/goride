@@ -9,6 +9,7 @@ import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 public interface DriverCandidateStore {
     List<DriverCandidate> findAvailableCandidates(MatchingRequest request);
@@ -27,6 +28,8 @@ public interface DriverCandidateStore {
     );
 
     Optional<TripMatchingState> findTripMatching(Long tripId);
+
+    Set<Long> findActiveMatchingTripIds();
 
     void clearTripMatching(Long tripId);
 

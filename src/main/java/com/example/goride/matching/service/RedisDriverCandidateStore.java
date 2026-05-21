@@ -30,6 +30,7 @@ import java.util.stream.Collectors;
 @Component
 public class RedisDriverCandidateStore implements DriverCandidateStore {
     private static final String ONLINE_DRIVERS_KEY = "drivers:online";
+    private static final String ACTIVE_MATCHING_TRIPS_KEY = "matching:activeTrips";
     private static final String AVAILABLE_STATUS = "AVAILABLE";
     private static final String BUSY_STATUS = "BUSY";
     private static final Duration BUSY_STATUS_TTL = Duration.ofHours(12);
@@ -94,6 +95,7 @@ public class RedisDriverCandidateStore implements DriverCandidateStore {
                 "rejectedDriverIds", serializeDriverIds(rejectedDriverIds)
         ));
         redisTemplate.expire(key, ttl);
+        redisTemplate.opsForSet().add(ACTIVE_MATCHING_TRIPS_KEY, String.valueOf(tripId));
     }
 
     @Override
@@ -117,8 +119,21 @@ public class RedisDriverCandidateStore implements DriverCandidateStore {
     }
 
     @Override
+    public Set<Long> findActiveMatchingTripIds() {
+        Set<String> tripIds = redisTemplate.opsForSet().members(ACTIVE_MATCHING_TRIPS_KEY);
+        if (tripIds == null || tripIds.isEmpty()) {
+            return Set.of();
+        }
+        return tripIds.stream()
+                .map(this::parseLong)
+                .flatMap(Optional::stream)
+                .collect(Collectors.toUnmodifiableSet());
+    }
+
+    @Override
     public void clearTripMatching(Long tripId) {
         redisTemplate.delete(tripMatchingKey(tripId));
+        redisTemplate.opsForSet().remove(ACTIVE_MATCHING_TRIPS_KEY, String.valueOf(tripId));
     }
 
     @Override
@@ -235,5 +250,13 @@ public class RedisDriverCandidateStore implements DriverCandidateStore {
                 .filter(driverId -> !driverId.isBlank())
                 .map(Long::parseLong)
                 .collect(Collectors.toUnmodifiableSet());
+    }
+
+    private Optional<Long> parseLong(String value) {
+        try {
+            return Optional.of(Long.parseLong(value));
+        } catch (NumberFormatException exception) {
+            return Optional.empty();
+        }
     }
 }

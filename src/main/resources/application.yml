@@ -29,3 +29,7 @@ app:
     radius-km: 5
     max-attempts: 3
     offer-timeout-seconds: 30
+    timeout-scheduler:
+      enabled: true
+      fixed-delay-ms: 5000
+      initial-delay-ms: 10000
