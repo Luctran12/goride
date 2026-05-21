@@ -6,6 +6,60 @@
 
 ---
 
+## Commit: `feat: add driver offer response API`
+
+Branch: `feature/matching-offer-response`
+
+Phase: Phase 4 - Matching, theo `docs/TDD.md` muc 4.7 va 5.3
+
+### Muc tieu
+
+Them endpoint de driver phan hoi offer matching: chap nhan thi gan driver vao trip, tu choi thi release offer hien tai va thu driver tiep theo trong gioi han 3 lan.
+
+Commit nay chua xu ly timeout tu dong bang scheduler/heartbeat. Timeout se tach commit rieng de tranh tron logic bat dong bo vao API response.
+
+### Noi dung da trien khai
+
+- Them endpoint `PATCH /api/v1/drivers/trips/{tripId}/respond`.
+- Them request action `ACCEPT | REJECT` va response toi thieu gom `tripId`, `status`.
+- Them `DriverOfferResponseService`:
+  - Doc `trip:{id}:matching` de xac nhan driver hien tai dung la `offeredDriverId`.
+  - Tu choi offer het han va don state Redis lien quan.
+  - Khi `ACCEPT`: lock trip bang pessimistic write, chuyen `SEARCHING -> ACCEPTED`, gan driver, ghi `trip_status_history`, set Redis status driver thanh `BUSY`, clear matching state.
+  - Khi `REJECT`: release driver lock, clear offer cu, them driver vao excluded list, goi matching lai voi attempt tiep theo, gui offer moi neu co driver.
+  - Neu het 3 attempts hoac khong lock duoc driver tiep theo: chuyen trip sang `NO_DRIVER` va ghi status history.
+- Mo rong Redis matching store:
+  - Luu/doc `rejectedDriverIds`.
+  - Xoa `driver:{id}:lock`.
+  - Xoa `trip:{id}:matching`.
+  - Set `driver:{id}:status = BUSY` khi accept.
+- Mo rong `MatchingService` de retry voi `attempt` va danh sach driver da reject.
+
+### Review truoc commit
+
+- Da xac nhan reject khong offer lai driver vua tu choi trong cung retry.
+- Da xac nhan accept chi thanh cong khi driver dung voi `offeredDriverId`.
+- Da xac nhan trip status transition co ghi history.
+- Da xac nhan timeout tu dong chua nam trong commit nay.
+- Da chay `./mvnw.cmd test`: pass 68 tests.
+
+### Files chinh
+
+- `src/main/java/com/example/goride/driver/controller/DriverTripController.java`
+- `src/main/java/com/example/goride/driver/dto/DriverTripRespondRequest.java`
+- `src/main/java/com/example/goride/matching/service/DriverOfferResponseService.java`
+- `src/main/java/com/example/goride/matching/service/MatchingService.java`
+- `src/main/java/com/example/goride/matching/service/RedisDriverCandidateStore.java`
+- `src/test/java/com/example/goride/matching/service/DriverOfferResponseServiceTests.java`
+
+### Viec tiep theo
+
+- Them timeout handler de tu dong xu ly offer het han sau 30 giay.
+- Notify passenger khi trip `ACCEPTED` hoac `NO_DRIVER`.
+- Them WebSocket/JWT handshake security cho realtime channel.
+
+---
+
 ## Commit: `feat: dispatch matching offers`
 
 Branch: `feature/matching-offer-dispatch`

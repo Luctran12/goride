@@ -27,6 +27,8 @@ public enum ErrorCode {
     TRIP_STATUS_INVALID_TRANSITION(HttpStatus.UNPROCESSABLE_ENTITY, "Trip status transition is invalid"),
     LOCATION_OUT_OF_SERVICE_AREA(HttpStatus.UNPROCESSABLE_ENTITY, "Location is outside the service area"),
     NO_DRIVER_AVAILABLE(HttpStatus.UNPROCESSABLE_ENTITY, "No driver is available nearby"),
+    MATCHING_OFFER_NOT_FOUND(HttpStatus.NOT_FOUND, "Matching offer not found"),
+    MATCHING_OFFER_EXPIRED(HttpStatus.UNPROCESSABLE_ENTITY, "Matching offer has expired"),
     INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "Internal server error");
 
     private final HttpStatus httpStatus;

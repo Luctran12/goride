@@ -14,6 +14,7 @@ import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -88,6 +89,23 @@ class MatchingServiceTests {
 
         verify(candidateStore, never()).recordTripMatching(any(), any(), anyInt(), any(), any());
         assertThat(offer).isEmpty();
+    }
+
+    @Test
+    void retryExcludesRejectedDriversAndRecordsAttemptState() {
+        MatchingRequest request = request();
+        DriverCandidate rejected = candidate(10L, 300);
+        DriverCandidate next = candidate(11L, 500);
+        when(candidateStore.findAvailableCandidates(request)).thenReturn(List.of(rejected, next));
+        when(candidateStore.tryLockCandidate(eq(99L), eq(11L), any(Duration.class))).thenReturn(true);
+
+        var offer = matchingService.findAndLockDriver(request, 2, Set.of(10L));
+
+        verify(candidateStore, never()).tryLockCandidate(eq(99L), eq(10L), any(Duration.class));
+        verify(candidateStore).recordTripMatching(eq(99L), eq(11L), eq(2), any(Instant.class), eq(Set.of(10L)), any(Duration.class));
+        assertThat(offer).isPresent();
+        assertThat(offer.get().candidate().driverId()).isEqualTo(11L);
+        assertThat(offer.get().attempt()).isEqualTo(2);
     }
 
     private MatchingRequest request() {
