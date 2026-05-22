@@ -6,6 +6,57 @@
 
 ---
 
+## Commit: `feat: create trip completion payment`
+
+Branch: `feature/trip-completion-payment`
+
+Phase: Phase 5 - Payment Module, theo `docs/TDD.md` muc 3.8 va 5.5
+
+### Muc tieu
+
+Sau khi trip duoc cap nhat sang `COMPLETED` va da co `finalFare`, backend tao payment record de bat dau flow thanh toan. Voi MVP tien mat, record duoc tao o trang thai `PENDING`; buoc driver xac nhan da nhan tien se tach commit sau.
+
+### Noi dung da trien khai
+
+- Them payment domain:
+  - `PaymentStatus`: `PENDING`, `COMPLETED`, `FAILED`, `REFUNDED`.
+  - `Payment`: entity map bang `payments`, lien ket unique voi `trip_id`.
+- Them `PaymentRepository` voi lookup theo `tripId`.
+- Them `TripPaymentService.createPendingPayment(...)`:
+  - Neu trip da co payment thi tra ve payment hien co, tranh tao duplicate.
+  - Neu chua co thi tao `Payment.createPending(trip)`.
+- Noi vao `DriverTripStatusService`:
+  - Khi trip status sau update la `COMPLETED`, tao pending payment trong cung transaction voi trip/history.
+  - Cac transition `ARRIVED` va `IN_PROGRESS` khong tao payment.
+- Cap nhat Spring context test mock `PaymentRepository`.
+
+### Review truoc commit
+
+- Da xac nhan payment chi duoc tao cho trip `COMPLETED` va da co `finalFare`.
+- Da xac nhan payment amount lay tu `trip.finalFare`, method lay tu `trip.paymentMethod`, status mac dinh `PENDING`.
+- Da xac nhan service khong tao duplicate khi payment cho trip da ton tai.
+- Da xac nhan transition sai thu tu khong goi payment service.
+- Da chay `./mvnw.cmd test`: pass 102 tests.
+
+### Files chinh
+
+- `src/main/java/com/example/goride/payment/domain/Payment.java`
+- `src/main/java/com/example/goride/payment/domain/PaymentStatus.java`
+- `src/main/java/com/example/goride/payment/repository/PaymentRepository.java`
+- `src/main/java/com/example/goride/payment/service/TripPaymentService.java`
+- `src/main/java/com/example/goride/driver/service/DriverTripStatusService.java`
+- `src/test/java/com/example/goride/payment/domain/PaymentTests.java`
+- `src/test/java/com/example/goride/payment/service/TripPaymentServiceTests.java`
+- `src/test/java/com/example/goride/driver/service/DriverTripStatusServiceTests.java`
+
+### Viec tiep theo
+
+- Them endpoint driver xac nhan da nhan tien mat: `PATCH /drivers/trips/{tripId}/payment-confirm`.
+- Chuyen payment `PENDING -> COMPLETED`, set `paidAt`.
+- Notify passenger/driver va dua driver ve `AVAILABLE` sau khi thanh toan hoan tat.
+
+---
+
 ## Commit: `feat: calculate trip completion fare`
 
 Branch: `feature/trip-completion-fare`

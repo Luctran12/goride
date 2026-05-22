@@ -4,6 +4,7 @@ import com.example.goride.booking.repository.PricingConfigRepository;
 import com.example.goride.booking.repository.TripRepository;
 import com.example.goride.booking.repository.TripStatusHistoryRepository;
 import com.example.goride.driver.repository.DriverProfileRepository;
+import com.example.goride.payment.repository.PaymentRepository;
 import com.example.goride.tracking.repository.TripLocationHistoryRepository;
 import com.example.goride.user.repository.UserRepository;
 import org.junit.jupiter.api.Test;
@@ -29,6 +30,9 @@ class GorideApplicationTests {
 
 	@MockitoBean
 	private TripLocationHistoryRepository tripLocationHistoryRepository;
+
+	@MockitoBean
+	private PaymentRepository paymentRepository;
 
 	@Test
 	void contextLoads() {

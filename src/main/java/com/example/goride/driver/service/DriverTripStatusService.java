@@ -13,6 +13,7 @@ import com.example.goride.notification.dto.UserNotification;
 import com.example.goride.notification.service.TripRealtimeNotifier;
 import com.example.goride.payment.service.TripCompletionFare;
 import com.example.goride.payment.service.TripCompletionFareService;
+import com.example.goride.payment.service.TripPaymentService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
@@ -26,17 +27,20 @@ public class DriverTripStatusService {
     private final TripStatusHistoryRepository tripStatusHistoryRepository;
     private final TripRealtimeNotifier tripRealtimeNotifier;
     private final TripCompletionFareService tripCompletionFareService;
+    private final TripPaymentService tripPaymentService;
 
     public DriverTripStatusService(
             TripRepository tripRepository,
             TripStatusHistoryRepository tripStatusHistoryRepository,
             TripRealtimeNotifier tripRealtimeNotifier,
-            TripCompletionFareService tripCompletionFareService
+            TripCompletionFareService tripCompletionFareService,
+            TripPaymentService tripPaymentService
     ) {
         this.tripRepository = tripRepository;
         this.tripStatusHistoryRepository = tripStatusHistoryRepository;
         this.tripRealtimeNotifier = tripRealtimeNotifier;
         this.tripCompletionFareService = tripCompletionFareService;
+        this.tripPaymentService = tripPaymentService;
     }
 
     @Transactional
@@ -59,6 +63,7 @@ public class DriverTripStatusService {
                 savedTrip.getDriver(),
                 "Driver updated trip status"
         ));
+        createPaymentIfCompleted(savedTrip);
         notifyTripStatusChanged(savedTrip);
         return new DriverTripResponse(savedTrip.getId(), savedTrip.getStatus());
     }
@@ -92,6 +97,12 @@ public class DriverTripStatusService {
 
         TripCompletionFare fare = tripCompletionFareService.calculate(trip);
         trip.complete(fare.finalFare(), fare.actualDistanceKm(), fare.actualDurationMin());
+    }
+
+    private void createPaymentIfCompleted(Trip trip) {
+        if (trip.getStatus() == TripStatus.COMPLETED) {
+            tripPaymentService.createPendingPayment(trip);
+        }
     }
 
     private void notifyTripStatusChanged(Trip trip) {
