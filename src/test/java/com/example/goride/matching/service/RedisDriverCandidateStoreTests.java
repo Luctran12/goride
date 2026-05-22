@@ -196,6 +196,15 @@ class RedisDriverCandidateStoreTests {
         verify(valueOperations).set(eq("driver:10:status"), eq("BUSY"), any(Duration.class));
     }
 
+    @Test
+    void markCandidateAvailableSetsAvailableStatusWithTtl() {
+        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
+
+        candidateStore.markCandidateAvailable(10L);
+
+        verify(valueOperations).set("driver:10:status", "AVAILABLE", Duration.ofSeconds(60));
+    }
+
     private MatchingRequest request(VehicleType vehicleType) {
         return new MatchingRequest(
                 99L,

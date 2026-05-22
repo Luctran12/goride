@@ -36,4 +36,6 @@ public interface DriverCandidateStore {
     void releaseCandidateLock(Long driverId);
 
     void markCandidateBusy(Long driverId);
+
+    void markCandidateAvailable(Long driverId);
 }

@@ -5,5 +5,6 @@ public enum NotificationType {
     DRIVER_ARRIVED,
     TRIP_STARTED,
     TRIP_COMPLETED,
+    PAYMENT_COMPLETED,
     NO_DRIVER_FOUND
 }

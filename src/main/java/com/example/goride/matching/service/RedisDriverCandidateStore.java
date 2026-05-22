@@ -33,6 +33,7 @@ public class RedisDriverCandidateStore implements DriverCandidateStore {
     private static final String ACTIVE_MATCHING_TRIPS_KEY = "matching:activeTrips";
     private static final String AVAILABLE_STATUS = "AVAILABLE";
     private static final String BUSY_STATUS = "BUSY";
+    private static final Duration AVAILABLE_STATUS_TTL = Duration.ofSeconds(60);
     private static final Duration BUSY_STATUS_TTL = Duration.ofHours(12);
 
     private final StringRedisTemplate redisTemplate;
@@ -144,6 +145,11 @@ public class RedisDriverCandidateStore implements DriverCandidateStore {
     @Override
     public void markCandidateBusy(Long driverId) {
         redisTemplate.opsForValue().set(statusKey(String.valueOf(driverId)), BUSY_STATUS, BUSY_STATUS_TTL);
+    }
+
+    @Override
+    public void markCandidateAvailable(Long driverId) {
+        redisTemplate.opsForValue().set(statusKey(String.valueOf(driverId)), AVAILABLE_STATUS, AVAILABLE_STATUS_TTL);
     }
 
     private Optional<DriverCandidate> toCandidate(

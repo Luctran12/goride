@@ -45,6 +45,26 @@ class PaymentTests {
                 .hasMessage("Payment can only be created for completed trip");
     }
 
+    @Test
+    void markCompletedMovesPendingPaymentToCompleted() {
+        Payment payment = Payment.createPending(completedTrip());
+
+        payment.markCompleted();
+
+        assertThat(payment.getStatus()).isEqualTo(PaymentStatus.COMPLETED);
+        assertThat(payment.getPaidAt()).isNotNull();
+    }
+
+    @Test
+    void markCompletedRejectsNonPendingPayment() {
+        Payment payment = Payment.createPending(completedTrip());
+        payment.markCompleted();
+
+        assertThatThrownBy(payment::markCompleted)
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("Payment can only be completed from pending status");
+    }
+
     private Trip completedTrip() {
         Trip trip = sampleTrip();
         trip.accept(driver());
