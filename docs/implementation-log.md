@@ -6,6 +6,65 @@
 
 ---
 
+## Commit: `feat: add trip rating flow`
+
+Branch: `feature/trip-rating-flow`
+
+Phase: Phase 6 - Payment + Rating, theo `docs/TDD.md` muc 3.7, 4.9 va `docs/backend-implementation.md` muc 3.10, 5.6
+
+### Muc tieu
+
+Cho phep passenger danh gia driver sau khi trip da hoan tat. Moi trip chi duoc rating mot lan, chi passenger cua trip moi duoc rating, va diem trung binh cua driver duoc cap nhat ngay trong cung transaction.
+
+### Noi dung da trien khai
+
+- Them rating domain va repository:
+  - `Rating`: entity map bang `ratings`, lien ket unique voi `trip_id`, luu `passenger_id`, `driver_id`, `score`, `comment`, `created_at`.
+  - `RatingRepository.existsByTripId(...)` de chan rating lap cho cung trip.
+- Them REST API:
+  - `POST /api/v1/ratings`
+  - Yeu cau role `PASSENGER`.
+  - Request gom `tripId`, `score`, `comment`.
+  - Response tra ve `ratingId`, `tripId`, `driverId`, `score`, `comment`, `createdAt`.
+- Them `RatingService.createRating(...)`:
+  - Lock trip theo `tripId` bang `TripRepository.findActiveByIdForUpdate(...)`.
+  - Validate passenger hien tai la passenger cua trip.
+  - Chi cho rating trip `COMPLETED` va da co driver.
+  - Chan duplicate bang `TRIP_ALREADY_RATED`.
+  - Lock `DriverProfile` theo driver user id de cap nhat rating an toan khi co concurrency.
+  - Cap nhat `averageRating` va `totalRatings` bang weighted average, lam tron 1 chu so thap phan.
+- Mo rong `DriverProfileRepository` voi `findByUserIdForUpdate(...)`.
+- Cap nhat Spring context test mock `RatingRepository`.
+
+### Review truoc commit
+
+- Da xac nhan API chi expose cho role `PASSENGER`.
+- Da xac nhan user khong phai passenger cua trip bi chan bang `FORBIDDEN`.
+- Da xac nhan trip chua `COMPLETED` khong duoc rating.
+- Da xac nhan moi trip chi co mot rating va duplicate tra `TRIP_ALREADY_RATED`.
+- Da xac nhan driver average rating tinh lai dung tu average hien tai, total hien tai va score moi.
+- Da chay `./mvnw.cmd test`: pass 119 tests.
+
+### Files chinh
+
+- `src/main/java/com/example/goride/rating/domain/Rating.java`
+- `src/main/java/com/example/goride/rating/repository/RatingRepository.java`
+- `src/main/java/com/example/goride/rating/service/RatingService.java`
+- `src/main/java/com/example/goride/rating/controller/RatingController.java`
+- `src/main/java/com/example/goride/rating/dto/RatingCreateRequest.java`
+- `src/main/java/com/example/goride/rating/dto/RatingResponse.java`
+- `src/main/java/com/example/goride/driver/repository/DriverProfileRepository.java`
+- `src/test/java/com/example/goride/rating/domain/RatingTests.java`
+- `src/test/java/com/example/goride/rating/service/RatingServiceTests.java`
+
+### Viec tiep theo
+
+- Them API public xem rating cua driver: `GET /api/v1/drivers/{driverId}/ratings`.
+- Dong bo Redis `driver:{id}:meta.rating` khi driver dang online de matching co rating moi hon.
+- Tiep tuc admin/statistics: doanh thu tu payment completed va rating trung binh.
+
+---
+
 ## Commit: `feat: add cash payment confirmation`
 
 Branch: `feature/cash-payment-confirmation`
