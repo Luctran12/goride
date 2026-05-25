@@ -6,6 +6,55 @@
 
 ---
 
+## Commit: `feat: add driver rating list api`
+
+Branch: `feature/driver-rating-list-api`
+
+Phase: Phase 6 - Payment + Rating, theo `docs/TDD.md` muc 4.9 va `docs/backend-implementation.md` muc 5.6
+
+### Muc tieu
+
+Bo sung API public de xem danh sach rating cua mot driver. API nay phuc vu man hinh ho so/lich su danh gia cong khai va dung pagination 1-based nhu tai lieu TDD.
+
+### Noi dung da trien khai
+
+- Them endpoint public:
+  - `GET /api/v1/drivers/{driverId}/ratings?page=1&size=20`
+  - Tra ve `ApiResponse<PageResponse<RatingResponse>>`.
+  - Khong yeu cau JWT nhung van validate driver profile ton tai.
+- Mo rong `SecurityConfig`:
+  - Permit route `/api/v1/drivers/*/ratings` de endpoint dung contract public.
+- Mo rong `RatingRepository`:
+  - Them `findByDriverIdOrderByCreatedAtDesc(driverId, pageable)`.
+- Mo rong `RatingService`:
+  - Them `listDriverRatings(driverId, page, size)`.
+  - Validate `driverId`, `page >= 1`, `1 <= size <= 100`.
+  - Convert page 1-based tu API sang `PageRequest` 0-based cua Spring Data.
+  - Tra ve `PageResponse` gom items va metadata pagination.
+
+### Review truoc commit
+
+- Da xac nhan route public duoc permit trong security filter.
+- Da xac nhan driver khong co profile tra `DRIVER_PROFILE_NOT_FOUND`.
+- Da xac nhan page/size sai bi chan truoc khi query database.
+- Da xac nhan danh sach rating sap xep theo `createdAt DESC`.
+- Da chay `./mvnw.cmd test`: pass 122 tests.
+
+### Files chinh
+
+- `src/main/java/com/example/goride/rating/controller/DriverRatingController.java`
+- `src/main/java/com/example/goride/rating/service/RatingService.java`
+- `src/main/java/com/example/goride/rating/repository/RatingRepository.java`
+- `src/main/java/com/example/goride/auth/config/SecurityConfig.java`
+- `src/test/java/com/example/goride/rating/service/RatingServiceTests.java`
+
+### Viec tiep theo
+
+- Dong bo Redis `driver:{id}:meta.rating` khi driver dang online de matching co rating moi hon.
+- Tiep tuc admin/statistics: doanh thu tu payment completed va rating trung binh.
+
+---
+
 ## Commit: `feat: add trip rating flow`
 
 Branch: `feature/trip-rating-flow`

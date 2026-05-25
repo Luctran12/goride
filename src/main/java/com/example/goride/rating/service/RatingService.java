@@ -3,6 +3,7 @@ package com.example.goride.rating.service;
 import com.example.goride.booking.domain.Trip;
 import com.example.goride.booking.domain.TripStatus;
 import com.example.goride.booking.repository.TripRepository;
+import com.example.goride.common.api.PageResponse;
 import com.example.goride.common.error.BusinessException;
 import com.example.goride.common.error.ErrorCode;
 import com.example.goride.driver.domain.DriverProfile;
@@ -11,6 +12,8 @@ import com.example.goride.rating.domain.Rating;
 import com.example.goride.rating.dto.RatingCreateRequest;
 import com.example.goride.rating.dto.RatingResponse;
 import com.example.goride.rating.repository.RatingRepository;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -20,6 +23,8 @@ import java.util.Objects;
 
 @Service
 public class RatingService {
+    private static final int MAX_PAGE_SIZE = 100;
+
     private final TripRepository tripRepository;
     private final RatingRepository ratingRepository;
     private final DriverProfileRepository driverProfileRepository;
@@ -61,6 +66,26 @@ public class RatingService {
         return RatingResponse.from(savedRating);
     }
 
+    @Transactional(readOnly = true)
+    public PageResponse<RatingResponse> listDriverRatings(Long driverId, int page, int size) {
+        validatePageRequest(driverId, page, size);
+        driverProfileRepository.findByUserIdAndUserDeletedAtIsNull(driverId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.DRIVER_PROFILE_NOT_FOUND));
+
+        Page<Rating> ratings = ratingRepository.findByDriverIdOrderByCreatedAtDesc(
+                driverId,
+                PageRequest.of(page - 1, size)
+        );
+        return PageResponse.of(
+                ratings.getContent().stream()
+                        .map(RatingResponse::from)
+                        .toList(),
+                page,
+                size,
+                ratings.getTotalElements()
+        );
+    }
+
     private void validateRequest(RatingCreateRequest request) {
         if (request == null) {
             throw new BusinessException(ErrorCode.VALIDATION_ERROR, "Rating request is required");
@@ -73,6 +98,18 @@ public class RatingService {
         }
         if (request.comment() != null && request.comment().length() > 500) {
             throw new BusinessException(ErrorCode.VALIDATION_ERROR, "Comment must be at most 500 characters");
+        }
+    }
+
+    private void validatePageRequest(Long driverId, int page, int size) {
+        if (driverId == null) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "Driver id is required");
+        }
+        if (page < 1) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "Page must be greater than or equal to 1");
+        }
+        if (size < 1 || size > MAX_PAGE_SIZE) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "Size must be between 1 and 100");
         }
     }
 
