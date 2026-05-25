@@ -2,6 +2,7 @@ package com.example.goride.notification.dto;
 
 import com.example.goride.booking.domain.Trip;
 import com.example.goride.notification.domain.NotificationType;
+import com.example.goride.payment.domain.Payment;
 
 import java.time.Instant;
 import java.util.LinkedHashMap;
@@ -70,6 +71,23 @@ public record UserNotification(
                 NotificationType.TRIP_COMPLETED,
                 "Trip completed",
                 "Your trip is completed"
+        );
+    }
+
+    public static UserNotification paymentCompleted(Trip trip, Payment payment) {
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("tripId", trip.getId());
+        data.put("status", trip.getStatus().name());
+        data.put("driverId", trip.getDriver().getId());
+        data.put("amount", payment.getAmount());
+        data.put("paymentStatus", payment.getStatus().name());
+
+        return new UserNotification(
+                NotificationType.PAYMENT_COMPLETED,
+                "Payment completed",
+                "Your payment has been completed",
+                data,
+                Instant.now()
         );
     }
 

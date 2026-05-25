@@ -7,6 +7,8 @@ import com.example.goride.driver.dto.DriverTripResponse;
 import com.example.goride.driver.dto.DriverTripStatusUpdateRequest;
 import com.example.goride.driver.service.DriverTripStatusService;
 import com.example.goride.matching.service.DriverOfferResponseService;
+import com.example.goride.payment.dto.PaymentConfirmationResponse;
+import com.example.goride.payment.service.CashPaymentConfirmationService;
 import jakarta.validation.Valid;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
@@ -21,15 +23,18 @@ import org.springframework.web.bind.annotation.RestController;
 public class DriverTripController {
     private final DriverOfferResponseService driverOfferResponseService;
     private final DriverTripStatusService driverTripStatusService;
+    private final CashPaymentConfirmationService cashPaymentConfirmationService;
     private final CurrentUser currentUser;
 
     public DriverTripController(
             DriverOfferResponseService driverOfferResponseService,
             DriverTripStatusService driverTripStatusService,
+            CashPaymentConfirmationService cashPaymentConfirmationService,
             CurrentUser currentUser
     ) {
         this.driverOfferResponseService = driverOfferResponseService;
         this.driverTripStatusService = driverTripStatusService;
+        this.cashPaymentConfirmationService = cashPaymentConfirmationService;
         this.currentUser = currentUser;
     }
 
@@ -59,6 +64,19 @@ public class DriverTripController {
                 currentUser.requireUserId(authentication),
                 tripId,
                 request.status()
+        );
+        return ApiResponse.ok(response);
+    }
+
+    @PatchMapping("/{tripId}/payment-confirm")
+    @PreAuthorize("hasRole('DRIVER')")
+    public ApiResponse<PaymentConfirmationResponse> confirmPayment(
+            Authentication authentication,
+            @PathVariable Long tripId
+    ) {
+        PaymentConfirmationResponse response = cashPaymentConfirmationService.confirmCashPayment(
+                currentUser.requireUserId(authentication),
+                tripId
         );
         return ApiResponse.ok(response);
     }

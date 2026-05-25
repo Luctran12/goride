@@ -6,6 +6,67 @@
 
 ---
 
+## Commit: `feat: add cash payment confirmation`
+
+Branch: `feature/cash-payment-confirmation`
+
+Phase: Phase 5 - Payment Module, theo `docs/TDD.md` muc 5.5
+
+### Muc tieu
+
+Hoan tat MVP cash payment sau khi trip da `COMPLETED`: driver xac nhan da nhan tien mat, payment chuyen tu `PENDING` sang `COMPLETED`, ghi `paidAt`, notify passenger/driver va dua driver ve trang thai co the nhan chuyen tiep theo.
+
+### Noi dung da trien khai
+
+- Them endpoint driver xac nhan thanh toan tien mat:
+  - `PATCH /api/v1/drivers/trips/{tripId}/payment-confirm`
+  - Yeu cau role `DRIVER`, lay driver id tu authentication hien tai.
+  - Tra ve `PaymentConfirmationResponse` gom `tripId`, `status`, `amount`, `paidAt`.
+- Them `CashPaymentConfirmationService`:
+  - Lock payment theo `tripId` bang `PaymentRepository.findByTripIdForUpdate(...)`.
+  - Validate payment ton tai, trip thuoc driver hien tai, trip da `COMPLETED`, method la `CASH`, status dang `PENDING`.
+  - Goi `Payment.markCompleted()` de set `COMPLETED` va `paidAt`.
+  - Sau transaction commit, set Redis driver status ve `AVAILABLE` va notify ca passenger/driver.
+- Mo rong payment domain:
+  - Them `Payment.markCompleted()`.
+  - Them error code `PAYMENT_NOT_FOUND`, `PAYMENT_INVALID_STATUS`.
+- Mo rong notification:
+  - Them `NotificationType.PAYMENT_COMPLETED`.
+  - Them `UserNotification.paymentCompleted(...)` voi payload `tripId`, `status`, `driverId`, `amount`, `paymentStatus`.
+- Mo rong driver candidate Redis store:
+  - Them `markCandidateAvailable(driverId)`.
+  - Set `driver:{id}:status = AVAILABLE` voi TTL 60 giay sau khi payment completed.
+
+### Review truoc commit
+
+- Da xac nhan chi assigned driver cua trip moi confirm duoc payment.
+- Da xac nhan payment chi duoc confirm khi trip `COMPLETED`, method `CASH`, status `PENDING`.
+- Da xac nhan double-confirm bi chan bang `PAYMENT_INVALID_STATUS`.
+- Da xac nhan notification va driver availability chi chay sau transaction commit.
+- Da chay `./mvnw.cmd test`: pass 110 tests.
+
+### Files chinh
+
+- `src/main/java/com/example/goride/payment/service/CashPaymentConfirmationService.java`
+- `src/main/java/com/example/goride/payment/dto/PaymentConfirmationResponse.java`
+- `src/main/java/com/example/goride/payment/domain/Payment.java`
+- `src/main/java/com/example/goride/payment/repository/PaymentRepository.java`
+- `src/main/java/com/example/goride/driver/controller/DriverTripController.java`
+- `src/main/java/com/example/goride/notification/dto/UserNotification.java`
+- `src/main/java/com/example/goride/matching/service/DriverCandidateStore.java`
+- `src/main/java/com/example/goride/matching/service/RedisDriverCandidateStore.java`
+- `src/test/java/com/example/goride/payment/service/CashPaymentConfirmationServiceTests.java`
+- `src/test/java/com/example/goride/payment/domain/PaymentTests.java`
+- `src/test/java/com/example/goride/matching/service/RedisDriverCandidateStoreTests.java`
+
+### Viec tiep theo
+
+- Them rating flow sau khi payment completed: passenger danh gia driver/trip.
+- Cap nhat driver statistics/revenue tu payments `COMPLETED`.
+- Tiep tuc hoan thien Payment Provider abstraction de mo rong MoMo/VNPay sau MVP cash.
+
+---
+
 ## Commit: `feat: create trip completion payment`
 
 Branch: `feature/trip-completion-payment`

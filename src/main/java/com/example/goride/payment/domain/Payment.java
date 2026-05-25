@@ -79,6 +79,15 @@ public class Payment {
         return payment;
     }
 
+    public void markCompleted() {
+        if (status != PaymentStatus.PENDING) {
+            throw new IllegalStateException("Payment can only be completed from pending status");
+        }
+
+        status = PaymentStatus.COMPLETED;
+        paidAt = Instant.now();
+    }
+
     @PrePersist
     void prePersist() {
         Instant now = Instant.now();
