@@ -7,6 +7,8 @@ import com.example.goride.user.domain.User;
 import com.example.goride.user.domain.UserRole;
 import com.example.goride.user.domain.UserStatus;
 import com.example.goride.user.dto.UserCreateRequest;
+import com.example.goride.user.dto.UserPasswordChangeRequest;
+import com.example.goride.user.dto.UserProfileUpdateRequest;
 import com.example.goride.user.dto.UserResponse;
 import com.example.goride.user.dto.UserUpdateRequest;
 import com.example.goride.user.repository.UserRepository;
@@ -62,6 +64,11 @@ public class UserService {
     }
 
     @Transactional(readOnly = true)
+    public UserResponse getMyProfile(Long userId) {
+        return getUserById(userId);
+    }
+
+    @Transactional(readOnly = true)
     public PageResponse<UserResponse> getAllUsers(int page, int size) {
         int normalizedPage = Math.max(page, 1);
         int normalizedSize = Math.min(Math.max(size, 1), MAX_PAGE_SIZE);
@@ -98,6 +105,33 @@ public class UserService {
         }
 
         return userMapper.toResponse(userRepository.save(user));
+    }
+
+    @Transactional
+    public UserResponse updateMyProfile(Long userId, UserProfileUpdateRequest request) {
+        User user = userRepository.findByIdAndDeletedAtIsNull(userId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+
+        String phone = normalizeRequired(request.phone(), "phone");
+        String email = normalizeOptional(request.email());
+        validateUniquePhoneForUpdate(phone, user.getPhone());
+        validateUniqueEmailForUpdate(email, user.getEmail());
+
+        user.updateDetails(request.fullName(), phone, email, request.avatarUrl());
+        return userMapper.toResponse(userRepository.save(user));
+    }
+
+    @Transactional
+    public void changeMyPassword(Long userId, UserPasswordChangeRequest request) {
+        User user = userRepository.findByIdAndDeletedAtIsNull(userId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+
+        if (!passwordEncoder.matches(request.currentPassword(), user.getPasswordHash())) {
+            throw new BusinessException(ErrorCode.INVALID_CREDENTIALS, "Current password is incorrect");
+        }
+
+        user.changePasswordHash(passwordEncoder.encode(request.newPassword()));
+        userRepository.save(user);
     }
 
     @Transactional

@@ -6,6 +6,8 @@ import com.example.goride.user.domain.User;
 import com.example.goride.user.domain.UserRole;
 import com.example.goride.user.domain.UserStatus;
 import com.example.goride.user.dto.UserCreateRequest;
+import com.example.goride.user.dto.UserPasswordChangeRequest;
+import com.example.goride.user.dto.UserProfileUpdateRequest;
 import com.example.goride.user.dto.UserUpdateRequest;
 import com.example.goride.user.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -96,6 +98,17 @@ class UserServiceTests {
     }
 
     @Test
+    void getMyProfileReturnsCurrentUserProfile() {
+        User user = withId(User.create("Nguyen Van A", "0901234567", null, "hash", Set.of(UserRole.PASSENGER)), 1L);
+        when(userRepository.findByIdAndDeletedAtIsNull(1L)).thenReturn(Optional.of(user));
+
+        var response = userService.getMyProfile(1L);
+
+        assertThat(response.id()).isEqualTo(1L);
+        assertThat(response.fullName()).isEqualTo("Nguyen Van A");
+    }
+
+    @Test
     void getAllUsersUsesOneBasedPaginationAndCreatedAtDescSort() {
         User user = withId(User.create("Nguyen Van A", "0901234567", null, "hash", Set.of(UserRole.PASSENGER)), 1L);
         when(userRepository.findByDeletedAtIsNull(any(Pageable.class)))
@@ -159,6 +172,83 @@ class UserServiceTests {
         verify(userRepository, never()).existsByPhoneAndDeletedAtIsNull(any());
         verify(userRepository, never()).existsByEmailAndDeletedAtIsNull(any());
         verify(passwordEncoder, never()).encode(any());
+    }
+
+    @Test
+    void updateMyProfileChangesOnlyEditableProfileFields() {
+        User user = withId(User.create(
+                "Old Name",
+                "0901234567",
+                "old@example.com",
+                "old-hash",
+                Set.of(UserRole.PASSENGER)
+        ), 1L);
+        UserProfileUpdateRequest request = new UserProfileUpdateRequest(
+                "New Name",
+                "0907654321",
+                "new@example.com",
+                "https://example.com/avatar.jpg"
+        );
+        when(userRepository.findByIdAndDeletedAtIsNull(1L)).thenReturn(Optional.of(user));
+        when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        var response = userService.updateMyProfile(1L, request);
+
+        assertThat(response.fullName()).isEqualTo("New Name");
+        assertThat(response.phone()).isEqualTo("0907654321");
+        assertThat(response.email()).isEqualTo("new@example.com");
+        assertThat(response.avatarUrl()).isEqualTo("https://example.com/avatar.jpg");
+        assertThat(response.roles()).containsExactly(UserRole.PASSENGER);
+        assertThat(response.status()).isEqualTo(UserStatus.ACTIVE);
+        assertThat(user.getPasswordHash()).isEqualTo("old-hash");
+        verify(passwordEncoder, never()).encode(any());
+    }
+
+    @Test
+    void updateMyProfileRejectsDuplicateEmail() {
+        User user = withId(User.create("Name", "0901234567", "old@example.com", "hash", Set.of(UserRole.PASSENGER)), 1L);
+        when(userRepository.findByIdAndDeletedAtIsNull(1L)).thenReturn(Optional.of(user));
+        when(userRepository.existsByEmailAndDeletedAtIsNull("taken@example.com")).thenReturn(true);
+
+        assertThatThrownBy(() -> userService.updateMyProfile(
+                1L,
+                new UserProfileUpdateRequest("Name", "0901234567", "taken@example.com", null)
+        ))
+                .isInstanceOfSatisfying(BusinessException.class, exception ->
+                        assertThat(exception.errorCode()).isEqualTo(ErrorCode.EMAIL_ALREADY_EXISTS)
+                );
+        verify(userRepository, never()).save(any(User.class));
+    }
+
+    @Test
+    void changeMyPasswordRequiresCurrentPasswordAndStoresEncodedNewPassword() {
+        User user = withId(User.create("Name", "0901234567", null, "old-hash", Set.of(UserRole.PASSENGER)), 1L);
+        when(userRepository.findByIdAndDeletedAtIsNull(1L)).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches("old-password", "old-hash")).thenReturn(true);
+        when(passwordEncoder.encode("new-password")).thenReturn("new-hash");
+
+        userService.changeMyPassword(1L, new UserPasswordChangeRequest("old-password", "new-password"));
+
+        assertThat(user.getPasswordHash()).isEqualTo("new-hash");
+        verify(userRepository).save(user);
+    }
+
+    @Test
+    void changeMyPasswordRejectsIncorrectCurrentPassword() {
+        User user = withId(User.create("Name", "0901234567", null, "old-hash", Set.of(UserRole.PASSENGER)), 1L);
+        when(userRepository.findByIdAndDeletedAtIsNull(1L)).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches("wrong-password", "old-hash")).thenReturn(false);
+
+        assertThatThrownBy(() -> userService.changeMyPassword(
+                1L,
+                new UserPasswordChangeRequest("wrong-password", "new-password")
+        ))
+                .isInstanceOfSatisfying(BusinessException.class, exception ->
+                        assertThat(exception.errorCode()).isEqualTo(ErrorCode.INVALID_CREDENTIALS)
+                );
+        assertThat(user.getPasswordHash()).isEqualTo("old-hash");
+        verify(passwordEncoder, never()).encode(any());
+        verify(userRepository, never()).save(any(User.class));
     }
 
     @Test
