@@ -106,8 +106,22 @@ public class User {
         this.email = normalizeOptional(email);
     }
 
+    public void updateDetails(String fullName, String phone, String email, String avatarUrl) {
+        this.fullName = requireText(fullName, "fullName");
+        this.phone = requireText(phone, "phone");
+        this.email = normalizeOptional(email);
+        this.avatarUrl = normalizeOptional(avatarUrl);
+    }
+
     public void changePasswordHash(String passwordHash) {
         this.passwordHash = requireText(passwordHash, "passwordHash");
+    }
+
+    public void replaceRoles(Set<UserRole> roles) {
+        if (roles == null || roles.isEmpty()) {
+            throw new IllegalArgumentException("User must have at least one role");
+        }
+        this.roles = EnumSet.copyOf(roles);
     }
 
     public void addRole(UserRole role) {
@@ -124,6 +138,10 @@ public class User {
 
     public void activate() {
         this.status = UserStatus.ACTIVE;
+    }
+
+    public void changeStatus(UserStatus status) {
+        this.status = Objects.requireNonNull(status, "status");
     }
 
     public void softDelete() {
