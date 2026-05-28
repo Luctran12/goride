@@ -6,6 +6,61 @@
 
 ---
 
+## Commit: `feat: add admin driver approval api`
+
+Branch: `feature/admin-driver-approval`
+
+Phase: Admin Module minimum, theo `docs/backend-implementation.md` muc 5.7 va checklist FE trong `integrate-plan.md`
+
+### Muc tieu
+
+Giai quyet diem nghen FE/driver onboarding: driver can profile `APPROVED` moi bat online duoc, nhung truoc commit nay chua co API admin duyet ho so. Commit nay them API admin xem ho so pending va approve/reject driver.
+
+### Noi dung da trien khai
+
+- Them `AdminDriverController`:
+  - `GET /api/v1/admin/drivers/pending?page=1&size=20`
+  - `PATCH /api/v1/admin/drivers/{driverId}/approval`
+  - Tat ca endpoint yeu cau role `ADMIN`.
+- Them `DriverApprovalUpdateRequest` voi field `approvalStatus`.
+- Them `DriverApprovalService`:
+  - List driver profiles dang `PENDING` voi pagination 1-based.
+  - Approve driver profile bang driver user id.
+  - Reject driver profile bang driver user id.
+  - Khi reject, set profile offline va goi Redis availability store de xoa driver khoi online pool.
+  - Chan request `PENDING` vi endpoint chi cho `APPROVED` hoac `REJECTED`.
+- Mo rong `DriverProfileRepository`:
+  - Query pending profiles theo `approvalStatus`.
+  - Tai su dung lock lookup theo `userId` cho update approval an toan.
+- Cap nhat `integrate-plan.md`:
+  - Danh dau admin pending/approve-reject da hoan thien.
+  - Them huong dan FE goi Admin driver approval APIs.
+
+### Review truoc commit
+
+- Da xac nhan endpoint admin duoc bao ve bang `hasRole('ADMIN')`.
+- Da xac nhan approve/reject dung driver user id, khop voi convention `driverId` trong cac API driver/rating hien co.
+- Da xac nhan reject driver online se goi `markOffline(...)` sau transaction commit.
+- Da xac nhan page/size sai va request `PENDING` bi chan bang `VALIDATION_ERROR`.
+- Da chay `./mvnw.cmd test`: pass 141 tests.
+
+### Files chinh
+
+- `src/main/java/com/example/goride/driver/controller/AdminDriverController.java`
+- `src/main/java/com/example/goride/driver/service/DriverApprovalService.java`
+- `src/main/java/com/example/goride/driver/dto/DriverApprovalUpdateRequest.java`
+- `src/main/java/com/example/goride/driver/repository/DriverProfileRepository.java`
+- `src/test/java/com/example/goride/driver/service/DriverApprovalServiceTests.java`
+- `integrate-plan.md`
+
+### Viec tiep theo
+
+- Them WebSocket JWT authentication interceptor cho STOMP `CONNECT`.
+- Them pricing public/admin API.
+- Them admin stats/dashboard.
+
+---
+
 ## Commit: `feat: add driver rating list api`
 
 Branch: `feature/driver-rating-list-api`

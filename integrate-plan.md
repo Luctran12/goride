@@ -115,6 +115,14 @@ type PaymentStatus = "PENDING" | "COMPLETED" | "FAILED" | "REFUNDED";
 - [x] Khi offline, backend xoa status/meta khoi Redis.
 - [x] Driver chi online duoc neu profile da `APPROVED`.
 
+### User profile va admin user management
+
+- [x] User xem profile cua minh.
+- [x] User cap nhat profile cua minh.
+- [x] User doi mat khau.
+- [x] Admin tao/xem/list/cap nhat/xoa user.
+- [x] Admin suspend/activate user qua `status`.
+
 ### Booking va trip
 
 - [x] Passenger tinh gia uoc luong.
@@ -166,6 +174,13 @@ type PaymentStatus = "PENDING" | "COMPLETED" | "FAILED" | "REFUNDED";
 - [x] Cap nhat `driver_profiles.average_rating` va `total_ratings`.
 - [x] Public API xem rating cua driver co pagination.
 
+### Admin driver approval
+
+- [x] Admin xem danh sach driver profile dang `PENDING`.
+- [x] Admin approve driver profile.
+- [x] Admin reject driver profile.
+- [x] Khi reject, backend dua driver offline khoi Redis availability pool.
+
 ### WebSocket notifications
 
 - [x] Driver offer queue: `/user/queue/trip-requests`.
@@ -182,15 +197,9 @@ type PaymentStatus = "PENDING" | "COMPLETED" | "FAILED" | "REFUNDED";
 - [ ] WebSocket JWT authentication chua thay interceptor xu ly STOMP `CONNECT`.
   - FE van nen thiet ke gui token trong connect headers.
   - Backend can commit them channel interceptor de gan `Principal`/roles cho STOMP message.
-- [ ] Admin approval driver chua co REST API.
-  - Driver online yeu cau profile `APPROVED`, nhung hien chua co endpoint admin approve/reject.
-  - Tam thoi can seed/update DB thu cong trong moi truong dev.
 - [ ] API pricing public/admin chua co.
   - Backend co seeder pricing config va dung noi bo de tinh fare.
   - FE chua co endpoint de hien thi bang gia.
-- [ ] API profile passenger/user chua co.
-  - Auth response chi tra `userId`, token, roles.
-  - Chua co API lay/cap nhat fullName/avatar/email cua user.
 
 ### Payment/rating/statistics
 
@@ -211,10 +220,10 @@ type PaymentStatus = "PENDING" | "COMPLETED" | "FAILED" | "REFUNDED";
 
 ### Admin module
 
-- [ ] Admin list users.
-- [ ] Admin suspend/activate user.
-- [ ] Admin list pending drivers.
-- [ ] Admin approve/reject driver.
+- [x] Admin list/create/update/delete users.
+- [x] Admin suspend/activate user.
+- [x] Admin list pending drivers.
+- [x] Admin approve/reject driver.
 - [ ] Admin list trips/filter.
 - [ ] Admin stats/dashboard.
 
@@ -801,6 +810,145 @@ FE action:
 
 ---
 
+### 4.9 User profile va admin user management
+
+Luu y: nhom API user hien dang dung prefix `/api/users`, khong phai `/api/v1`.
+
+#### User lay profile cua minh
+
+```http
+GET /api/users/me
+Authorization: Bearer <accessToken>
+```
+
+Response `data`:
+
+```json
+{
+  "id": 1,
+  "fullName": "Nguyen Van A",
+  "phone": "0900000000",
+  "email": "a@example.com",
+  "avatarUrl": "https://cdn.example.com/avatar.jpg",
+  "status": "ACTIVE",
+  "roles": ["PASSENGER"],
+  "createdAt": "2026-05-27T10:00:00Z",
+  "updatedAt": "2026-05-27T10:00:00Z"
+}
+```
+
+#### User cap nhat profile cua minh
+
+```http
+PUT /api/users/me
+Authorization: Bearer <accessToken>
+```
+
+Request:
+
+```json
+{
+  "fullName": "Nguyen Van A",
+  "phone": "0900000000",
+  "email": "a@example.com",
+  "avatarUrl": "https://cdn.example.com/avatar.jpg"
+}
+```
+
+#### User doi mat khau
+
+```http
+PUT /api/users/me/password
+Authorization: Bearer <accessToken>
+```
+
+Request:
+
+```json
+{
+  "currentPassword": "old-password",
+  "newPassword": "new-password"
+}
+```
+
+FE action:
+- Neu `INVALID_CREDENTIALS`, hien "Mat khau hien tai khong dung".
+- Sau khi doi mat khau thanh cong, nen yeu cau user dang nhap lai neu app policy can chat hon.
+
+#### Admin list users
+
+```http
+GET /api/users?page=1&size=20
+Authorization: Bearer <adminToken>
+```
+
+Response `data`: `PageResponse<UserResponse>`.
+
+#### Admin tao/cap nhat/xoa user
+
+```http
+POST /api/users
+GET /api/users/{id}
+PUT /api/users/{id}
+DELETE /api/users/{id}
+Authorization: Bearer <adminToken>
+```
+
+FE action:
+- Dung `status` = `ACTIVE` hoac `SUSPENDED` de activate/suspend.
+- `roles` la set role day du cua user sau cap nhat.
+
+---
+
+### 4.10 Admin driver approval
+
+#### Admin xem driver dang cho duyet
+
+```http
+GET /api/v1/admin/drivers/pending?page=1&size=20
+Authorization: Bearer <adminToken>
+```
+
+Response `data`: `PageResponse<DriverProfileResponse>`.
+
+FE action:
+- Hien danh sach ho so driver co `approvalStatus = PENDING`.
+- `page` la 1-based, `size` hop le tu 1 den 100.
+
+#### Admin approve/reject driver
+
+```http
+PATCH /api/v1/admin/drivers/{driverId}/approval
+Authorization: Bearer <adminToken>
+```
+
+Luu y: `driverId` la `userId` cua driver trong `DriverProfileResponse`, khong phai profile `id`.
+
+Request approve:
+
+```json
+{
+  "approvalStatus": "APPROVED"
+}
+```
+
+Request reject:
+
+```json
+{
+  "approvalStatus": "REJECTED"
+}
+```
+
+Response `data`: `DriverProfileResponse`.
+
+FE action:
+- Sau approve, driver co the bat online.
+- Sau reject, backend set profile offline va xoa driver khoi Redis availability pool.
+- Khong gui `PENDING`; backend se tra `VALIDATION_ERROR`.
+
+---
+
 ## 5. WebSocket integration
 
 ### Ket noi
@@ -872,8 +1020,8 @@ Can luu y: backend hien chua co interceptor doc JWT tu STOMP `CONNECT`, nen day 
 ### Driver app
 
 - [ ] Auth screen.
-- [ ] Profile onboarding.
-- [ ] Approval waiting screen.
+- [ ] Profile onboarding: tao profile bang `POST /api/v1/drivers/me/profile`.
+- [ ] Approval waiting screen: doc `approvalStatus` tu `GET /api/v1/drivers/me/profile`; chi cho online khi status la `APPROVED`.
 - [ ] Online toggle with current GPS.
 - [ ] Offer modal from `/user/queue/trip-requests`.
 - [ ] Trip workflow buttons: arrived/start/complete.
@@ -885,6 +1033,14 @@ Can luu y: backend hien chua co interceptor doc JWT tu STOMP `CONNECT`, nen day 
 
 - [ ] Public rating list: `GET /api/v1/drivers/{driverId}/ratings`.
 - [ ] Display `averageRating` tu driver profile neu FE co endpoint lay profile tu app driver; public driver profile API rieng chua co.
+
+### Admin app
+
+- [ ] User management: list/create/update/delete users qua `/api/users`.
+- [ ] User status management: set `ACTIVE`/`SUSPENDED` qua `/api/users/{id}`.
+- [ ] Pending driver list: `GET /api/v1/admin/drivers/pending`.
+- [ ] Driver approval action: `PATCH /api/v1/admin/drivers/{driverId}/approval`.
+- [ ] Trip monitoring/dashboard: cho backend bo sung admin trip filter va stats API.
 
 ---
 
@@ -911,12 +1067,16 @@ Can luu y: backend hien chua co interceptor doc JWT tu STOMP `CONNECT`, nen day 
 ## 8. Thu tu tich hop de giam rui ro
 
 1. Auth REST + token refresh.
-2. Passenger estimate/create booking/list booking.
-3. Driver profile + online/offline.
-4. WebSocket subscribe driver offer va passenger trip status.
-5. Driver accept/reject offer.
-6. Trip status buttons.
-7. Tracking realtime.
-8. Cash payment confirm.
-9. Rating create + public rating list.
-10. Sau khi backend co admin approval API va STOMP JWT interceptor, noi tiep admin app va WebSocket auth production.
+2. User profile: get/update me va change password.
+3. Admin user management: list/create/update/delete/suspend users.
+4. Driver profile onboarding.
+5. Admin approve/reject driver profile.
+6. Driver online/offline sau khi profile da `APPROVED`.
+7. Passenger estimate/create booking/list booking.
+8. WebSocket subscribe driver offer va passenger trip status.
+9. Driver accept/reject offer.
+10. Trip status buttons.
+11. Tracking realtime.
+12. Cash payment confirm.
+13. Rating create + public rating list.
+14. Sau khi backend co STOMP JWT interceptor, noi tiep WebSocket auth production.
