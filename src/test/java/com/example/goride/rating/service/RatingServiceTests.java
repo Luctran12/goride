@@ -23,11 +23,14 @@ import org.locationtech.jts.geom.PrecisionModel;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 
@@ -160,6 +163,55 @@ class RatingServiceTests {
         verify(driverProfileRepository, never()).save(any());
     }
 
+    @Test
+    void listsDriverRatingsWithOneBasedPagination() {
+        User driver = driver(20L);
+        DriverProfile driverProfile = driverProfile(driver);
+        Rating firstRating = savedRating(completedTrip(driver), 55L, 5, "Great driver", "2026-05-25T02:00:00Z");
+        Rating secondRating = savedRating(completedTrip(driver), 54L, 4, null, "2026-05-24T02:00:00Z");
+        when(driverProfileRepository.findByUserIdAndUserDeletedAtIsNull(20L)).thenReturn(Optional.of(driverProfile));
+        when(ratingRepository.findByDriverIdOrderByCreatedAtDesc(20L, PageRequest.of(0, 2)))
+                .thenReturn(new PageImpl<>(List.of(firstRating, secondRating), PageRequest.of(0, 2), 3));
+
+        var response = service.listDriverRatings(20L, 1, 2);
+
+        assertThat(response.items()).hasSize(2);
+        assertThat(response.items().get(0).ratingId()).isEqualTo(55L);
+        assertThat(response.items().get(0).score()).isEqualTo(5);
+        assertThat(response.items().get(0).comment()).isEqualTo("Great driver");
+        assertThat(response.items().get(1).ratingId()).isEqualTo(54L);
+        assertThat(response.pagination().page()).isEqualTo(1);
+        assertThat(response.pagination().size()).isEqualTo(2);
+        assertThat(response.pagination().totalItems()).isEqualTo(3);
+        assertThat(response.pagination().totalPages()).isEqualTo(2);
+    }
+
+    @Test
+    void listDriverRatingsRejectsMissingDriverProfile() {
+        when(driverProfileRepository.findByUserIdAndUserDeletedAtIsNull(20L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.listDriverRatings(20L, 1, 20))
+                .isInstanceOfSatisfying(BusinessException.class, exception ->
+                        assertThat(exception.errorCode()).isEqualTo(ErrorCode.DRIVER_PROFILE_NOT_FOUND)
+                );
+
+        verifyNoInteractions(ratingRepository);
+    }
+
+    @Test
+    void listDriverRatingsRejectsInvalidPaginationBeforeQuerying() {
+        assertThatThrownBy(() -> service.listDriverRatings(20L, 0, 20))
+                .isInstanceOfSatisfying(BusinessException.class, exception ->
+                        assertThat(exception.errorCode()).isEqualTo(ErrorCode.VALIDATION_ERROR)
+                );
+        assertThatThrownBy(() -> service.listDriverRatings(20L, 1, 101))
+                .isInstanceOfSatisfying(BusinessException.class, exception ->
+                        assertThat(exception.errorCode()).isEqualTo(ErrorCode.VALIDATION_ERROR)
+                );
+
+        verifyNoInteractions(driverProfileRepository, ratingRepository);
+    }
+
     private Trip completedTrip(User driver) {
         Trip trip = acceptedTrip(driver);
         trip.markArrived();
@@ -215,6 +267,13 @@ class RatingServiceTests {
                 "Black",
                 (short) 2022
         );
+    }
+
+    private Rating savedRating(Trip trip, Long id, int score, String comment, String createdAt) {
+        Rating rating = Rating.create(trip, trip.getPassenger(), trip.getDriver(), score, comment);
+        ReflectionTestUtils.setField(rating, "id", id);
+        ReflectionTestUtils.setField(rating, "createdAt", Instant.parse(createdAt));
+        return rating;
     }
 
     private User passenger(Long id) {
