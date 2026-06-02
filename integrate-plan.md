@@ -183,6 +183,7 @@ type PaymentStatus = "PENDING" | "COMPLETED" | "FAILED" | "REFUNDED";
 
 ### WebSocket notifications
 
+- [x] STOMP `CONNECT` authenticate bang JWT trong header `Authorization`.
 - [x] Driver offer queue: `/user/queue/trip-requests`.
 - [x] User notification queue: `/user/queue/notifications`.
 - [x] Trip status topic: `/topic/trip/{tripId}/status`.
@@ -194,9 +195,6 @@ type PaymentStatus = "PENDING" | "COMPLETED" | "FAILED" | "REFUNDED";
 
 ### High priority cho FE integration
 
-- [ ] WebSocket JWT authentication chua thay interceptor xu ly STOMP `CONNECT`.
-  - FE van nen thiet ke gui token trong connect headers.
-  - Backend can commit them channel interceptor de gan `Principal`/roles cho STOMP message.
 - [ ] API pricing public/admin chua co.
   - Backend co seeder pricing config va dung noi bo de tinh fare.
   - FE chua co endpoint de hien thi bang gia.
@@ -981,7 +979,7 @@ connectHeaders: {
 }
 ```
 
-Can luu y: backend hien chua co interceptor doc JWT tu STOMP `CONNECT`, nen day la contract FE nen chuan bi, con backend can commit rieng de hoan thien auth WebSocket.
+Luu y: HTTP handshake toi `/ws` duoc mo de client ket noi WebSocket. Backend authenticate o STOMP `CONNECT`; neu thieu hoac sai `Authorization: Bearer <accessToken>`, connection frame bi tu choi. Sau khi connect thanh cong, backend gan `Principal`/roles tu JWT cho message mapping nhu `/app/driver.location`.
 
 ### Destinations can subscribe
 
@@ -1079,4 +1077,4 @@ Can luu y: backend hien chua co interceptor doc JWT tu STOMP `CONNECT`, nen day 
 11. Tracking realtime.
 12. Cash payment confirm.
 13. Rating create + public rating list.
-14. Sau khi backend co STOMP JWT interceptor, noi tiep WebSocket auth production.
+14. WebSocket auth production: gui token trong STOMP `CONNECT`, test reconnect khi access token het han.
