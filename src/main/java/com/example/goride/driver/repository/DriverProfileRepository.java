@@ -3,6 +3,8 @@ package com.example.goride.driver.repository;
 import com.example.goride.driver.domain.ApprovalStatus;
 import com.example.goride.driver.domain.DriverProfile;
 import jakarta.persistence.LockModeType;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
@@ -22,6 +24,11 @@ public interface DriverProfileRepository extends JpaRepository<DriverProfile, Lo
               and user.deletedAt is null
             """)
     Optional<DriverProfile> findByUserIdForUpdate(@Param("userId") Long userId);
+
+    Page<DriverProfile> findByApprovalStatusAndUserDeletedAtIsNull(
+            ApprovalStatus approvalStatus,
+            Pageable pageable
+    );
 
     boolean existsByUserId(Long userId);
 
