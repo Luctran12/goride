@@ -6,6 +6,58 @@
 
 ---
 
+## Commit: `feat: add stomp jwt authentication`
+
+Branch: `feature/stomp-jwt-auth`
+
+Phase: Phase 5 - Tracking realtime, theo `docs/backend-implementation.md` muc 6.1 va 10.2
+
+### Muc tieu
+
+Hoan thien authentication cho WebSocket/STOMP: client ket noi `/ws`, sau do gui JWT trong STOMP `CONNECT` de backend gan dung `Principal` va roles cho cac message mapping realtime.
+
+### Noi dung da trien khai
+
+- Them `StompJwtAuthenticationInterceptor`:
+  - Doc `Authorization: Bearer <accessToken>` tu STOMP `CONNECT`.
+  - Decode JWT bang `JwtDecoder` hien co.
+  - Chuyen claim `roles` thanh authorities `ROLE_*`.
+  - Gan `JwtAuthenticationToken` vao STOMP user/principal.
+  - Set `SecurityContext` trong `beforeHandle` cho `SEND`/`SUBSCRIBE` de method security co authentication tren handler thread.
+  - Chan `CONNECT` thieu/sai token va chan `SEND`/`SUBSCRIBE` khong co authenticated principal.
+- Wire interceptor vao `WebSocketConfig.configureClientInboundChannel(...)`.
+- Mo REST security cho `/ws` va `/ws/**` de handshake WebSocket khong bi chan truoc khi STOMP `CONNECT` gui token.
+- Them unit test cho interceptor:
+  - CONNECT hop le.
+  - CONNECT thieu token.
+  - CONNECT token invalid.
+  - SEND co principal se set/clear `SecurityContext`.
+  - SEND khong co principal bi reject.
+- Cap nhat `integrate-plan.md` de FE biet authentication nam o STOMP `CONNECT`, khong nam o HTTP handshake.
+
+### Review truoc commit
+
+- Da xac nhan `/ws` permitAll chi ap dung HTTP handshake; STOMP frame van bat buoc JWT o interceptor.
+- Da xac nhan role mapping dung claim `roles` va prefix `ROLE_`, khop REST JWT converter.
+- Da xac nhan `SecurityContextHolder.clearContext()` duoc goi sau message handled de tranh leak authentication giua thread.
+- Da chay `./mvnw.cmd test`: pass 146 tests.
+
+### Files chinh
+
+- `src/main/java/com/example/goride/common/security/StompJwtAuthenticationInterceptor.java`
+- `src/main/java/com/example/goride/common/config/WebSocketConfig.java`
+- `src/main/java/com/example/goride/auth/config/SecurityConfig.java`
+- `src/test/java/com/example/goride/common/security/StompJwtAuthenticationInterceptorTests.java`
+- `integrate-plan.md`
+
+### Viec tiep theo
+
+- Them authorize SUBSCRIBE theo owner cua trip cho `/topic/trip/{tripId}/...`.
+- Them pricing public/admin API.
+- Them admin trip filter va stats/dashboard.
+
+---
+
 ## Commit: `feat: add admin driver approval api`
 
 Branch: `feature/admin-driver-approval`
