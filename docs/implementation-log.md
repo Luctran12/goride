@@ -6,6 +6,67 @@
 
 ---
 
+## Commit: `feat: add pricing config api`
+
+Branch: `feature/pricing-api`
+
+Phase: Phase 3 - Pricing + Booking va Phase 7 - Admin minimum, theo `docs/backend-implementation.md` muc 3.5 va `integrate-plan.md`
+
+### Muc tieu
+
+Mo API pricing de FE hien thi bang gia active va admin quan ly pricing versions. Backend van tiep tuc tu tinh fare khi estimate/create booking, khong tin gia client gui len.
+
+### Noi dung da trien khai
+
+- Them DTO pricing:
+  - `PricingConfigResponse`
+  - `PricingConfigCreateRequest`
+- Mo rong `PricingConfigRepository`:
+  - List active pricing configs.
+  - List tat ca pricing versions cho admin.
+  - Tim active configs theo `vehicleType` de deactivate khi tao version moi.
+- Them `PricingConfigService`:
+  - Public list active pricing.
+  - Admin list all pricing.
+  - Admin create pricing version moi va deactivate active config cu cung `vehicleType`.
+  - Chan `effectiveFrom` trong tuong lai de tranh deactivate pricing hien tai truoc khi version moi co hieu luc.
+  - Admin deactivate pricing config theo id.
+- Them controller:
+  - `GET /api/v1/pricing`
+  - `GET /api/v1/admin/pricing`
+  - `POST /api/v1/admin/pricing`
+  - `PATCH /api/v1/admin/pricing/{pricingConfigId}/deactivate`
+- Mo REST security cho `/api/v1/pricing/**` public; admin endpoints van yeu cau role `ADMIN`.
+- Them service tests cho list/create/deactivate pricing.
+- Cap nhat `integrate-plan.md` voi huong dan FE goi pricing APIs.
+
+### Review truoc commit
+
+- Da xac nhan public endpoint chi expose pricing config active.
+- Da xac nhan admin create version moi khong sua version cu truc tiep, ma deactivate active config cu va tao record moi.
+- Da xac nhan booking estimate/create van dung server-side pricing config hien co.
+- Da xac nhan khong cho tao pricing version co `effectiveFrom` trong tuong lai vi MVP deactivate active config cu ngay.
+- Da chay `./mvnw.cmd test`: pass 152 tests.
+
+### Files chinh
+
+- `src/main/java/com/example/goride/booking/controller/PricingController.java`
+- `src/main/java/com/example/goride/booking/controller/AdminPricingController.java`
+- `src/main/java/com/example/goride/booking/service/PricingConfigService.java`
+- `src/main/java/com/example/goride/booking/dto/PricingConfigResponse.java`
+- `src/main/java/com/example/goride/booking/dto/PricingConfigCreateRequest.java`
+- `src/main/java/com/example/goride/booking/repository/PricingConfigRepository.java`
+- `src/test/java/com/example/goride/booking/service/PricingConfigServiceTests.java`
+- `integrate-plan.md`
+
+### Viec tiep theo
+
+- Them authorize SUBSCRIBE theo owner cua trip cho `/topic/trip/{tripId}/...`.
+- Them admin trip filter va stats/dashboard.
+- Them payment detail/history API neu FE can man hinh hoa don.
+
+---
+
 ## Commit: `feat: add stomp jwt authentication`
 
 Branch: `feature/stomp-jwt-auth`
