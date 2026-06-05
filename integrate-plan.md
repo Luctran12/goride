@@ -187,6 +187,7 @@ type PaymentStatus = "PENDING" | "COMPLETED" | "FAILED" | "REFUNDED";
 ### WebSocket notifications
 
 - [x] STOMP `CONNECT` authenticate bang JWT trong header `Authorization`.
+- [x] STOMP `SUBSCRIBE` vao trip topic chi cho passenger/driver cua trip hoac admin.
 - [x] Driver offer queue: `/user/queue/trip-requests`.
 - [x] User notification queue: `/user/queue/notifications`.
 - [x] Trip status topic: `/topic/trip/{tripId}/status`.
@@ -195,11 +196,6 @@ type PaymentStatus = "PENDING" | "COMPLETED" | "FAILED" | "REFUNDED";
 ---
 
 ## 3. Checklist chuc nang chua hoan thien / can lam tiep
-
-### High priority cho FE integration
-
-- [ ] WebSocket SUBSCRIBE authorization theo owner trip chua co.
-  - Backend da authenticate STOMP `CONNECT`, nhung can them guard theo trip owner cho `/topic/trip/{tripId}/...`.
 
 ### Payment/rating/statistics
 
@@ -1063,6 +1059,8 @@ connectHeaders: {
 ```
 
 Luu y: HTTP handshake toi `/ws` duoc mo de client ket noi WebSocket. Backend authenticate o STOMP `CONNECT`; neu thieu hoac sai `Authorization: Bearer <accessToken>`, connection frame bi tu choi. Sau khi connect thanh cong, backend gan `Principal`/roles tu JWT cho message mapping nhu `/app/driver.location`.
+
+Subscribe vao `/topic/trip/{tripId}/status` va `/topic/trip/{tripId}/location` chi thanh cong neu JWT user la passenger cua trip, driver cua trip, hoac admin. Neu FE subscribe nham trip, backend reject frame voi `FORBIDDEN`/access denied o WebSocket layer.
 
 ### Destinations can subscribe
 

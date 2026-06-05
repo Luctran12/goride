@@ -6,6 +6,62 @@
 
 ---
 
+## Commit: `feat: authorize trip topic subscriptions`
+
+Branch: `feature/stomp-subscribe-authorization`
+
+Phase: Phase 5 - Tracking realtime va WebSocket security, theo `docs/backend-implementation.md` muc 6.3 va 10.2
+
+### Muc tieu
+
+Chan user subscribe vao topic realtime cua trip khong thuoc ve minh. Sau commit STOMP JWT auth, backend da biet user la ai; commit nay them owner check cho trip status/location topics.
+
+### Noi dung da trien khai
+
+- Them `StompSubscriptionAuthorizer` lam extension point cho cac rule authorize STOMP subscribe.
+- Cap nhat `StompJwtAuthenticationInterceptor`:
+  - Khi frame la `SUBSCRIBE`, goi tat ca `StompSubscriptionAuthorizer`.
+  - Van set `SecurityContext` cho handler thread nhu truoc.
+- Them `TripTopicSubscriptionAuthorizer`:
+  - Guard `/topic/trip/{tripId}/status`.
+  - Guard `/topic/trip/{tripId}/location`.
+  - Cho phep passenger cua trip, driver cua trip, hoac admin.
+  - Bo qua destination khong phai trip topic.
+- Mo rong `TripRepository` voi query `existsAccessibleTripTopicByUserId(...)`.
+- Them tests:
+  - Interceptor delegate SUBSCRIBE sang authorizer.
+  - Passenger/driver owner duoc subscribe.
+  - User khong thuoc trip bi reject.
+  - Admin duoc subscribe khong can owner lookup.
+  - Destination khac khong bi guard nham.
+  - Principal subject khong phai numeric bi reject.
+- Cap nhat `integrate-plan.md` de FE biet trip topics da enforce owner/admin.
+
+### Review truoc commit
+
+- Da xac nhan guard dung destination thuc te trong code: `/topic/trip/%d/status` va `/topic/trip/%d/location`.
+- Da xac nhan user queues nhu `/user/queue/notifications` va `/user/queue/trip-requests` khong bi trip topic guard nham.
+- Da xac nhan query owner check khong load full trip entity.
+- Da chay `./mvnw.cmd test`: pass 158 tests.
+
+### Files chinh
+
+- `src/main/java/com/example/goride/common/security/StompSubscriptionAuthorizer.java`
+- `src/main/java/com/example/goride/common/security/StompJwtAuthenticationInterceptor.java`
+- `src/main/java/com/example/goride/booking/security/TripTopicSubscriptionAuthorizer.java`
+- `src/main/java/com/example/goride/booking/repository/TripRepository.java`
+- `src/test/java/com/example/goride/common/security/StompJwtAuthenticationInterceptorTests.java`
+- `src/test/java/com/example/goride/booking/security/TripTopicSubscriptionAuthorizerTests.java`
+- `integrate-plan.md`
+
+### Viec tiep theo
+
+- Them admin trip filter va stats/dashboard.
+- Them payment detail/history API neu FE can man hinh hoa don.
+- Cap nhat `driver_profiles.total_trips` khi trip completed.
+
+---
+
 ## Commit: `feat: add pricing config api`
 
 Branch: `feature/pricing-api`
