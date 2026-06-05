@@ -125,6 +125,9 @@ type PaymentStatus = "PENDING" | "COMPLETED" | "FAILED" | "REFUNDED";
 
 ### Booking va trip
 
+- [x] Public API xem pricing config active.
+- [x] Admin API xem/tao pricing config version moi.
+- [x] Admin API deactivate pricing config cu.
 - [x] Passenger tinh gia uoc luong.
 - [x] Passenger tao booking.
 - [x] Passenger/driver xem chi tiet trip neu co quyen.
@@ -195,9 +198,8 @@ type PaymentStatus = "PENDING" | "COMPLETED" | "FAILED" | "REFUNDED";
 
 ### High priority cho FE integration
 
-- [ ] API pricing public/admin chua co.
-  - Backend co seeder pricing config va dung noi bo de tinh fare.
-  - FE chua co endpoint de hien thi bang gia.
+- [ ] WebSocket SUBSCRIBE authorization theo owner trip chua co.
+  - Backend da authenticate STOMP `CONNECT`, nhung can them guard theo trip owner cho `/topic/trip/{tripId}/...`.
 
 ### Payment/rating/statistics
 
@@ -220,6 +222,7 @@ type PaymentStatus = "PENDING" | "COMPLETED" | "FAILED" | "REFUNDED";
 
 - [x] Admin list/create/update/delete users.
 - [x] Admin suspend/activate user.
+- [x] Admin pricing list/create/deactivate.
 - [x] Admin list pending drivers.
 - [x] Admin approve/reject driver.
 - [ ] Admin list trips/filter.
@@ -947,6 +950,86 @@ FE action:
 
 ---
 
+### 4.11 Pricing config
+
+#### Public xem bang gia active
+
+```http
+GET /api/v1/pricing
+```
+
+Response `data`: `PricingConfigResponse[]`.
+
+```json
+[
+  {
+    "id": 1,
+    "vehicleType": "MOTORBIKE",
+    "baseFare": 10000,
+    "perKmRate": 4000,
+    "perMinuteRate": 300,
+    "minimumFare": 15000,
+    "surgeMultiplier": 1.0,
+    "active": true,
+    "effectiveFrom": "2026-01-01T00:00:00Z",
+    "createdAt": "2026-06-03T10:00:00Z",
+    "currency": "VND"
+  }
+]
+```
+
+FE action:
+- Dung endpoint nay de hien thi bang gia cho tung `vehicleType`.
+- Gia hien thi chi mang tinh config; khi booking, van goi `POST /api/v1/bookings/estimate` de server tinh gia theo khoang cach/thoi gian.
+
+#### Admin xem tat ca pricing versions
+
+```http
+GET /api/v1/admin/pricing
+Authorization: Bearer <adminToken>
+```
+
+Response `data`: `PricingConfigResponse[]`, bao gom active va inactive versions.
+
+#### Admin tao pricing version moi
+
+```http
+POST /api/v1/admin/pricing
+Authorization: Bearer <adminToken>
+```
+
+Request:
+
+```json
+{
+  "vehicleType": "CAR_4_SEAT",
+  "baseFare": 18000,
+  "perKmRate": 8500,
+  "perMinuteRate": 600,
+  "minimumFare": 28000,
+  "surgeMultiplier": 1.1,
+  "effectiveFrom": "2026-06-01T00:00:00Z"
+}
+```
+
+FE action:
+- Khi tao version moi cho cung `vehicleType`, backend deactivate cac active config cu cua loai xe do.
+- Khong sua version cu truc tiep de giu lich su pricing.
+- `effectiveFrom` khong duoc nam trong tuong lai trong MVP; tao version moi chi ap dung ngay hoac tu thoi diem qua khu.
+
+#### Admin deactivate pricing version
+
+```http
+PATCH /api/v1/admin/pricing/{pricingConfigId}/deactivate
+Authorization: Bearer <adminToken>
+```
+
+FE action:
+- Dung khi can tat mot pricing config.
+- Can dam bao moi `vehicleType` co it nhat mot active config neu FE/backend van cho booking loai xe do.
+
+---
+
 ## 5. WebSocket integration
 
 ### Ket noi
@@ -1036,6 +1119,7 @@ Luu y: HTTP handshake toi `/ws` duoc mo de client ket noi WebSocket. Backend aut
 
 - [ ] User management: list/create/update/delete users qua `/api/users`.
 - [ ] User status management: set `ACTIVE`/`SUSPENDED` qua `/api/users/{id}`.
+- [ ] Pricing management: list/create/deactivate pricing qua `/api/v1/admin/pricing`.
 - [ ] Pending driver list: `GET /api/v1/admin/drivers/pending`.
 - [ ] Driver approval action: `PATCH /api/v1/admin/drivers/{driverId}/approval`.
 - [ ] Trip monitoring/dashboard: cho backend bo sung admin trip filter va stats API.
