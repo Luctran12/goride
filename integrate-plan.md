@@ -1,6 +1,6 @@
 # GoRide Front-end Integration Plan
 
-Branch da kiem tra: `feature/driver-rating-list-api`
+Branch da kiem tra: `feature/admin-trip-list-api`
 
 Muc tieu file nay:
 - Checklist chuc nang backend da co code va co the tich hop FE.
@@ -221,7 +221,7 @@ type PaymentStatus = "PENDING" | "COMPLETED" | "FAILED" | "REFUNDED";
 - [x] Admin pricing list/create/deactivate.
 - [x] Admin list pending drivers.
 - [x] Admin approve/reject driver.
-- [ ] Admin list trips/filter.
+- [x] Admin list trips/filter.
 - [ ] Admin stats/dashboard.
 
 ---
@@ -1026,6 +1026,74 @@ FE action:
 
 ---
 
+### 4.12 Admin trip monitoring
+
+#### Admin list/filter trips
+
+```http
+GET /api/v1/admin/trips?page=1&size=20&status=COMPLETED&from=2026-06-01T00:00:00Z&to=2026-06-08T23:59:59Z
+Authorization: Bearer <adminToken>
+```
+
+Query params:
+- `page`: 1-based, default `1`, min `1`.
+- `size`: default `20`, min `1`, max `100`.
+- `status`: optional `TripStatus`.
+- `from`: optional ISO-8601 instant, filter `requestedAt >= from`.
+- `to`: optional ISO-8601 instant, filter `requestedAt <= to`.
+
+Response `data`: `PageResponse<TripResponse>`.
+
+```json
+{
+  "items": [
+    {
+      "id": 99,
+      "passengerId": 10,
+      "driverId": 20,
+      "status": "COMPLETED",
+      "vehicleType": "MOTORBIKE",
+      "paymentMethod": "CASH",
+      "pickup": {
+        "lat": 10.77,
+        "lng": 106.7,
+        "address": "Ben Thanh Market"
+      },
+      "dropoff": {
+        "lat": 10.813,
+        "lng": 106.665,
+        "address": "Tan Son Nhat Airport"
+      },
+      "estimatedDistanceKm": 4.2,
+      "estimatedDurationMin": 18,
+      "estimatedFare": 32000,
+      "finalFare": 45000,
+      "requestedAt": "2026-06-05T10:00:00Z",
+      "acceptedAt": "2026-06-05T10:01:00Z",
+      "arrivedAt": "2026-06-05T10:10:00Z",
+      "startedAt": "2026-06-05T10:12:00Z",
+      "completedAt": "2026-06-05T10:30:00Z",
+      "cancelledAt": null,
+      "cancelReason": null
+    }
+  ],
+  "pagination": {
+    "page": 1,
+    "size": 20,
+    "totalItems": 1,
+    "totalPages": 1
+  }
+}
+```
+
+FE action:
+- Dung cho admin trip monitoring/table.
+- Goi lai API khi admin doi status/date range/page/size.
+- Neu `from > to`, backend tra `VALIDATION_ERROR`; FE nen validate tren form de tranh request sai.
+- Ket hop voi `GET /api/v1/admin/trips?status=SEARCHING` de theo doi trip dang tim tai xe.
+
+---
+
 ## 5. WebSocket integration
 
 ### Ket noi
@@ -1120,7 +1188,8 @@ Subscribe vao `/topic/trip/{tripId}/status` va `/topic/trip/{tripId}/location` c
 - [ ] Pricing management: list/create/deactivate pricing qua `/api/v1/admin/pricing`.
 - [ ] Pending driver list: `GET /api/v1/admin/drivers/pending`.
 - [ ] Driver approval action: `PATCH /api/v1/admin/drivers/{driverId}/approval`.
-- [ ] Trip monitoring/dashboard: cho backend bo sung admin trip filter va stats API.
+- [ ] Trip monitoring: list/filter trips qua `GET /api/v1/admin/trips`.
+- [ ] Dashboard statistics: cho backend bo sung stats API.
 
 ---
 
