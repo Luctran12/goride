@@ -6,6 +6,64 @@
 
 ---
 
+## Commit: `feat: add admin trip list api`
+
+Branch: `feature/admin-trip-list-api`
+
+Phase: Phase 7 - Admin module, theo `integrate-plan.md` muc Admin module
+
+### Muc tieu
+
+Bo sung API de admin theo doi danh sach trip va loc theo status/khoang thoi gian request. Endpoint nay phuc vu man hinh trip monitoring truoc khi lam tiep dashboard/statistics.
+
+### Noi dung da trien khai
+
+- Them `AdminTripController`:
+  - `GET /api/v1/admin/trips`
+  - Yeu cau role `ADMIN`.
+  - Ho tro query params `status`, `from`, `to`, `page`, `size`.
+- Them `AdminTripService`:
+  - Validate pagination 1-based, `size` toi da 100.
+  - Validate `from <= to`.
+  - Sort trip theo `requestedAt DESC`.
+  - Tra ve `PageResponse<TripResponse>` de FE dung lai contract trip hien co.
+- Mo rong `TripRepository` voi `searchAdminTrips(...)`:
+  - Bo qua trip da soft delete.
+  - Optional filter theo `TripStatus`.
+  - Optional filter theo `requestedAt` tu `from` den `to`.
+  - Co `countQuery` rieng cho pagination.
+- Them `AdminTripServiceTests`:
+  - Kiem tra status/date filters duoc truyen xuong repository.
+  - Kiem tra page 1-based sang Spring Pageable 0-based.
+  - Kiem tra validate page/size va date range sai truoc khi query.
+- Cap nhat `integrate-plan.md`:
+  - Danh dau admin list trips/filter da hoan thien.
+  - Them huong dan FE goi `GET /api/v1/admin/trips`.
+
+### Review truoc commit
+
+- Da xac nhan endpoint admin duoc bao ve bang `hasRole('ADMIN')`.
+- Da xac nhan API dung pagination contract 1-based giong admin driver pending list.
+- Da xac nhan query mac dinh khong tra trip da soft delete.
+- Da xac nhan `from > to` tra `VALIDATION_ERROR` thay vi query sai khoang thoi gian.
+- Da chay `./mvnw.cmd test`: pass 161 tests.
+
+### Files chinh
+
+- `src/main/java/com/example/goride/booking/controller/AdminTripController.java`
+- `src/main/java/com/example/goride/booking/service/AdminTripService.java`
+- `src/main/java/com/example/goride/booking/repository/TripRepository.java`
+- `src/test/java/com/example/goride/booking/service/AdminTripServiceTests.java`
+- `integrate-plan.md`
+
+### Viec tiep theo
+
+- Them admin stats/dashboard API.
+- Them payment detail/history API neu FE can man hinh hoa don.
+- Cap nhat `driver_profiles.total_trips` khi trip completed.
+
+---
+
 ## Commit: `feat: authorize trip topic subscriptions`
 
 Branch: `feature/stomp-subscribe-authorization`
