@@ -7,7 +7,9 @@ import com.example.goride.booking.repository.TripRepository;
 import com.example.goride.booking.repository.TripStatusHistoryRepository;
 import com.example.goride.common.error.BusinessException;
 import com.example.goride.common.error.ErrorCode;
+import com.example.goride.driver.domain.DriverProfile;
 import com.example.goride.driver.dto.DriverTripResponse;
+import com.example.goride.driver.repository.DriverProfileRepository;
 import com.example.goride.notification.dto.TripStatusNotification;
 import com.example.goride.notification.dto.UserNotification;
 import com.example.goride.notification.service.TripRealtimeNotifier;
@@ -25,6 +27,7 @@ import java.util.Objects;
 public class DriverTripStatusService {
     private final TripRepository tripRepository;
     private final TripStatusHistoryRepository tripStatusHistoryRepository;
+    private final DriverProfileRepository driverProfileRepository;
     private final TripRealtimeNotifier tripRealtimeNotifier;
     private final TripCompletionFareService tripCompletionFareService;
     private final TripPaymentService tripPaymentService;
@@ -32,12 +35,14 @@ public class DriverTripStatusService {
     public DriverTripStatusService(
             TripRepository tripRepository,
             TripStatusHistoryRepository tripStatusHistoryRepository,
+            DriverProfileRepository driverProfileRepository,
             TripRealtimeNotifier tripRealtimeNotifier,
             TripCompletionFareService tripCompletionFareService,
             TripPaymentService tripPaymentService
     ) {
         this.tripRepository = tripRepository;
         this.tripStatusHistoryRepository = tripStatusHistoryRepository;
+        this.driverProfileRepository = driverProfileRepository;
         this.tripRealtimeNotifier = tripRealtimeNotifier;
         this.tripCompletionFareService = tripCompletionFareService;
         this.tripPaymentService = tripPaymentService;
@@ -97,6 +102,13 @@ public class DriverTripStatusService {
 
         TripCompletionFare fare = tripCompletionFareService.calculate(trip);
         trip.complete(fare.finalFare(), fare.actualDistanceKm(), fare.actualDurationMin());
+        recordDriverCompletedTrip(trip);
+    }
+
+    private void recordDriverCompletedTrip(Trip trip) {
+        DriverProfile profile = driverProfileRepository.findByUserIdForUpdate(trip.getDriver().getId())
+                .orElseThrow(() -> new BusinessException(ErrorCode.DRIVER_PROFILE_NOT_FOUND));
+        profile.recordCompletedTrip();
     }
 
     private void createPaymentIfCompleted(Trip trip) {
