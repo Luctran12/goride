@@ -21,5 +21,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     boolean existsByEmailAndDeletedAtIsNull(String email);
 
+    long countByDeletedAtIsNull();
+
     long countByStatusAndDeletedAtIsNull(UserStatus status);
 }

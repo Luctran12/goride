@@ -6,6 +6,65 @@
 
 ---
 
+## Commit: `feat: add admin dashboard api`
+
+Branch: `feature/admin-dashboard-api`
+
+Phase: Phase 7 - Admin module va statistics foundation, theo `integrate-plan.md` muc Admin module
+
+### Muc tieu
+
+Bo sung API tong hop dashboard cho admin de FE co so lieu cards/chart co ban: user, driver approval, trip theo status, payment completed revenue va average driver rating.
+
+### Noi dung da trien khai
+
+- Them `AdminDashboardController`:
+  - `GET /api/v1/admin/dashboard`
+  - Yeu cau role `ADMIN`.
+- Them `AdminDashboardService`:
+  - Tong hop user active/suspended/total.
+  - Tong hop driver total va approval status `PENDING`, `APPROVED`, `REJECTED`.
+  - Tong hop total trips va `tripsByStatus`, luon fill du moi `TripStatus` voi default `0`.
+  - Tong hop payment `COMPLETED`: count va revenue.
+  - Tinh average driver rating, lam tron 1 chu so thap phan.
+- Them `AdminDashboardResponse`.
+- Mo rong repositories voi aggregate queries/counts:
+  - `UserRepository.countByDeletedAtIsNull()`.
+  - `DriverProfileRepository` count theo approval va average rating.
+  - `TripRepository.countTripsByStatus()`.
+  - `PaymentRepository.countByStatus(...)` va `sumAmountByStatus(...)`.
+- Them `AdminDashboardServiceTests` cho aggregate mapping va default trip status count.
+- Cap nhat `integrate-plan.md` voi endpoint FE `GET /api/v1/admin/dashboard`.
+
+### Review truoc commit
+
+- Da xac nhan endpoint admin duoc bao ve bang `hasRole('ADMIN')`.
+- Da xac nhan revenue chi tinh payment `COMPLETED`.
+- Da xac nhan `tripsByStatus` fill du tat ca `TripStatus` de FE khong can tu bo sung key thieu.
+- Da chay `./mvnw.cmd -Dtest=AdminDashboardServiceTests test`: pass 1 test.
+- Da chay `./mvnw.cmd test`: pass 163 tests.
+- CodeRabbit CLI chua chay duoc trong moi truong nay vi `coderabbit` command not found.
+
+### Files chinh
+
+- `src/main/java/com/example/goride/admin/controller/AdminDashboardController.java`
+- `src/main/java/com/example/goride/admin/service/AdminDashboardService.java`
+- `src/main/java/com/example/goride/admin/dto/AdminDashboardResponse.java`
+- `src/main/java/com/example/goride/booking/repository/TripRepository.java`
+- `src/main/java/com/example/goride/payment/repository/PaymentRepository.java`
+- `src/main/java/com/example/goride/driver/repository/DriverProfileRepository.java`
+- `src/main/java/com/example/goride/user/repository/UserRepository.java`
+- `src/test/java/com/example/goride/admin/service/AdminDashboardServiceTests.java`
+- `integrate-plan.md`
+
+### Viec tiep theo
+
+- Them payment detail/history API neu FE can man hinh hoa don.
+- Dong bo Redis `driver:{id}:meta.rating` khi driver dang online sau rating.
+- Neu admin can chart theo ngay, them endpoint statistics time-series rieng.
+
+---
+
 ## Commit: `feat: update driver total trips on completion`
 
 Branch: `feature/driver-total-trips-update`
