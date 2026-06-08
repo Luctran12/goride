@@ -39,4 +39,15 @@ public interface DriverProfileRepository extends JpaRepository<DriverProfile, Lo
     boolean existsByVehiclePlate(String vehiclePlate);
 
     long countByApprovalStatus(ApprovalStatus approvalStatus);
+
+    long countByUserDeletedAtIsNull();
+
+    long countByApprovalStatusAndUserDeletedAtIsNull(ApprovalStatus approvalStatus);
+
+    @Query("""
+            select coalesce(avg(profile.averageRating), 0)
+            from DriverProfile profile
+            where profile.user.deletedAt is null
+            """)
+    double averageRatingByUserDeletedAtIsNull();
 }

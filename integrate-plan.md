@@ -206,7 +206,6 @@ type PaymentStatus = "PENDING" | "COMPLETED" | "FAILED" | "REFUNDED";
 - [ ] Chua co API kiem tra trip da rating hay chua; FE co the suy luan tu response loi `TRIP_ALREADY_RATED` khi submit.
 - [ ] Sau khi rating, Redis `driver:{id}:meta.rating` chua duoc sync ngay neu driver dang online.
   - Rating moi se vao PostgreSQL, matching Redis co the cap nhat khi driver online lai.
-- [ ] Admin/statistics doanh thu/rating trung binh chua co API.
 
 ### Notification/mo rong
 
@@ -222,7 +221,7 @@ type PaymentStatus = "PENDING" | "COMPLETED" | "FAILED" | "REFUNDED";
 - [x] Admin list pending drivers.
 - [x] Admin approve/reject driver.
 - [x] Admin list trips/filter.
-- [ ] Admin stats/dashboard.
+- [x] Admin stats/dashboard.
 
 ---
 
@@ -1095,6 +1094,50 @@ FE action:
 
 ---
 
+### 4.13 Admin dashboard
+
+#### Admin dashboard summary
+
+```http
+GET /api/v1/admin/dashboard
+Authorization: Bearer <adminToken>
+```
+
+Response `data`:
+
+```json
+{
+  "totalUsers": 120,
+  "activeUsers": 110,
+  "suspendedUsers": 10,
+  "totalDrivers": 35,
+  "pendingDrivers": 4,
+  "approvedDrivers": 29,
+  "rejectedDrivers": 2,
+  "totalTrips": 450,
+  "tripsByStatus": {
+    "SEARCHING": 2,
+    "ACCEPTED": 3,
+    "ARRIVED": 1,
+    "IN_PROGRESS": 4,
+    "COMPLETED": 420,
+    "CANCELLED": 15,
+    "NO_DRIVER": 5
+  },
+  "completedPayments": 400,
+  "completedRevenue": 18500000,
+  "averageDriverRating": 4.7
+}
+```
+
+FE action:
+- Dung cho admin dashboard cards va trip status chart.
+- `completedRevenue` chi tinh payment `COMPLETED`, khong tinh payment `PENDING`.
+- `tripsByStatus` luon co du cac key `TripStatus`; status chua co trip se la `0`.
+- `averageDriverRating` la trung binh rating hien tai cua driver profiles, lam tron 1 chu so thap phan.
+
+---
+
 ## 5. WebSocket integration
 
 ### Ket noi
@@ -1190,7 +1233,7 @@ Subscribe vao `/topic/trip/{tripId}/status` va `/topic/trip/{tripId}/location` c
 - [ ] Pending driver list: `GET /api/v1/admin/drivers/pending`.
 - [ ] Driver approval action: `PATCH /api/v1/admin/drivers/{driverId}/approval`.
 - [ ] Trip monitoring: list/filter trips qua `GET /api/v1/admin/trips`.
-- [ ] Dashboard statistics: cho backend bo sung stats API.
+- [ ] Dashboard statistics: summary cards qua `GET /api/v1/admin/dashboard`.
 
 ---
 

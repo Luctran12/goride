@@ -35,6 +35,16 @@ public interface TripRepository extends JpaRepository<Trip, Long> {
 
     boolean existsByDriverIdAndStatusInAndDeletedAtIsNull(Long driverId, Collection<TripStatus> statuses);
 
+    long countByDeletedAtIsNull();
+
+    @Query("""
+            select trip.status as status, count(trip) as total
+            from Trip trip
+            where trip.deletedAt is null
+            group by trip.status
+            """)
+    List<TripStatusCount> countTripsByStatus();
+
     @Query(
             value = """
                     select trip
@@ -69,4 +79,10 @@ public interface TripRepository extends JpaRepository<Trip, Long> {
               and (trip.passenger.id = :userId or driver.id = :userId)
             """)
     boolean existsAccessibleTripTopicByUserId(@Param("tripId") Long tripId, @Param("userId") Long userId);
+
+    interface TripStatusCount {
+        TripStatus getStatus();
+
+        long getTotal();
+    }
 }
