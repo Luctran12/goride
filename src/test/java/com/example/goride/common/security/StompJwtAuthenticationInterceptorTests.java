@@ -24,13 +24,19 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 class StompJwtAuthenticationInterceptorTests {
     private final JwtDecoder jwtDecoder = mock(JwtDecoder.class);
     private final MessageChannel channel = mock(MessageChannel.class);
     private final MessageHandler handler = mock(MessageHandler.class);
-    private final StompJwtAuthenticationInterceptor interceptor = new StompJwtAuthenticationInterceptor(jwtDecoder);
+    private final StompSubscriptionAuthorizer subscriptionAuthorizer = mock(StompSubscriptionAuthorizer.class);
+    private final StompJwtAuthenticationInterceptor interceptor = new StompJwtAuthenticationInterceptor(
+            jwtDecoder,
+            List.of(subscriptionAuthorizer)
+    );
 
     @AfterEach
     void tearDown() {
@@ -90,6 +96,26 @@ class StompJwtAuthenticationInterceptorTests {
         interceptor.afterMessageHandled(result, channel, handler, null);
 
         assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
+        verifyNoInteractions(subscriptionAuthorizer);
+    }
+
+    @Test
+    void delegatesAuthenticatedSubscribeFrameToSubscriptionAuthorizers() {
+        JwtAuthenticationToken authentication = new JwtAuthenticationToken(
+                jwt("42", "PASSENGER"),
+                List.of(new SimpleGrantedAuthority("ROLE_PASSENGER")),
+                "42"
+        );
+        Message<byte[]> message = stompMessage(
+                StompCommand.SUBSCRIBE,
+                null,
+                authentication,
+                "/topic/trip/99/status"
+        );
+
+        interceptor.beforeHandle(message, channel, handler);
+
+        verify(subscriptionAuthorizer).authorize(authentication, "/topic/trip/99/status");
     }
 
     @Test
@@ -113,6 +139,24 @@ class StompJwtAuthenticationInterceptorTests {
         if (user != null) {
             accessor.setUser(user);
         }
+        accessor.setLeaveMutable(true);
+        return MessageBuilder.createMessage(new byte[0], accessor.getMessageHeaders());
+    }
+
+    private Message<byte[]> stompMessage(
+            StompCommand command,
+            String authorization,
+            JwtAuthenticationToken user,
+            String destination
+    ) {
+        StompHeaderAccessor accessor = StompHeaderAccessor.create(command);
+        if (authorization != null) {
+            accessor.setNativeHeader("Authorization", authorization);
+        }
+        if (user != null) {
+            accessor.setUser(user);
+        }
+        accessor.setDestination(destination);
         accessor.setLeaveMutable(true);
         return MessageBuilder.createMessage(new byte[0], accessor.getMessageHeaders());
     }

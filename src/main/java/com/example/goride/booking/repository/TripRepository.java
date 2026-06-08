@@ -31,4 +31,14 @@ public interface TripRepository extends JpaRepository<Trip, Long> {
     boolean existsByPassengerIdAndStatusInAndDeletedAtIsNull(Long passengerId, Collection<TripStatus> statuses);
 
     boolean existsByDriverIdAndStatusInAndDeletedAtIsNull(Long driverId, Collection<TripStatus> statuses);
+
+    @Query("""
+            select case when count(trip) > 0 then true else false end
+            from Trip trip
+            left join trip.driver driver
+            where trip.id = :tripId
+              and trip.deletedAt is null
+              and (trip.passenger.id = :userId or driver.id = :userId)
+            """)
+    boolean existsAccessibleTripTopicByUserId(@Param("tripId") Long tripId, @Param("userId") Long userId);
 }

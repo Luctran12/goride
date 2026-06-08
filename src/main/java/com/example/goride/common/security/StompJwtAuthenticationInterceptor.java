@@ -21,16 +21,22 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
 import java.security.Principal;
+import java.util.List;
 
 @Component
 public class StompJwtAuthenticationInterceptor implements ExecutorChannelInterceptor {
     private static final String BEARER_PREFIX = "Bearer ";
 
     private final JwtDecoder jwtDecoder;
+    private final List<StompSubscriptionAuthorizer> subscriptionAuthorizers;
     private final JwtGrantedAuthoritiesConverter authoritiesConverter = new JwtGrantedAuthoritiesConverter();
 
-    public StompJwtAuthenticationInterceptor(JwtDecoder jwtDecoder) {
+    public StompJwtAuthenticationInterceptor(
+            JwtDecoder jwtDecoder,
+            List<StompSubscriptionAuthorizer> subscriptionAuthorizers
+    ) {
         this.jwtDecoder = jwtDecoder;
+        this.subscriptionAuthorizers = List.copyOf(subscriptionAuthorizers);
         this.authoritiesConverter.setAuthoritiesClaimName("roles");
         this.authoritiesConverter.setAuthorityPrefix("ROLE_");
     }
@@ -55,6 +61,7 @@ public class StompJwtAuthenticationInterceptor implements ExecutorChannelInterce
         StompHeaderAccessor accessor = MessageHeaderAccessor.getAccessor(message, StompHeaderAccessor.class);
         if (accessor != null && requiresAuthenticatedPrincipal(accessor.getCommand())) {
             Authentication authentication = requireAuthentication(accessor.getUser());
+            authorizeSubscription(accessor, authentication);
             setSecurityContext(authentication);
         }
         return message;
@@ -126,6 +133,15 @@ public class StompJwtAuthenticationInterceptor implements ExecutorChannelInterce
 
     private boolean requiresAuthenticatedPrincipal(StompCommand command) {
         return command == StompCommand.SEND || command == StompCommand.SUBSCRIBE;
+    }
+
+    private void authorizeSubscription(StompHeaderAccessor accessor, Authentication authentication) {
+        if (accessor.getCommand() != StompCommand.SUBSCRIBE) {
+            return;
+        }
+        subscriptionAuthorizers.forEach(authorizer ->
+                authorizer.authorize(authentication, accessor.getDestination())
+        );
     }
 
     private void setSecurityContext(Authentication authentication) {
