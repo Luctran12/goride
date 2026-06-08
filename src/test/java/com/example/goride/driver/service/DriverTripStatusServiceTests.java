@@ -9,7 +9,9 @@ import com.example.goride.booking.repository.TripRepository;
 import com.example.goride.booking.repository.TripStatusHistoryRepository;
 import com.example.goride.common.error.BusinessException;
 import com.example.goride.common.error.ErrorCode;
+import com.example.goride.driver.domain.DriverProfile;
 import com.example.goride.driver.domain.VehicleType;
+import com.example.goride.driver.repository.DriverProfileRepository;
 import com.example.goride.notification.domain.NotificationType;
 import com.example.goride.notification.dto.TripStatusNotification;
 import com.example.goride.notification.dto.UserNotification;
@@ -55,6 +57,9 @@ class DriverTripStatusServiceTests {
     private TripStatusHistoryRepository tripStatusHistoryRepository;
 
     @Mock
+    private DriverProfileRepository driverProfileRepository;
+
+    @Mock
     private TripRealtimeNotifier tripRealtimeNotifier;
 
     @Mock
@@ -70,6 +75,7 @@ class DriverTripStatusServiceTests {
         service = new DriverTripStatusService(
                 tripRepository,
                 tripStatusHistoryRepository,
+                driverProfileRepository,
                 tripRealtimeNotifier,
                 tripCompletionFareService,
                 tripPaymentService
@@ -89,6 +95,7 @@ class DriverTripStatusServiceTests {
         assertThat(response.status()).isEqualTo(TripStatus.ARRIVED);
         assertThat(trip.getArrivedAt()).isNotNull();
         assertThat(history.getNote()).isEqualTo("Driver updated trip status");
+        verifyNoInteractions(driverProfileRepository);
         verifyPassengerNotification(NotificationType.DRIVER_ARRIVED, TripStatus.ARRIVED);
     }
 
@@ -104,6 +111,7 @@ class DriverTripStatusServiceTests {
         verifyHistory(TripStatus.ARRIVED, TripStatus.IN_PROGRESS, driver);
         assertThat(response.status()).isEqualTo(TripStatus.IN_PROGRESS);
         assertThat(trip.getStartedAt()).isNotNull();
+        verifyNoInteractions(driverProfileRepository);
         verifyPassengerNotification(NotificationType.TRIP_STARTED, TripStatus.IN_PROGRESS);
     }
 
@@ -113,25 +121,52 @@ class DriverTripStatusServiceTests {
         Trip trip = acceptedTrip(driver);
         trip.markArrived();
         trip.startTrip();
+        DriverProfile profile = profile(driver);
         stubTripForUpdate(trip);
         when(tripCompletionFareService.calculate(trip)).thenReturn(new TripCompletionFare(
                 BigDecimal.valueOf(20000),
                 BigDecimal.valueOf(1.00),
                 20
         ));
+        when(driverProfileRepository.findByUserIdForUpdate(20L)).thenReturn(Optional.of(profile));
 
         var response = service.updateTripStatus(20L, 99L, TripStatus.COMPLETED);
 
         verifyHistory(TripStatus.IN_PROGRESS, TripStatus.COMPLETED, driver);
         verify(tripCompletionFareService).calculate(trip);
+        verify(driverProfileRepository).findByUserIdForUpdate(20L);
         verify(tripPaymentService).createPendingPayment(trip);
         assertThat(response.status()).isEqualTo(TripStatus.COMPLETED);
         assertThat(trip.getFinalFare()).isEqualByComparingTo(BigDecimal.valueOf(20000));
         assertThat(trip.getActualDistanceKm()).isEqualByComparingTo(BigDecimal.valueOf(1.00));
         assertThat(trip.getActualDurationMin()).isEqualTo(20);
         assertThat(trip.getCompletedAt()).isNotNull();
+        assertThat(profile.getTotalTrips()).isEqualTo(1);
         verifyPassengerNotification(NotificationType.TRIP_COMPLETED, TripStatus.COMPLETED);
         verifyDriverCompletionNotification();
+    }
+
+    @Test
+    void rejectsCompletionWhenDriverProfileIsMissing() {
+        User driver = driver(20L);
+        Trip trip = acceptedTrip(driver);
+        trip.markArrived();
+        trip.startTrip();
+        when(tripRepository.findActiveByIdForUpdate(99L)).thenReturn(Optional.of(trip));
+        when(tripCompletionFareService.calculate(trip)).thenReturn(new TripCompletionFare(
+                BigDecimal.valueOf(20000),
+                BigDecimal.valueOf(1.00),
+                20
+        ));
+        when(driverProfileRepository.findByUserIdForUpdate(20L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.updateTripStatus(20L, 99L, TripStatus.COMPLETED))
+                .isInstanceOfSatisfying(BusinessException.class, exception ->
+                        assertThat(exception.errorCode()).isEqualTo(ErrorCode.DRIVER_PROFILE_NOT_FOUND)
+                );
+
+        verify(tripRepository, never()).save(any());
+        verifyNoInteractions(tripStatusHistoryRepository, tripRealtimeNotifier, tripPaymentService);
     }
 
     @Test
@@ -145,7 +180,13 @@ class DriverTripStatusServiceTests {
                 );
 
         verify(tripRepository, never()).save(any());
-        verifyNoInteractions(tripStatusHistoryRepository, tripRealtimeNotifier, tripCompletionFareService, tripPaymentService);
+        verifyNoInteractions(
+                driverProfileRepository,
+                tripStatusHistoryRepository,
+                tripRealtimeNotifier,
+                tripCompletionFareService,
+                tripPaymentService
+        );
     }
 
     @Test
@@ -159,7 +200,13 @@ class DriverTripStatusServiceTests {
                 );
 
         verify(tripRepository, never()).save(any());
-        verifyNoInteractions(tripStatusHistoryRepository, tripRealtimeNotifier, tripCompletionFareService, tripPaymentService);
+        verifyNoInteractions(
+                driverProfileRepository,
+                tripStatusHistoryRepository,
+                tripRealtimeNotifier,
+                tripCompletionFareService,
+                tripPaymentService
+        );
     }
 
     @Test
@@ -173,7 +220,13 @@ class DriverTripStatusServiceTests {
                 );
 
         verify(tripRepository, never()).save(any());
-        verifyNoInteractions(tripStatusHistoryRepository, tripRealtimeNotifier, tripCompletionFareService, tripPaymentService);
+        verifyNoInteractions(
+                driverProfileRepository,
+                tripStatusHistoryRepository,
+                tripRealtimeNotifier,
+                tripCompletionFareService,
+                tripPaymentService
+        );
     }
 
     @Test
@@ -183,7 +236,14 @@ class DriverTripStatusServiceTests {
                         assertThat(exception.errorCode()).isEqualTo(ErrorCode.VALIDATION_ERROR)
                 );
 
-        verifyNoInteractions(tripRepository, tripStatusHistoryRepository, tripRealtimeNotifier, tripCompletionFareService, tripPaymentService);
+        verifyNoInteractions(
+                tripRepository,
+                driverProfileRepository,
+                tripStatusHistoryRepository,
+                tripRealtimeNotifier,
+                tripCompletionFareService,
+                tripPaymentService
+        );
     }
 
     private void stubTripForUpdate(Trip trip) {
@@ -271,6 +331,24 @@ class DriverTripStatusServiceTests {
         User user = User.create("Driver", "0900000001", null, "hash", Set.of(UserRole.DRIVER));
         ReflectionTestUtils.setField(user, "id", id);
         return user;
+    }
+
+    private DriverProfile profile(User driver) {
+        DriverProfile profile = DriverProfile.create(
+                driver,
+                "GPLX123456",
+                java.time.LocalDate.now().plusYears(2),
+                "012345678901",
+                "https://example.com/portrait.jpg",
+                "51A-123.45",
+                VehicleType.MOTORBIKE,
+                "Honda",
+                "Wave",
+                "Black",
+                (short) 2022
+        );
+        ReflectionTestUtils.setField(profile, "id", 30L);
+        return profile;
     }
 
     private static org.locationtech.jts.geom.Point point(double longitude, double latitude) {

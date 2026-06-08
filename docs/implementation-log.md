@@ -6,6 +6,54 @@
 
 ---
 
+## Commit: `feat: update driver total trips on completion`
+
+Branch: `feature/driver-total-trips-update`
+
+Phase: Phase 6 - Payment/statistics foundation, theo `integrate-plan.md` muc Payment/rating/statistics
+
+### Muc tieu
+
+Cap nhat thong ke so chuyen da hoan thanh cua driver ngay khi trip chuyen sang `COMPLETED`. Truoc commit nay `DriverProfile.recordCompletedTrip()` da co trong domain nhung service chua goi, lam `DriverProfileResponse.totalTrips` khong tang theo lifecycle trip.
+
+### Noi dung da trien khai
+
+- Cap nhat `DriverTripStatusService`:
+  - Inject `DriverProfileRepository`.
+  - Khi driver complete trip hop le, lock driver profile bang `findByUserIdForUpdate(...)`.
+  - Goi `DriverProfile.recordCompletedTrip()` trong cung transaction voi trip update, history va pending payment.
+  - Neu assigned driver khong co profile, tra `DRIVER_PROFILE_NOT_FOUND` va rollback flow complete.
+- Cap nhat `DriverTripStatusServiceTests`:
+  - Kiem tra `totalTrips` tang khi `IN_PROGRESS -> COMPLETED`.
+  - Kiem tra cac transition `ARRIVED` va `IN_PROGRESS` khong cham vao driver profile.
+  - Kiem tra missing driver profile bi chan truoc khi save trip/history/payment.
+- Cap nhat `integrate-plan.md`:
+  - Danh dau `driver_profiles.total_trips` da duoc cap nhat khi trip completed.
+  - Ghi chu FE co the doc lai driver profile de thay `totalTrips` moi.
+
+### Review truoc commit
+
+- Da xac nhan increment chi nam trong nhánh `COMPLETED`, sau khi domain transition hop le.
+- Da xac nhan trip lock va profile lock cung nam trong transaction de tranh double-count theo concurrent complete request.
+- Da xac nhan transition khong phai `COMPLETED` khong query driver profile.
+- Da chay `./mvnw.cmd -Dtest=DriverTripStatusServiceTests test`: pass 8 tests.
+- Da chay `./mvnw.cmd test`: pass 162 tests.
+- CodeRabbit CLI chua chay duoc trong moi truong nay vi `coderabbit` command not found.
+
+### Files chinh
+
+- `src/main/java/com/example/goride/driver/service/DriverTripStatusService.java`
+- `src/test/java/com/example/goride/driver/service/DriverTripStatusServiceTests.java`
+- `integrate-plan.md`
+
+### Viec tiep theo
+
+- Them admin stats/dashboard API.
+- Them payment detail/history API neu FE can man hinh hoa don.
+- Dong bo Redis `driver:{id}:meta.rating` khi driver dang online sau rating.
+
+---
+
 ## Commit: `feat: add admin trip list api`
 
 Branch: `feature/admin-trip-list-api`

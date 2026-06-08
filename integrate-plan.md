@@ -151,6 +151,7 @@ type PaymentStatus = "PENDING" | "COMPLETED" | "FAILED" | "REFUNDED";
 - [x] Driver cap nhat `IN_PROGRESS -> COMPLETED`.
 - [x] Khi completed, backend tinh actual distance/duration tu tracking history va tinh `finalFare`.
 - [x] Khi completed, backend tao payment `PENDING`.
+- [x] Khi completed, backend tang `driver_profiles.total_trips` cua assigned driver.
 - [x] Broadcast trip status qua WebSocket topic.
 
 ### Tracking realtime
@@ -205,7 +206,6 @@ type PaymentStatus = "PENDING" | "COMPLETED" | "FAILED" | "REFUNDED";
 - [ ] Chua co API kiem tra trip da rating hay chua; FE co the suy luan tu response loi `TRIP_ALREADY_RATED` khi submit.
 - [ ] Sau khi rating, Redis `driver:{id}:meta.rating` chua duoc sync ngay neu driver dang online.
   - Rating moi se vao PostgreSQL, matching Redis co the cap nhat khi driver online lai.
-- [ ] `driver_profiles.total_trips` co method domain nhung chua thay service goi cap nhat khi trip completed.
 - [ ] Admin/statistics doanh thu/rating trung binh chua co API.
 
 ### Notification/mo rong
@@ -632,6 +632,7 @@ FE action:
   - `ARRIVED`: "Bat dau chuyen" -> `IN_PROGRESS`
   - `IN_PROGRESS`: "Hoan thanh" -> `COMPLETED`
 - Sau `COMPLETED`, backend tinh `finalFare` va tao payment `PENDING`.
+- Sau `COMPLETED`, backend tang `totalTrips` trong driver profile; FE doc lai driver profile se thay thong ke moi.
 - Passenger/driver subscribe `/topic/trip/{tripId}/status`.
 - Driver cung nhan user notification khi trip completed.
 
