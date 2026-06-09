@@ -1,6 +1,6 @@
 # GoRide Front-end Integration Plan
 
-Branch da kiem tra: `feature/driver-rating-redis-sync`
+Branch da kiem tra: `feature/fcm-device-token-api`
 
 Muc tieu file nay:
 - Checklist chuc nang backend da co code va co the tich hop FE.
@@ -190,6 +190,9 @@ type PaymentStatus = "PENDING" | "COMPLETED" | "FAILED" | "REFUNDED";
 
 ### WebSocket notifications
 
+- [x] User dang ky/cap nhat FCM device token sau login.
+- [x] User xoa FCM device token khi logout hoac token invalid.
+- [x] FCM token duoc luu Redis theo key `fcm_token:{userId}`.
 - [x] STOMP `CONNECT` authenticate bang JWT trong header `Authorization`.
 - [x] STOMP `SUBSCRIBE` vao trip topic chi cho passenger/driver cua trip hoac admin.
 - [x] Driver offer queue: `/user/queue/trip-requests`.
@@ -208,7 +211,6 @@ type PaymentStatus = "PENDING" | "COMPLETED" | "FAILED" | "REFUNDED";
 
 ### Notification/mo rong
 
-- [ ] Chua co FCM device token API.
 - [ ] Chua co mobile push notification; hien tai moi co WebSocket.
 - [ ] Chua co persistence cho notification inbox.
 
@@ -1207,6 +1209,60 @@ FE action:
 
 ---
 
+### 4.14 FCM device token
+
+#### Dang ky/cap nhat FCM token
+
+```http
+PUT /api/v1/notifications/fcm-token
+Authorization: Bearer <accessToken>
+```
+
+Request:
+
+```json
+{
+  "token": "firebase-device-token"
+}
+```
+
+Response `data`:
+
+```json
+{
+  "userId": 10,
+  "registered": true
+}
+```
+
+FE action:
+- Goi sau login, sau refresh FCM token, hoac khi Firebase cap token moi.
+- Backend trim token va luu vao Redis key `fcm_token:{userId}`.
+- Token toi da 4096 ky tu; neu token rong backend tra `VALIDATION_ERROR`.
+- Commit nay moi luu token, chua gui push qua Firebase.
+
+#### Xoa FCM token
+
+```http
+DELETE /api/v1/notifications/fcm-token
+Authorization: Bearer <accessToken>
+```
+
+Response `data`:
+
+```json
+{
+  "userId": 10,
+  "registered": false
+}
+```
+
+FE action:
+- Goi khi logout hoac khi Firebase bao token invalid tren client.
+- Sau khi xoa, user van nhan WebSocket notification neu app dang ket noi.
+
+---
+
 ## 5. WebSocket integration
 
 ### Ket noi
@@ -1265,6 +1321,7 @@ Subscribe vao `/topic/trip/{tripId}/status` va `/topic/trip/{tripId}/location` c
 ### Passenger app
 
 - [ ] Auth screen: register/login/refresh/logout.
+- [ ] FCM token registration sau login/refresh token.
 - [ ] Home map: chon pickup/dropoff/vehicleType, goi estimate.
 - [ ] Booking confirm: goi create booking.
 - [ ] Finding driver: subscribe trip status + notifications.
@@ -1280,6 +1337,7 @@ Subscribe vao `/topic/trip/{tripId}/status` va `/topic/trip/{tripId}/location` c
 ### Driver app
 
 - [ ] Auth screen.
+- [ ] FCM token registration sau login/refresh token.
 - [ ] Profile onboarding: tao profile bang `POST /api/v1/drivers/me/profile`.
 - [ ] Approval waiting screen: doc `approvalStatus` tu `GET /api/v1/drivers/me/profile`; chi cho online khi status la `APPROVED`.
 - [ ] Online toggle with current GPS.

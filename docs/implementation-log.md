@@ -6,6 +6,66 @@
 
 ---
 
+## Commit: `feat: add fcm device token api`
+
+Branch: `feature/fcm-device-token-api`
+
+Phase: Phase 6 - Notification module foundation, theo `docs/TDD.md` muc 5.6 va `integrate-plan.md` muc Notification
+
+### Muc tieu
+
+Them nen tang de mobile app dang ky FCM device token len backend sau login. Commit nay chi quan ly token trong Redis theo thiet ke `fcm_token:{userId}`; viec gui push qua Firebase se tach commit sau de giu scope review nho.
+
+### Noi dung da trien khai
+
+- Them `NotificationController`:
+  - `PUT /api/v1/notifications/fcm-token`
+  - `DELETE /api/v1/notifications/fcm-token`
+  - Yeu cau user da authenticate.
+- Them DTO:
+  - `FcmTokenUpdateRequest` voi `token` bat buoc, toi da 4096 ky tu.
+  - `FcmTokenResponse` gom `userId` va `registered`.
+- Them `FcmDeviceTokenService`:
+  - Validate user id.
+  - Trim token truoc khi luu.
+  - Chan token rong hoac qua dai bang `VALIDATION_ERROR`.
+- Them `FcmDeviceTokenStore` va `RedisFcmDeviceTokenStore`:
+  - Luu token vao Redis key `fcm_token:{userId}`.
+  - Xoa token khi logout/token invalid tren client.
+  - Doc token qua `findToken(...)` de dung cho push sender o commit sau.
+- Them tests cho service validation va Redis key contract.
+- Cap nhat `integrate-plan.md` voi huong dan FE goi API FCM token.
+
+### Review truoc commit
+
+- Da xac nhan endpoint khong public, yeu cau JWT authenticated user.
+- Da xac nhan backend khong expose lai raw token trong response.
+- Da xac nhan Redis key khop TDD: `fcm_token:{userId}`.
+- Da xac nhan commit chua them Firebase SDK/webhook gui push de tranh tron scope voi token registry.
+- Da chay `./mvnw.cmd "-Dtest=FcmDeviceTokenServiceTests,RedisFcmDeviceTokenStoreTests" test`: pass 9 tests.
+- Da chay `./mvnw.cmd test`: pass 185 tests.
+- CodeRabbit CLI chua chay duoc trong moi truong nay vi `coderabbit` command not found.
+
+### Files chinh
+
+- `src/main/java/com/example/goride/notification/controller/NotificationController.java`
+- `src/main/java/com/example/goride/notification/dto/FcmTokenUpdateRequest.java`
+- `src/main/java/com/example/goride/notification/dto/FcmTokenResponse.java`
+- `src/main/java/com/example/goride/notification/service/FcmDeviceTokenService.java`
+- `src/main/java/com/example/goride/notification/service/FcmDeviceTokenStore.java`
+- `src/main/java/com/example/goride/notification/service/RedisFcmDeviceTokenStore.java`
+- `src/test/java/com/example/goride/notification/service/FcmDeviceTokenServiceTests.java`
+- `src/test/java/com/example/goride/notification/service/RedisFcmDeviceTokenStoreTests.java`
+- `integrate-plan.md`
+
+### Viec tiep theo
+
+- Them Firebase sender/channel de gui mobile push dua tren token trong Redis.
+- Ket noi cac notification hien co sang pipeline push + WebSocket.
+- Them notification inbox persistence neu FE can lich su thong bao.
+
+---
+
 ## Commit: `feat: sync driver rating to redis`
 
 Branch: `feature/driver-rating-redis-sync`
