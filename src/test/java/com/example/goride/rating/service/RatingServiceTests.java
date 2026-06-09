@@ -212,6 +212,59 @@ class RatingServiceTests {
         verifyNoInteractions(driverProfileRepository, ratingRepository);
     }
 
+    @Test
+    void returnsRatedStatusForPassengerTrip() {
+        Trip trip = completedTrip(driver(20L));
+        Rating rating = savedRating(trip, 55L, 5, "Great driver", "2026-05-25T02:00:00Z");
+        when(tripRepository.findByIdAndDeletedAtIsNull(99L)).thenReturn(Optional.of(trip));
+        when(ratingRepository.findByTripId(99L)).thenReturn(Optional.of(rating));
+
+        var response = service.getMyTripRatingStatus(10L, 99L);
+
+        assertThat(response.tripId()).isEqualTo(99L);
+        assertThat(response.rated()).isTrue();
+        assertThat(response.rating().ratingId()).isEqualTo(55L);
+        assertThat(response.rating().score()).isEqualTo(5);
+    }
+
+    @Test
+    void returnsNotRatedStatusForPassengerTripWithoutRating() {
+        Trip trip = completedTrip(driver(20L));
+        when(tripRepository.findByIdAndDeletedAtIsNull(99L)).thenReturn(Optional.of(trip));
+        when(ratingRepository.findByTripId(99L)).thenReturn(Optional.empty());
+
+        var response = service.getMyTripRatingStatus(10L, 99L);
+
+        assertThat(response.tripId()).isEqualTo(99L);
+        assertThat(response.rated()).isFalse();
+        assertThat(response.rating()).isNull();
+    }
+
+    @Test
+    void tripRatingStatusRejectsUnrelatedPassenger() {
+        Trip trip = completedTrip(driver(20L));
+        when(tripRepository.findByIdAndDeletedAtIsNull(99L)).thenReturn(Optional.of(trip));
+
+        assertThatThrownBy(() -> service.getMyTripRatingStatus(11L, 99L))
+                .isInstanceOfSatisfying(BusinessException.class, exception ->
+                        assertThat(exception.errorCode()).isEqualTo(ErrorCode.FORBIDDEN)
+                );
+
+        verify(ratingRepository, never()).findByTripId(any());
+    }
+
+    @Test
+    void tripRatingStatusRejectsMissingTrip() {
+        when(tripRepository.findByIdAndDeletedAtIsNull(99L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.getMyTripRatingStatus(10L, 99L))
+                .isInstanceOfSatisfying(BusinessException.class, exception ->
+                        assertThat(exception.errorCode()).isEqualTo(ErrorCode.TRIP_NOT_FOUND)
+                );
+
+        verifyNoInteractions(ratingRepository);
+    }
+
     private Trip completedTrip(User driver) {
         Trip trip = acceptedTrip(driver);
         trip.markArrived();

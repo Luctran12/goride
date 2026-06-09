@@ -11,6 +11,7 @@ import com.example.goride.driver.repository.DriverProfileRepository;
 import com.example.goride.rating.domain.Rating;
 import com.example.goride.rating.dto.RatingCreateRequest;
 import com.example.goride.rating.dto.RatingResponse;
+import com.example.goride.rating.dto.TripRatingStatusResponse;
 import com.example.goride.rating.repository.RatingRepository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -84,6 +85,20 @@ public class RatingService {
                 size,
                 ratings.getTotalElements()
         );
+    }
+
+    @Transactional(readOnly = true)
+    public TripRatingStatusResponse getMyTripRatingStatus(Long passengerId, Long tripId) {
+        if (tripId == null) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "Trip id is required");
+        }
+        Trip trip = tripRepository.findByIdAndDeletedAtIsNull(tripId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.TRIP_NOT_FOUND));
+        assertPassengerOwnsTrip(passengerId, trip);
+        return ratingRepository.findByTripId(trip.getId())
+                .map(RatingResponse::from)
+                .map(TripRatingStatusResponse::rated)
+                .orElseGet(() -> TripRatingStatusResponse.notRated(trip.getId()));
     }
 
     private void validateRequest(RatingCreateRequest request) {
