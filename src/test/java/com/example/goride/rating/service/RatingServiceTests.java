@@ -9,6 +9,7 @@ import com.example.goride.common.error.ErrorCode;
 import com.example.goride.driver.domain.DriverProfile;
 import com.example.goride.driver.domain.VehicleType;
 import com.example.goride.driver.repository.DriverProfileRepository;
+import com.example.goride.driver.service.availability.DriverAvailabilityStore;
 import com.example.goride.rating.domain.Rating;
 import com.example.goride.rating.dto.RatingCreateRequest;
 import com.example.goride.rating.repository.RatingRepository;
@@ -55,11 +56,14 @@ class RatingServiceTests {
     @Mock
     private DriverProfileRepository driverProfileRepository;
 
+    @Mock
+    private DriverAvailabilityStore driverAvailabilityStore;
+
     private RatingService service;
 
     @BeforeEach
     void setUp() {
-        service = new RatingService(tripRepository, ratingRepository, driverProfileRepository);
+        service = new RatingService(tripRepository, ratingRepository, driverProfileRepository, driverAvailabilityStore);
     }
 
     @Test
@@ -83,6 +87,7 @@ class RatingServiceTests {
         ArgumentCaptor<Rating> ratingCaptor = ArgumentCaptor.forClass(Rating.class);
         verify(ratingRepository).save(ratingCaptor.capture());
         verify(driverProfileRepository).save(driverProfile);
+        verify(driverAvailabilityStore).updateRating(20L, BigDecimal.valueOf(4.3));
         assertThat(ratingCaptor.getValue().getPassenger().getId()).isEqualTo(10L);
         assertThat(ratingCaptor.getValue().getDriver().getId()).isEqualTo(20L);
         assertThat(ratingCaptor.getValue().getScore()).isEqualTo(5);
@@ -106,7 +111,7 @@ class RatingServiceTests {
                         assertThat(exception.errorCode()).isEqualTo(ErrorCode.FORBIDDEN)
                 );
 
-        verifyNoInteractions(ratingRepository, driverProfileRepository);
+        verifyNoInteractions(ratingRepository, driverProfileRepository, driverAvailabilityStore);
     }
 
     @Test
@@ -119,7 +124,7 @@ class RatingServiceTests {
                         assertThat(exception.errorCode()).isEqualTo(ErrorCode.TRIP_STATUS_INVALID_TRANSITION)
                 );
 
-        verifyNoInteractions(ratingRepository, driverProfileRepository);
+        verifyNoInteractions(ratingRepository, driverProfileRepository, driverAvailabilityStore);
     }
 
     @Test
@@ -133,7 +138,7 @@ class RatingServiceTests {
                         assertThat(exception.errorCode()).isEqualTo(ErrorCode.TRIP_ALREADY_RATED)
                 );
 
-        verifyNoInteractions(driverProfileRepository);
+        verifyNoInteractions(driverProfileRepository, driverAvailabilityStore);
         verify(ratingRepository, never()).save(any());
     }
 
@@ -144,7 +149,7 @@ class RatingServiceTests {
                         assertThat(exception.errorCode()).isEqualTo(ErrorCode.VALIDATION_ERROR)
                 );
 
-        verifyNoInteractions(tripRepository, ratingRepository, driverProfileRepository);
+        verifyNoInteractions(tripRepository, ratingRepository, driverProfileRepository, driverAvailabilityStore);
     }
 
     @Test
@@ -161,6 +166,7 @@ class RatingServiceTests {
 
         verify(ratingRepository, never()).save(any());
         verify(driverProfileRepository, never()).save(any());
+        verifyNoInteractions(driverAvailabilityStore);
     }
 
     @Test
