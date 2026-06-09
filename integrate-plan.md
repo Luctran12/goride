@@ -176,6 +176,7 @@ type PaymentStatus = "PENDING" | "COMPLETED" | "FAILED" | "REFUNDED";
 - [x] Passenger rating driver sau trip completed.
 - [x] Moi trip chi duoc rating mot lan.
 - [x] Chi passenger cua trip moi rating duoc.
+- [x] Passenger kiem tra trip da rating hay chua.
 - [x] Cap nhat `driver_profiles.average_rating` va `total_ratings`.
 - [x] Public API xem rating cua driver co pagination.
 
@@ -203,7 +204,6 @@ type PaymentStatus = "PENDING" | "COMPLETED" | "FAILED" | "REFUNDED";
 
 - [ ] Payment chi ho tro `CASH`.
 - [ ] Chua co provider MoMo/VNPay.
-- [ ] Chua co API kiem tra trip da rating hay chua; FE co the suy luan tu response loi `TRIP_ALREADY_RATED` khi submit.
 - [ ] Sau khi rating, Redis `driver:{id}:meta.rating` chua duoc sync ngay neu driver dang online.
   - Rating moi se vao PostgreSQL, matching Redis co the cap nhat khi driver online lai.
 
@@ -798,6 +798,45 @@ FE action:
 - Hien rating prompt sau khi trip `COMPLETED` va payment `COMPLETED`.
 - Gioi han score 1-5, comment <= 500 ky tu.
 - Neu `TRIP_ALREADY_RATED`, an form va coi la da rating.
+
+#### Passenger kiem tra trip da rating chua
+
+```http
+GET /api/v1/ratings/trips/{tripId}/me
+Authorization: Bearer <passengerToken>
+```
+
+Response chua rating:
+
+```json
+{
+  "tripId": 99,
+  "rated": false,
+  "rating": null
+}
+```
+
+Response da rating:
+
+```json
+{
+  "tripId": 99,
+  "rated": true,
+  "rating": {
+    "ratingId": 55,
+    "tripId": 99,
+    "driverId": 20,
+    "score": 5,
+    "comment": "Tai xe dung gio",
+    "createdAt": "2026-05-27T10:10:00Z"
+  }
+}
+```
+
+FE action:
+- Goi truoc khi hien rating form o trip completed/payment completed screen.
+- Chi passenger cua trip moi xem duoc status nay.
+- Neu `rated = true`, an form va hien rating da gui.
 
 #### Public list rating cua driver
 

@@ -6,6 +6,60 @@
 
 ---
 
+## Commit: `feat: add trip rating status api`
+
+Branch: `feature/trip-rating-status-api`
+
+Phase: Phase 6 - Rating module, theo `integrate-plan.md` muc Rating
+
+### Muc tieu
+
+Bo sung API de passenger kiem tra trip da rating hay chua truoc khi hien form danh gia. Truoc commit nay FE phai submit rating roi suy luan tu loi `TRIP_ALREADY_RATED`.
+
+### Noi dung da trien khai
+
+- Them endpoint:
+  - `GET /api/v1/ratings/trips/{tripId}/me`
+  - Yeu cau role `PASSENGER`.
+- Them `TripRatingStatusResponse`:
+  - `tripId`
+  - `rated`
+  - `rating` neu da co rating, `null` neu chua rating.
+- Mo rong `RatingService`:
+  - Load trip active theo `tripId`.
+  - Chi passenger cua trip moi xem rating status.
+  - Tra `rated=false` neu chua co rating.
+  - Tra `rated=true` kem `RatingResponse` neu trip da co rating.
+- Mo rong `RatingRepository` voi `findByTripId(...)`.
+- Cap nhat `RatingServiceTests` cho rated/not-rated, unrelated passenger va missing trip.
+- Cap nhat `integrate-plan.md` voi huong dan FE goi rating status endpoint.
+
+### Review truoc commit
+
+- Da xac nhan endpoint chi expose cho role `PASSENGER`.
+- Da xac nhan service van check passenger owner cua trip.
+- Da xac nhan response khong bat FE suy luan bang loi duplicate submit nua.
+- Da chay `./mvnw.cmd -Dtest=RatingServiceTests test`: pass 13 tests.
+- Da chay `./mvnw.cmd test`: pass 173 tests.
+- CodeRabbit CLI chua chay duoc trong moi truong nay vi `coderabbit` command not found.
+
+### Files chinh
+
+- `src/main/java/com/example/goride/rating/controller/RatingController.java`
+- `src/main/java/com/example/goride/rating/service/RatingService.java`
+- `src/main/java/com/example/goride/rating/dto/TripRatingStatusResponse.java`
+- `src/main/java/com/example/goride/rating/repository/RatingRepository.java`
+- `src/test/java/com/example/goride/rating/service/RatingServiceTests.java`
+- `integrate-plan.md`
+
+### Viec tiep theo
+
+- Dong bo Redis `driver:{id}:meta.rating` khi driver dang online sau rating.
+- Them payment provider abstraction neu bat dau MoMo/VNPay.
+- Neu can mobile production notification, them FCM device token va push pipeline.
+
+---
+
 ## Commit: `feat: add payment detail api`
 
 Branch: `feature/payment-detail-api`

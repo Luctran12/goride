@@ -4,12 +4,15 @@ import com.example.goride.common.api.ApiResponse;
 import com.example.goride.common.security.CurrentUser;
 import com.example.goride.rating.dto.RatingCreateRequest;
 import com.example.goride.rating.dto.RatingResponse;
+import com.example.goride.rating.dto.TripRatingStatusResponse;
 import com.example.goride.rating.service.RatingService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -39,5 +42,17 @@ public class RatingController {
         return ResponseEntity
                 .status(HttpStatus.CREATED)
                 .body(ApiResponse.created(response));
+    }
+
+    @GetMapping("/trips/{tripId}/me")
+    @PreAuthorize("hasRole('PASSENGER')")
+    public ApiResponse<TripRatingStatusResponse> getMyTripRatingStatus(
+            Authentication authentication,
+            @PathVariable Long tripId
+    ) {
+        return ApiResponse.ok(ratingService.getMyTripRatingStatus(
+                currentUser.requireUserId(authentication),
+                tripId
+        ));
     }
 }
