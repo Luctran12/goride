@@ -11,13 +11,19 @@ public class WebSocketTripRealtimeNotifier implements TripRealtimeNotifier {
     private static final String TRIP_STATUS_TOPIC_TEMPLATE = "/topic/trip/%d/status";
 
     private final SimpMessagingTemplate messagingTemplate;
+    private final NotificationInboxService notificationInboxService;
 
-    public WebSocketTripRealtimeNotifier(SimpMessagingTemplate messagingTemplate) {
+    public WebSocketTripRealtimeNotifier(
+            SimpMessagingTemplate messagingTemplate,
+            NotificationInboxService notificationInboxService
+    ) {
         this.messagingTemplate = messagingTemplate;
+        this.notificationInboxService = notificationInboxService;
     }
 
     @Override
     public void notifyUser(Long userId, UserNotification notification) {
+        notificationInboxService.saveInboxNotification(userId, notification);
         messagingTemplate.convertAndSendToUser(
                 String.valueOf(userId),
                 USER_NOTIFICATIONS_QUEUE,
