@@ -3,9 +3,13 @@ package com.example.goride.payment.service;
 import com.example.goride.booking.domain.PaymentMethod;
 import com.example.goride.booking.domain.PricingConfig;
 import com.example.goride.booking.domain.Trip;
+import com.example.goride.common.error.BusinessException;
+import com.example.goride.common.error.ErrorCode;
 import com.example.goride.driver.domain.VehicleType;
 import com.example.goride.payment.domain.Payment;
 import com.example.goride.payment.domain.PaymentStatus;
+import com.example.goride.payment.provider.CashPaymentProvider;
+import com.example.goride.payment.provider.PaymentProvider;
 import com.example.goride.payment.repository.PaymentRepository;
 import com.example.goride.user.domain.User;
 import com.example.goride.user.domain.UserRole;
@@ -21,10 +25,12 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -41,7 +47,7 @@ class TripPaymentServiceTests {
 
     @BeforeEach
     void setUp() {
-        service = new TripPaymentService(paymentRepository);
+        service = new TripPaymentService(paymentRepository, List.of(new CashPaymentProvider()));
     }
 
     @Test
@@ -69,6 +75,31 @@ class TripPaymentServiceTests {
 
         assertThat(payment).isSameAs(existingPayment);
         verify(paymentRepository, never()).save(any(Payment.class));
+    }
+
+    @Test
+    void rejectsPaymentMethodWithoutRegisteredProvider() {
+        Trip trip = completedTrip();
+        TripPaymentService serviceWithoutProvider = new TripPaymentService(paymentRepository, List.of());
+        when(paymentRepository.findByTripId(99L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> serviceWithoutProvider.createPendingPayment(trip))
+                .isInstanceOfSatisfying(BusinessException.class, exception ->
+                        assertThat(exception.errorCode()).isEqualTo(ErrorCode.PAYMENT_INVALID_STATUS)
+                );
+
+        verify(paymentRepository, never()).save(any(Payment.class));
+    }
+
+    @Test
+    void rejectsDuplicatePaymentProviderForMethod() {
+        PaymentProvider firstProvider = new CashPaymentProvider();
+        PaymentProvider secondProvider = new CashPaymentProvider();
+
+        assertThatThrownBy(() ->
+                        new TripPaymentService(paymentRepository, List.of(firstProvider, secondProvider)))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Duplicate payment provider");
     }
 
     private Trip completedTrip() {
