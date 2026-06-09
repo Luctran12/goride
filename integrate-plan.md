@@ -167,6 +167,7 @@ type PaymentStatus = "PENDING" | "COMPLETED" | "FAILED" | "REFUNDED";
 - [x] Tao payment record khi trip completed.
 - [x] Driver confirm da nhan tien mat.
 - [x] Payment `PENDING -> COMPLETED`, set `paidAt`.
+- [x] Passenger/driver/admin xem payment detail theo trip.
 - [x] Notify passenger va driver khi payment completed.
 - [x] Set Redis driver status ve `AVAILABLE` sau payment completed.
 
@@ -201,7 +202,6 @@ type PaymentStatus = "PENDING" | "COMPLETED" | "FAILED" | "REFUNDED";
 ### Payment/rating/statistics
 
 - [ ] Payment chi ho tro `CASH`.
-- [ ] Chua co API xem payment detail/history theo trip.
 - [ ] Chua co provider MoMo/VNPay.
 - [ ] Chua co API kiem tra trip da rating hay chua; FE co the suy luan tu response loi `TRIP_ALREADY_RATED` khi submit.
 - [ ] Sau khi rating, Redis `driver:{id}:meta.rating` chua duoc sync ngay neu driver dang online.
@@ -729,6 +729,36 @@ FE action:
 - Sau thanh cong, driver co the ve man online/available.
 - Passenger/driver subscribe `/user/queue/notifications` de nhan `PAYMENT_COMPLETED`.
 - Neu `PAYMENT_INVALID_STATUS`, refresh trip/payment state; co the payment da confirm roi.
+
+#### Xem payment theo trip
+
+```http
+GET /api/v1/payments/trips/{tripId}
+Authorization: Bearer <passengerOrDriverOrAdminToken>
+```
+
+Response `data`:
+
+```json
+{
+  "paymentId": 70,
+  "tripId": 99,
+  "amount": 45000,
+  "method": "CASH",
+  "status": "COMPLETED",
+  "provider": null,
+  "transactionRef": null,
+  "paidAt": "2026-05-27T10:05:00Z",
+  "createdAt": "2026-05-27T10:01:00Z",
+  "updatedAt": "2026-05-27T10:05:00Z"
+}
+```
+
+FE action:
+- Passenger cua trip, assigned driver, hoac admin moi xem duoc payment.
+- Goi sau khi trip `COMPLETED` de hydrate invoice/payment screen.
+- Neu tra `PAYMENT_NOT_FOUND`, payment record chua duoc tao hoac trip chua completed; FE nen refresh trip detail.
+- Neu tra `FORBIDDEN`, an invoice/payment action cho user khong co quyen.
 
 ---
 

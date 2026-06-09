@@ -14,6 +14,17 @@ import java.util.Optional;
 public interface PaymentRepository extends JpaRepository<Payment, Long> {
     Optional<Payment> findByTripId(Long tripId);
 
+    @Query("""
+            select payment
+            from Payment payment
+            join fetch payment.trip trip
+            join fetch trip.passenger passenger
+            left join fetch trip.driver driver
+            where trip.id = :tripId
+              and trip.deletedAt is null
+            """)
+    Optional<Payment> findByTripIdWithTrip(@Param("tripId") Long tripId);
+
     long countByStatus(PaymentStatus status);
 
     @Query("""

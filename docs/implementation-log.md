@@ -6,6 +6,58 @@
 
 ---
 
+## Commit: `feat: add payment detail api`
+
+Branch: `feature/payment-detail-api`
+
+Phase: Phase 6 - Payment module, theo `integrate-plan.md` muc Payment cash
+
+### Muc tieu
+
+Bo sung API de passenger/driver/admin xem payment cua mot trip, phuc vu man hinh hoa don/payment state sau khi trip completed.
+
+### Noi dung da trien khai
+
+- Them `PaymentController`:
+  - `GET /api/v1/payments/trips/{tripId}`
+  - Yeu cau role `PASSENGER`, `DRIVER`, hoac `ADMIN`.
+- Them `PaymentQueryService`:
+  - Load current user active.
+  - Load payment theo `tripId` kem trip passenger/driver.
+  - Cho phep passenger cua trip, assigned driver, hoac admin xem payment.
+  - Tra `PAYMENT_NOT_FOUND` neu payment chua ton tai.
+  - Tra `FORBIDDEN` neu user khong thuoc trip.
+- Them `PaymentDetailResponse` gom payment id, trip id, amount, method, status, provider, transactionRef, paidAt, createdAt, updatedAt.
+- Mo rong `PaymentRepository` voi `findByTripIdWithTrip(...)`.
+- Them `PaymentQueryServiceTests` cho passenger, driver, admin, missing payment, missing user va unauthorized user.
+- Cap nhat `integrate-plan.md` voi huong dan FE goi payment detail endpoint.
+
+### Review truoc commit
+
+- Da xac nhan endpoint co method security `hasAnyRole('PASSENGER', 'DRIVER', 'ADMIN')`.
+- Da xac nhan service van check owner/admin theo trip, khong chi dua vao role.
+- Da xac nhan user khong ton tai bi chan truoc khi query payment.
+- Da chay `./mvnw.cmd -Dtest=PaymentQueryServiceTests test`: pass 6 tests.
+- Da chay `./mvnw.cmd test`: pass 169 tests.
+- CodeRabbit CLI chua chay duoc trong moi truong nay vi `coderabbit` command not found.
+
+### Files chinh
+
+- `src/main/java/com/example/goride/payment/controller/PaymentController.java`
+- `src/main/java/com/example/goride/payment/service/PaymentQueryService.java`
+- `src/main/java/com/example/goride/payment/dto/PaymentDetailResponse.java`
+- `src/main/java/com/example/goride/payment/repository/PaymentRepository.java`
+- `src/test/java/com/example/goride/payment/service/PaymentQueryServiceTests.java`
+- `integrate-plan.md`
+
+### Viec tiep theo
+
+- Them API kiem tra trip da rating hay chua neu FE can disable form truoc submit.
+- Dong bo Redis `driver:{id}:meta.rating` khi driver dang online sau rating.
+- Them payment provider abstraction neu bat dau MoMo/VNPay.
+
+---
+
 ## Commit: `feat: add admin dashboard api`
 
 Branch: `feature/admin-dashboard-api`
