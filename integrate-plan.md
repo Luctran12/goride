@@ -1,6 +1,6 @@
 # GoRide Front-end Integration Plan
 
-Branch da kiem tra: `feature/fcm-device-token-api`
+Branch da kiem tra: `feature/notification-inbox-api`
 
 Muc tieu file nay:
 - Checklist chuc nang backend da co code va co the tich hop FE.
@@ -193,6 +193,8 @@ type PaymentStatus = "PENDING" | "COMPLETED" | "FAILED" | "REFUNDED";
 - [x] User dang ky/cap nhat FCM device token sau login.
 - [x] User xoa FCM device token khi logout hoac token invalid.
 - [x] FCM token duoc luu Redis theo key `fcm_token:{userId}`.
+- [x] Notification ca nhan duoc luu DB de lam inbox trong app.
+- [x] User xem danh sach notification inbox va mark read.
 - [x] STOMP `CONNECT` authenticate bang JWT trong header `Authorization`.
 - [x] STOMP `SUBSCRIBE` vao trip topic chi cho passenger/driver cua trip hoac admin.
 - [x] Driver offer queue: `/user/queue/trip-requests`.
@@ -212,7 +214,6 @@ type PaymentStatus = "PENDING" | "COMPLETED" | "FAILED" | "REFUNDED";
 ### Notification/mo rong
 
 - [ ] Chua co mobile push notification; hien tai moi co WebSocket.
-- [ ] Chua co persistence cho notification inbox.
 
 ### Admin module
 
@@ -1263,6 +1264,68 @@ FE action:
 
 ---
 
+### 4.15 Notification inbox
+
+Notification inbox luu cac `UserNotification` ca nhan da gui qua `/user/queue/notifications`.
+
+#### Xem notification inbox
+
+```http
+GET /api/v1/notifications?page=1&size=20
+Authorization: Bearer <accessToken>
+```
+
+Response `data`:
+
+```json
+{
+  "items": [
+    {
+      "notificationId": 50,
+      "type": "TRIP_ACCEPTED",
+      "title": "Trip accepted",
+      "body": "Your driver is on the way",
+      "data": {
+        "tripId": 99,
+        "status": "ACCEPTED",
+        "driverId": 20
+      },
+      "read": false,
+      "readAt": null,
+      "createdAt": "2026-06-09T10:00:00Z"
+    }
+  ],
+  "pagination": {
+    "page": 1,
+    "size": 20,
+    "totalItems": 1,
+    "totalPages": 1
+  }
+}
+```
+
+FE action:
+- Goi khi mo notification center/inbox.
+- `page` la 1-based, `size` hop le tu 1 den 100.
+- `data` giu payload theo tung notification type de FE deep link ve trip/payment.
+- Notification moi van duoc gui realtime qua WebSocket; inbox la fallback/history.
+
+#### Mark notification read
+
+```http
+PATCH /api/v1/notifications/{notificationId}/read
+Authorization: Bearer <accessToken>
+```
+
+Response `data`: `NotificationResponse`.
+
+FE action:
+- Goi khi user mo notification hoac bam danh dau da doc.
+- Chi owner cua notification moi mark read duoc.
+- Neu tra `NOTIFICATION_NOT_FOUND`, notification khong ton tai hoac khong thuoc user hien tai.
+
+---
+
 ## 5. WebSocket integration
 
 ### Ket noi
@@ -1381,6 +1444,7 @@ Subscribe vao `/topic/trip/{tripId}/status` va `/topic/trip/{tripId}/location` c
 | `PAYMENT_INVALID_STATUS`, `PAYMENT_NOT_FOUND` | Refresh payment/trip, tranh double confirm. |
 | `TRIP_ALREADY_RATED` | An rating form, coi trip da danh gia. |
 | `DRIVER_LOCATION_NOT_FOUND` | Hien "Dang cho vi tri tai xe". |
+| `NOTIFICATION_NOT_FOUND` | Refresh inbox; notification khong ton tai hoac khong thuoc user. |
 
 ---
 

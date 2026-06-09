@@ -6,6 +6,65 @@
 
 ---
 
+## Commit: `feat: add notification inbox api`
+
+Branch: `feature/notification-inbox-api`
+
+Phase: Phase 6 - Notification module, theo `docs/TDD.md` muc 6.4 va `integrate-plan.md` muc Notification inbox
+
+### Muc tieu
+
+Them in-app notification persistence de FE co man hinh inbox/history cho cac notification ca nhan da gui qua WebSocket. Truoc commit nay user chi nhan realtime qua `/user/queue/notifications`, neu app mat ket noi thi khong co API doc lai notification.
+
+### Noi dung da trien khai
+
+- Them entity `Notification` va repository:
+  - Bang `notifications`.
+  - Luu `user_id`, `type`, `title`, `body`, `data_json`, `is_read`, `read_at`, `created_at`.
+  - Them index `idx_notifications_user_created_at` cho list inbox theo user.
+- Them `NotificationInboxService`:
+  - Luu `UserNotification` vao DB, serialize `data` thanh JSON.
+  - List notification cua user voi pagination 1-based.
+  - Mark notification read theo `id + userId`, chan user doc/sua notification cua nguoi khac.
+- Mo rong `NotificationController`:
+  - `GET /api/v1/notifications?page=1&size=20`.
+  - `PATCH /api/v1/notifications/{notificationId}/read`.
+- Cap nhat `WebSocketTripRealtimeNotifier`:
+  - Moi `notifyUser(...)` vua luu inbox vua gui WebSocket `/user/queue/notifications`.
+- Them `NotificationResponse`.
+- Them `NOTIFICATION_NOT_FOUND`.
+- Cap nhat `GorideApplicationTests` voi mock `NotificationRepository`.
+- Cap nhat `integrate-plan.md` voi huong dan FE cho notification inbox.
+
+### Review truoc commit
+
+- Da xac nhan endpoint yeu cau authenticated user.
+- Da xac nhan list/mark-read luon scope theo current `userId`.
+- Da xac nhan response khong expose notification cua user khac.
+- Da xac nhan WebSocket notification hien co van duoc gui sau khi luu inbox.
+- Da chay `./mvnw.cmd "-Dtest=NotificationInboxServiceTests,WebSocketTripRealtimeNotifierTests" test`: pass 8 tests.
+- Da chay `./mvnw.cmd test`: pass 191 tests.
+- CodeRabbit CLI chua chay duoc trong moi truong nay vi `coderabbit` command not found.
+
+### Files chinh
+
+- `src/main/java/com/example/goride/notification/domain/Notification.java`
+- `src/main/java/com/example/goride/notification/repository/NotificationRepository.java`
+- `src/main/java/com/example/goride/notification/service/NotificationInboxService.java`
+- `src/main/java/com/example/goride/notification/service/WebSocketTripRealtimeNotifier.java`
+- `src/main/java/com/example/goride/notification/controller/NotificationController.java`
+- `src/main/java/com/example/goride/notification/dto/NotificationResponse.java`
+- `src/test/java/com/example/goride/notification/service/NotificationInboxServiceTests.java`
+- `src/test/java/com/example/goride/notification/service/WebSocketTripRealtimeNotifierTests.java`
+- `integrate-plan.md`
+
+### Viec tiep theo
+
+- Them Firebase sender/channel de gui mobile push dua tren token trong Redis.
+- Them payment provider abstraction neu bat dau MoMo/VNPay.
+
+---
+
 ## Commit: `feat: add fcm device token api`
 
 Branch: `feature/fcm-device-token-api`

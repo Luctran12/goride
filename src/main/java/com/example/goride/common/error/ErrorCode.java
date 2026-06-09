@@ -27,6 +27,7 @@ public enum ErrorCode {
     TRIP_STATUS_INVALID_TRANSITION(HttpStatus.UNPROCESSABLE_ENTITY, "Trip status transition is invalid"),
     LOCATION_OUT_OF_SERVICE_AREA(HttpStatus.UNPROCESSABLE_ENTITY, "Location is outside the service area"),
     DRIVER_LOCATION_NOT_FOUND(HttpStatus.NOT_FOUND, "Driver location not found"),
+    NOTIFICATION_NOT_FOUND(HttpStatus.NOT_FOUND, "Notification not found"),
     PAYMENT_NOT_FOUND(HttpStatus.NOT_FOUND, "Payment not found"),
     PAYMENT_INVALID_STATUS(HttpStatus.UNPROCESSABLE_ENTITY, "Payment status is invalid"),
     NO_DRIVER_AVAILABLE(HttpStatus.UNPROCESSABLE_ENTITY, "No driver is available nearby"),

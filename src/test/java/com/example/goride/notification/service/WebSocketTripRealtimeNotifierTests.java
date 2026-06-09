@@ -17,7 +17,11 @@ class WebSocketTripRealtimeNotifierTests {
     @Test
     void sendsPassengerNotificationToUserQueue() {
         SimpMessagingTemplate messagingTemplate = mock(SimpMessagingTemplate.class);
-        WebSocketTripRealtimeNotifier notifier = new WebSocketTripRealtimeNotifier(messagingTemplate);
+        NotificationInboxService notificationInboxService = mock(NotificationInboxService.class);
+        WebSocketTripRealtimeNotifier notifier = new WebSocketTripRealtimeNotifier(
+                messagingTemplate,
+                notificationInboxService
+        );
         UserNotification notification = new UserNotification(
                 NotificationType.TRIP_ACCEPTED,
                 "Trip accepted",
@@ -28,13 +32,18 @@ class WebSocketTripRealtimeNotifierTests {
 
         notifier.notifyPassenger(10L, notification);
 
+        verify(notificationInboxService).saveInboxNotification(10L, notification);
         verify(messagingTemplate).convertAndSendToUser("10", "/queue/notifications", notification);
     }
 
     @Test
     void broadcastsTripStatusToTopic() {
         SimpMessagingTemplate messagingTemplate = mock(SimpMessagingTemplate.class);
-        WebSocketTripRealtimeNotifier notifier = new WebSocketTripRealtimeNotifier(messagingTemplate);
+        NotificationInboxService notificationInboxService = mock(NotificationInboxService.class);
+        WebSocketTripRealtimeNotifier notifier = new WebSocketTripRealtimeNotifier(
+                messagingTemplate,
+                notificationInboxService
+        );
         TripStatusNotification notification = new TripStatusNotification(
                 99L,
                 TripStatus.ACCEPTED,
