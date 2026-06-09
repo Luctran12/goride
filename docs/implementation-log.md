@@ -6,6 +6,57 @@
 
 ---
 
+## Commit: `feat: sync driver rating to redis`
+
+Branch: `feature/driver-rating-redis-sync`
+
+Phase: Phase 6 - Rating + matching metadata consistency, theo `integrate-plan.md` muc Rating
+
+### Muc tieu
+
+Dong bo rating moi cua driver vao Redis availability metadata sau khi passenger tao rating thanh cong. Truoc commit nay PostgreSQL da co `average_rating` moi, nhung matching co the tiep tuc doc rating cu trong `driver:{id}:meta.rating` cho den khi driver online lai.
+
+### Noi dung da trien khai
+
+- Mo rong `DriverAvailabilityStore` voi `updateRating(driverId, rating)`.
+- Cap nhat `RedisDriverAvailabilityStore`:
+  - Chi update Redis khi ca `driver:{id}:status` va `driver:{id}:meta` con ton tai, de tranh tao metadata thieu cho driver offline.
+  - Ghi field `rating` bang `BigDecimal.toPlainString()`.
+  - Refresh TTL cua `driver:{id}:meta` ve 60 giay, dong bo voi TTL availability hien co.
+- Cap nhat `RatingService`:
+  - Inject `DriverAvailabilityStore`.
+  - Sau khi cap nhat `DriverProfile.averageRating`, dang ky sync Redis bang callback sau transaction commit.
+  - Khi khong co transaction synchronization trong unit test, callback chay ngay theo pattern cac service hien co.
+- Them `RedisDriverAvailabilityStoreTests` cho case update metadata, thieu status va thieu metadata.
+- Cap nhat `RatingServiceTests` de verify rating moi duoc sync va cac flow loi khong cham Redis.
+- Cap nhat `integrate-plan.md` danh dau Redis rating sync da hoan thien va huong dan FE khong can goi them endpoint.
+
+### Review truoc commit
+
+- Da xac nhan Redis sync chi chay sau DB transaction commit, tranh cache rating moi khi DB rollback.
+- Da xac nhan driver offline/thieu metadata khong bi tao hash metadata khong day du.
+- Da xac nhan matching van doc cung field `driver:{id}:meta.rating`, nen khong thay doi contract Redis hien co.
+- Da chay `./mvnw.cmd "-Dtest=RatingServiceTests,RedisDriverAvailabilityStoreTests" test`: pass 16 tests.
+- Da chay `./mvnw.cmd test`: pass 176 tests.
+- CodeRabbit CLI chua chay duoc trong moi truong nay vi `coderabbit` command not found.
+
+### Files chinh
+
+- `src/main/java/com/example/goride/driver/service/availability/DriverAvailabilityStore.java`
+- `src/main/java/com/example/goride/driver/service/availability/RedisDriverAvailabilityStore.java`
+- `src/main/java/com/example/goride/rating/service/RatingService.java`
+- `src/test/java/com/example/goride/driver/service/availability/RedisDriverAvailabilityStoreTests.java`
+- `src/test/java/com/example/goride/rating/service/RatingServiceTests.java`
+- `integrate-plan.md`
+
+### Viec tiep theo
+
+- Them payment provider abstraction neu bat dau MoMo/VNPay.
+- Them FCM device token va push notification pipeline neu can mobile production notification.
+- Them notification inbox persistence neu FE can lich su thong bao.
+
+---
+
 ## Commit: `feat: add trip rating status api`
 
 Branch: `feature/trip-rating-status-api`

@@ -4,6 +4,7 @@ import org.springframework.data.geo.Point;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 
+import java.math.BigDecimal;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
@@ -42,6 +43,24 @@ public class RedisDriverAvailabilityStore implements DriverAvailabilityStore {
         String driverIdValue = String.valueOf(driverId);
         redisTemplate.opsForGeo().remove(ONLINE_DRIVERS_KEY, driverIdValue);
         redisTemplate.delete(List.of(statusKey(driverIdValue), metaKey(driverIdValue)));
+    }
+
+    @Override
+    public void updateRating(Long driverId, BigDecimal rating) {
+        if (driverId == null || rating == null) {
+            return;
+        }
+
+        String driverIdValue = String.valueOf(driverId);
+        String statusKey = statusKey(driverIdValue);
+        String metaKey = metaKey(driverIdValue);
+        if (!Boolean.TRUE.equals(redisTemplate.hasKey(statusKey))
+                || !Boolean.TRUE.equals(redisTemplate.hasKey(metaKey))) {
+            return;
+        }
+
+        redisTemplate.opsForHash().put(metaKey, "rating", rating.toPlainString());
+        redisTemplate.expire(metaKey, DRIVER_STATUS_TTL);
     }
 
     private String statusKey(String driverId) {

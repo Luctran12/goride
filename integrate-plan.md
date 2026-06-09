@@ -1,6 +1,6 @@
 # GoRide Front-end Integration Plan
 
-Branch da kiem tra: `feature/admin-trip-list-api`
+Branch da kiem tra: `feature/driver-rating-redis-sync`
 
 Muc tieu file nay:
 - Checklist chuc nang backend da co code va co the tich hop FE.
@@ -178,6 +178,7 @@ type PaymentStatus = "PENDING" | "COMPLETED" | "FAILED" | "REFUNDED";
 - [x] Chi passenger cua trip moi rating duoc.
 - [x] Passenger kiem tra trip da rating hay chua.
 - [x] Cap nhat `driver_profiles.average_rating` va `total_ratings`.
+- [x] Sau khi rating, sync `driver:{id}:meta.rating` trong Redis neu driver dang online.
 - [x] Public API xem rating cua driver co pagination.
 
 ### Admin driver approval
@@ -204,8 +205,6 @@ type PaymentStatus = "PENDING" | "COMPLETED" | "FAILED" | "REFUNDED";
 
 - [ ] Payment chi ho tro `CASH`.
 - [ ] Chua co provider MoMo/VNPay.
-- [ ] Sau khi rating, Redis `driver:{id}:meta.rating` chua duoc sync ngay neu driver dang online.
-  - Rating moi se vao PostgreSQL, matching Redis co the cap nhat khi driver online lai.
 
 ### Notification/mo rong
 
@@ -798,6 +797,7 @@ FE action:
 - Hien rating prompt sau khi trip `COMPLETED` va payment `COMPLETED`.
 - Gioi han score 1-5, comment <= 500 ky tu.
 - Neu `TRIP_ALREADY_RATED`, an form va coi la da rating.
+- Neu driver dang online, backend sync `driver:{id}:meta.rating` sau khi transaction rating commit; FE khong can goi them endpoint.
 
 #### Passenger kiem tra trip da rating chua
 

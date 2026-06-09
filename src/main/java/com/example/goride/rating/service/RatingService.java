@@ -8,6 +8,7 @@ import com.example.goride.common.error.BusinessException;
 import com.example.goride.common.error.ErrorCode;
 import com.example.goride.driver.domain.DriverProfile;
 import com.example.goride.driver.repository.DriverProfileRepository;
+import com.example.goride.driver.service.availability.DriverAvailabilityStore;
 import com.example.goride.rating.domain.Rating;
 import com.example.goride.rating.dto.RatingCreateRequest;
 import com.example.goride.rating.dto.RatingResponse;
@@ -17,6 +18,8 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -29,15 +32,18 @@ public class RatingService {
     private final TripRepository tripRepository;
     private final RatingRepository ratingRepository;
     private final DriverProfileRepository driverProfileRepository;
+    private final DriverAvailabilityStore driverAvailabilityStore;
 
     public RatingService(
             TripRepository tripRepository,
             RatingRepository ratingRepository,
-            DriverProfileRepository driverProfileRepository
+            DriverProfileRepository driverProfileRepository,
+            DriverAvailabilityStore driverAvailabilityStore
     ) {
         this.tripRepository = tripRepository;
         this.ratingRepository = ratingRepository;
         this.driverProfileRepository = driverProfileRepository;
+        this.driverAvailabilityStore = driverAvailabilityStore;
     }
 
     @Transactional
@@ -64,6 +70,7 @@ public class RatingService {
         Rating savedRating = ratingRepository.save(rating);
         updateDriverRating(driverProfile, savedRating.getScore());
         driverProfileRepository.save(driverProfile);
+        syncDriverRatingAfterCommit(trip.getDriver().getId(), driverProfile.getAverageRating());
         return RatingResponse.from(savedRating);
     }
 
@@ -155,5 +162,23 @@ public class RatingService {
                 RoundingMode.HALF_UP
         );
         driverProfile.updateAverageRating(newAverageRating, newTotalRatings);
+    }
+
+    private void syncDriverRatingAfterCommit(Long driverId, BigDecimal averageRating) {
+        runAfterCommit(() -> driverAvailabilityStore.updateRating(driverId, averageRating));
+    }
+
+    private void runAfterCommit(Runnable action) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            action.run();
+            return;
+        }
+
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                action.run();
+            }
+        });
     }
 }

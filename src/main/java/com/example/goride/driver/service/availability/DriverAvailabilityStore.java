@@ -9,6 +9,8 @@ public interface DriverAvailabilityStore {
 
     void markOffline(Long driverId);
 
+    void updateRating(Long driverId, BigDecimal rating);
+
     record DriverAvailability(
             Long driverId,
             BigDecimal latitude,
