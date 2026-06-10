@@ -6,6 +6,9 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 public class FcmPushProperties {
     private boolean enabled;
     private int maxAttempts = 2;
+    private String serviceAccountPath;
+    private String projectId;
+    private String appName = "goride";
 
     public boolean isEnabled() {
         return enabled;
@@ -24,5 +27,44 @@ public class FcmPushProperties {
             throw new IllegalArgumentException("app.notifications.fcm.max-attempts must be at least 1");
         }
         this.maxAttempts = maxAttempts;
+    }
+
+    public String getServiceAccountPath() {
+        return serviceAccountPath;
+    }
+
+    public void setServiceAccountPath(String serviceAccountPath) {
+        this.serviceAccountPath = serviceAccountPath;
+    }
+
+    public boolean hasServiceAccountPath() {
+        return serviceAccountPath != null && !serviceAccountPath.isBlank();
+    }
+
+    public String normalizedServiceAccountPath() {
+        return serviceAccountPath == null ? null : serviceAccountPath.strip();
+    }
+
+    public String getProjectId() {
+        return projectId;
+    }
+
+    public void setProjectId(String projectId) {
+        this.projectId = projectId;
+    }
+
+    public String normalizedProjectId() {
+        return projectId == null || projectId.isBlank() ? null : projectId.strip();
+    }
+
+    public String getAppName() {
+        return appName;
+    }
+
+    public void setAppName(String appName) {
+        if (appName == null || appName.isBlank()) {
+            throw new IllegalArgumentException("app.notifications.fcm.app-name must not be blank");
+        }
+        this.appName = appName.strip();
     }
 }

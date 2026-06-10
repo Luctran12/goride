@@ -6,6 +6,67 @@
 
 ---
 
+## Commit: `feat: add firebase admin push sender`
+
+Branch: `feature/firebase-admin-push-sender`
+
+Phase: Phase 6 - Notification module, theo `docs/TDD.md` muc 5.6 gui push notification qua Firebase FCM
+
+### Muc tieu
+
+Hoan thien sender Firebase Admin SDK that cho `FcmPushSender`, de FCM channel co the gui mobile push bang service account khi production/local duoc cau hinh. Commit nay van giu local/dev an toan: Firebase Admin SDK chi lazy-init khi backend thuc su gui push va co `service-account-path`.
+
+### Noi dung da trien khai
+
+- Them dependency `com.google.firebase:firebase-admin` version `9.9.0`, exclude `commons-logging` de tranh conflict voi `spring-jcl`.
+- Mo rong `FcmPushProperties`:
+  - `serviceAccountPath` de tro den Firebase service account JSON.
+  - `projectId` tuy chon.
+  - `appName` mac dinh `goride`.
+- Them `FirebaseMessagingGateway` interface de tach tang Firebase SDK.
+- Them `FirebaseAdminMessagingGateway`:
+  - Lazy-init `FirebaseApp` theo `appName`.
+  - Doc credential tu `app.notifications.fcm.service-account-path`.
+  - Set `projectId` neu duoc cau hinh.
+  - Wrap loi Firebase/IO bang `FcmPushSendException`.
+- Them `FirebaseAdminFcmPushSender`:
+  - Implement `FcmPushSender`.
+  - Build Firebase `Message` tu `FcmPushMessage`.
+  - Set notification title/body va data payload.
+- Them unit test cho properties, sender va gateway missing credential.
+- Cap nhat `integrate-plan.md` voi cau hinh runtime can thiet cho backend push that.
+
+### Review truoc commit
+
+- Da xac nhan app context van khong can credential khi `app.notifications.fcm.enabled=false`.
+- Da xac nhan FCM channel tiep tuc retry/suppress loi de khong lam fail WebSocket/inbox pipeline.
+- Da xac nhan FE khong co endpoint moi, van chi dang ky/xoa token nhu truoc.
+- Da chay `./mvnw.cmd "-Dtest=FcmPushPropertiesTests,FirebaseAdminFcmPushSenderTests,FirebaseAdminMessagingGatewayTests,FcmUserNotificationChannelTests" test`: pass 11 tests.
+- Da chay `./mvnw.cmd test`: pass 208 tests.
+- Maven lan dau can tai `firebase-admin` vao `~/.m2`; sandbox bi AccessDenied nen da chay lai voi quyen ngoai sandbox.
+- Da chay `git diff --check`: khong co whitespace error.
+- Da quet marker debug/disabled test: khong co ket qua.
+- CodeRabbit CLI chua chay duoc trong moi truong nay vi `coderabbit` command not found.
+
+### Files chinh
+
+- `pom.xml`
+- `src/main/java/com/example/goride/notification/config/FcmPushProperties.java`
+- `src/main/java/com/example/goride/notification/service/FirebaseMessagingGateway.java`
+- `src/main/java/com/example/goride/notification/service/FirebaseAdminMessagingGateway.java`
+- `src/main/java/com/example/goride/notification/service/FirebaseAdminFcmPushSender.java`
+- `src/test/java/com/example/goride/notification/config/FcmPushPropertiesTests.java`
+- `src/test/java/com/example/goride/notification/service/FirebaseAdminFcmPushSenderTests.java`
+- `src/test/java/com/example/goride/notification/service/FirebaseAdminMessagingGatewayTests.java`
+- `integrate-plan.md`
+
+### Viec tiep theo
+
+- Them co che xoa token trong Redis khi Firebase bao token invalid/unregistered.
+- Bo sung deploy secret/env cho service account path trong moi truong production.
+
+---
+
 ## Commit: `feat: add fcm push channel foundation`
 
 Branch: `feature/fcm-push-channel`
