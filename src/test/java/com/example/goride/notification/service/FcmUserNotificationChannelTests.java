@@ -16,6 +16,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentCaptor.forClass;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -120,6 +121,27 @@ class FcmUserNotificationChannelTests {
         channel.send(10L, notification());
 
         verify(sender, times(2)).send(any(FcmPushMessage.class));
+        verify(tokenStore, never()).deleteToken(10L);
+    }
+
+    @Test
+    void removesStoredTokenWhenFirebaseReportsInvalidToken() {
+        FcmDeviceTokenStore tokenStore = mock(FcmDeviceTokenStore.class);
+        FcmPushSender sender = mock(FcmPushSender.class);
+        when(tokenStore.findToken(10L)).thenReturn(Optional.of("token-123"));
+        doThrow(FcmPushSendException.invalidToken("FCM token is not registered", null))
+                .when(sender)
+                .send(any(FcmPushMessage.class));
+        FcmUserNotificationChannel channel = new FcmUserNotificationChannel(
+                tokenStore,
+                senderProvider(sender),
+                properties(true, 2)
+        );
+
+        channel.send(10L, notification());
+
+        verify(sender).send(any(FcmPushMessage.class));
+        verify(tokenStore).deleteToken(10L);
     }
 
     @SuppressWarnings("unchecked")

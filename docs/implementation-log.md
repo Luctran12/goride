@@ -6,6 +6,57 @@
 
 ---
 
+## Commit: `feat: remove invalid fcm tokens`
+
+Branch: `feature/fcm-invalid-token-cleanup`
+
+Phase: Phase 6 - Notification module, theo `docs/TDD.md` muc 5.6 FCM error handling
+
+### Muc tieu
+
+Tu dong xoa FCM token trong Redis khi Firebase Admin SDK bao token da het hieu luc/khong con dang ky. Muc tieu la tranh retry push vo ich cho token chet, dong thoi giu WebSocket/inbox pipeline khong bi fail khi mobile push loi.
+
+### Noi dung da trien khai
+
+- Mo rong `FcmPushSendException`:
+  - Them flag `invalidToken`.
+  - Them factory `invalidToken(message, cause)`.
+- Cap nhat `FirebaseAdminMessagingGateway`:
+  - Map `MessagingErrorCode.UNREGISTERED` thanh `FcmPushSendException.invalidToken(...)`.
+  - Cac loi Firebase khac van la loi push thong thuong de retry/suppress theo channel.
+- Cap nhat `FcmUserNotificationChannel`:
+  - Neu sender bao `invalidToken`, xoa token qua `FcmDeviceTokenStore.deleteToken(userId)`.
+  - Khong retry token invalid.
+  - Van retry loi transient theo `maxAttempts` va khong xoa token voi loi transient.
+- Them unit test cho invalid token exception va token cleanup trong channel.
+- Cap nhat `integrate-plan.md` de FE biet backend tu cleanup token invalid khi Firebase tra `UNREGISTERED`.
+
+### Review truoc commit
+
+- Da xac nhan backend chi xoa token voi `UNREGISTERED`, khong xoa voi loi transient/payload.
+- Da xac nhan cleanup token khong lam fail WebSocket/inbox pipeline.
+- Da chay `./mvnw.cmd "-Dtest=FcmPushSendExceptionTests,FcmUserNotificationChannelTests,FirebaseAdminMessagingGatewayTests" test`: pass 11 tests.
+- Da chay `./mvnw.cmd test`: pass 212 tests.
+- Da chay `git diff --check`: khong co whitespace error.
+- Da quet marker debug/disabled test: khong co ket qua.
+- CodeRabbit CLI chua chay duoc trong moi truong nay vi `coderabbit` command not found.
+
+### Files chinh
+
+- `src/main/java/com/example/goride/notification/service/FcmPushSendException.java`
+- `src/main/java/com/example/goride/notification/service/FirebaseAdminMessagingGateway.java`
+- `src/main/java/com/example/goride/notification/service/FcmUserNotificationChannel.java`
+- `src/test/java/com/example/goride/notification/service/FcmPushSendExceptionTests.java`
+- `src/test/java/com/example/goride/notification/service/FcmUserNotificationChannelTests.java`
+- `integrate-plan.md`
+
+### Viec tiep theo
+
+- Bo sung deploy secret/env cho service account path trong moi truong production.
+- Can nhac them observability/metrics cho push success/failure.
+
+---
+
 ## Commit: `feat: add firebase admin push sender`
 
 Branch: `feature/firebase-admin-push-sender`

@@ -6,6 +6,7 @@ import com.google.firebase.FirebaseApp;
 import com.google.firebase.FirebaseOptions;
 import com.google.firebase.messaging.FirebaseMessaging;
 import com.google.firebase.messaging.FirebaseMessagingException;
+import com.google.firebase.messaging.MessagingErrorCode;
 import com.google.firebase.messaging.Message;
 import org.springframework.stereotype.Component;
 
@@ -28,6 +29,9 @@ public class FirebaseAdminMessagingGateway implements FirebaseMessagingGateway {
         try {
             return firebaseMessaging().send(message);
         } catch (FirebaseMessagingException exception) {
+            if (exception.getMessagingErrorCode() == MessagingErrorCode.UNREGISTERED) {
+                throw FcmPushSendException.invalidToken("FCM token is not registered", exception);
+            }
             throw new FcmPushSendException("Failed to send FCM message", exception);
         }
     }

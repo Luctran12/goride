@@ -198,6 +198,7 @@ type PaymentStatus = "PENDING" | "COMPLETED" | "FAILED" | "REFUNDED";
 - [x] Notification ca nhan duoc route qua `UserNotificationChannel` pipeline.
 - [x] FCM push channel foundation doc token Redis va build payload push.
 - [x] Firebase Admin SDK sender gui mobile push khi backend duoc cau hinh service account.
+- [x] Backend tu xoa FCM token Redis khi Firebase bao token `UNREGISTERED`.
 - [x] Notification ca nhan duoc luu DB de lam inbox trong app.
 - [x] User xem danh sach notification inbox va mark read.
 - [x] STOMP `CONNECT` authenticate bang JWT trong header `Authorization`.
@@ -219,7 +220,6 @@ type PaymentStatus = "PENDING" | "COMPLETED" | "FAILED" | "REFUNDED";
 ### Notification/mo rong
 
 - [ ] Chua co deploy secret/env production cho Firebase service account path.
-- [ ] Chua co xu ly xoa FCM token khi Firebase bao token invalid.
 
 ### Admin module
 
@@ -1270,6 +1270,7 @@ FE action:
 - Goi khi logout hoac khi Firebase bao token invalid tren client.
 - Sau khi xoa, user van nhan WebSocket notification neu app dang ket noi.
 - Neu app nhan token moi, goi lai `PUT /api/v1/notifications/fcm-token`; backend se overwrite token cu trong Redis.
+- Neu backend gui push va Firebase tra token `UNREGISTERED`, backend se tu xoa Redis key `fcm_token:{userId}`. FE can dang ky lai token o lan app khoi dong/login/refresh token tiep theo.
 
 #### Trang thai backend FCM push
 
@@ -1279,6 +1280,8 @@ Runtime backend:
 - `app.notifications.fcm.enabled=false` theo mac dinh trong code.
 - Khi `enabled=false`, channel FCM bo qua push va khong doc Redis token.
 - Khi `enabled=true`, backend lay token tu `fcm_token:{userId}`, build payload `{ title, body, data }`, retry theo `app.notifications.fcm.max-attempts` mac dinh `2`.
+- Neu Firebase tra `UNREGISTERED`, backend xoa token trong Redis va khong retry token do.
+- Cac loi transient khac duoc retry/suppress; backend khong xoa token voi cac loi nay.
 - Firebase Admin SDK lazy-init khi gui push lan dau. Neu thieu/sai service account path, loi push duoc log/suppress trong FCM channel; WebSocket va inbox van chay binh thuong.
 - Cau hinh backend can co de gui push that:
   - `app.notifications.fcm.enabled=true`
