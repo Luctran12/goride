@@ -71,6 +71,27 @@ public class FcmUserNotificationChannel implements UserNotificationChannel {
             try {
                 pushSender.send(message);
                 return;
+            } catch (FcmPushSendException exception) {
+                if (exception.isInvalidToken()) {
+                    fcmDeviceTokenStore.deleteToken(userId);
+                    log.info("Removed invalid FCM token for user {}", userId);
+                    return;
+                }
+                if (attempt == maxAttempts) {
+                    log.warn(
+                            "Failed to send FCM notification to user {} after {} attempts",
+                            userId,
+                            maxAttempts,
+                            exception
+                    );
+                    return;
+                }
+                log.debug(
+                        "Retrying FCM notification for user {} after attempt {} failed",
+                        userId,
+                        attempt,
+                        exception
+                );
             } catch (RuntimeException exception) {
                 if (attempt == maxAttempts) {
                     log.warn(
