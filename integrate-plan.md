@@ -1,6 +1,6 @@
 # GoRide Front-end Integration Plan
 
-Branch da kiem tra: `feature/fcm-push-channel`
+Branch da kiem tra: `feature/firebase-admin-push-sender`
 
 Muc tieu file nay:
 - Checklist chuc nang backend da co code va co the tich hop FE.
@@ -197,6 +197,7 @@ type PaymentStatus = "PENDING" | "COMPLETED" | "FAILED" | "REFUNDED";
 - [x] FCM token duoc luu Redis theo key `fcm_token:{userId}`.
 - [x] Notification ca nhan duoc route qua `UserNotificationChannel` pipeline.
 - [x] FCM push channel foundation doc token Redis va build payload push.
+- [x] Firebase Admin SDK sender gui mobile push khi backend duoc cau hinh service account.
 - [x] Notification ca nhan duoc luu DB de lam inbox trong app.
 - [x] User xem danh sach notification inbox va mark read.
 - [x] STOMP `CONNECT` authenticate bang JWT trong header `Authorization`.
@@ -217,7 +218,7 @@ type PaymentStatus = "PENDING" | "COMPLETED" | "FAILED" | "REFUNDED";
 
 ### Notification/mo rong
 
-- [ ] Chua co Firebase Admin SDK sender implementation/service account credential.
+- [ ] Chua co deploy secret/env production cho Firebase service account path.
 - [ ] Chua co xu ly xoa FCM token khi Firebase bao token invalid.
 
 ### Admin module
@@ -1246,8 +1247,8 @@ FE action:
 - Goi sau login, sau refresh FCM token, hoac khi Firebase cap token moi.
 - Backend trim token va luu vao Redis key `fcm_token:{userId}`.
 - Token toi da 4096 ky tu; neu token rong backend tra `VALIDATION_ERROR`.
-- Backend da co FCM channel foundation: khi backend bat `app.notifications.fcm.enabled=true` va co `FcmPushSender` implementation, notification ca nhan se duoc gui them qua FCM bang token da luu.
-- Hien tai repo chua co Firebase Admin SDK sender implementation/service account credential, nen local/dev van mac dinh khong gui push that.
+- Backend da co FCM channel va Firebase Admin SDK sender. Khi backend bat `app.notifications.fcm.enabled=true` va cau hinh service account path, notification ca nhan se duoc gui them qua FCM bang token da luu.
+- Local/dev van mac dinh khong gui push that neu `app.notifications.fcm.enabled=false`.
 
 #### Xoa FCM token
 
@@ -1277,8 +1278,13 @@ Khong co REST/WebSocket contract moi cho FE. FE chi can dang ky token qua endpoi
 Runtime backend:
 - `app.notifications.fcm.enabled=false` theo mac dinh trong code.
 - Khi `enabled=false`, channel FCM bo qua push va khong doc Redis token.
-- Khi `enabled=true` nhung chua co `FcmPushSender` bean, backend log warning va van giu WebSocket/inbox binh thuong.
-- Khi co sender that, backend lay token tu `fcm_token:{userId}`, build payload `{ title, body, data }`, retry theo `app.notifications.fcm.max-attempts` mac dinh `2`.
+- Khi `enabled=true`, backend lay token tu `fcm_token:{userId}`, build payload `{ title, body, data }`, retry theo `app.notifications.fcm.max-attempts` mac dinh `2`.
+- Firebase Admin SDK lazy-init khi gui push lan dau. Neu thieu/sai service account path, loi push duoc log/suppress trong FCM channel; WebSocket va inbox van chay binh thuong.
+- Cau hinh backend can co de gui push that:
+  - `app.notifications.fcm.enabled=true`
+  - `app.notifications.fcm.service-account-path=/path/to/firebase-service-account.json`
+  - `app.notifications.fcm.project-id=<firebase-project-id>` neu service account khong tu suy ra project.
+  - `app.notifications.fcm.app-name=goride` neu can doi app name mac dinh.
 
 ---
 
