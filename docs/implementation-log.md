@@ -6,6 +6,61 @@
 
 ---
 
+## Commit: `feat: add payment provider foundation`
+
+Branch: `feature/payment-provider-foundation`
+
+Phase: Phase 6 - Payment module extensibility, theo `docs/TDD.md` muc 2.15 va 6.2
+
+### Muc tieu
+
+Tach nen tang payment provider de sau nay them MoMo/VNPay bang implementation moi, khong phai sua trip completion flow. Commit nay giu behavior CASH hien tai khong doi: khi trip completed, backend tao payment `PENDING` va driver van confirm cash bang endpoint hien co.
+
+### Noi dung da trien khai
+
+- Them `PaymentProvider` interface:
+  - Khai bao `paymentMethod()`.
+  - Khai bao `createPendingPayment(trip)`.
+- Them `CashPaymentProvider`:
+  - Ho tro `PaymentMethod.CASH`.
+  - Tao `Payment.createPending(trip)` nhu behavior hien co.
+- Cap nhat `TripPaymentService`:
+  - Inject danh sach provider.
+  - Build map theo `PaymentMethod`.
+  - Tao pending payment bang provider tuong ung voi `trip.paymentMethod`.
+  - Chan duplicate provider cho cung payment method.
+  - Tra `PAYMENT_INVALID_STATUS` neu trip dung payment method chua co provider.
+- Cap nhat `TripPaymentServiceTests`:
+  - Tao payment qua cash provider.
+  - Khong tao duplicate neu payment da ton tai.
+  - Reject missing provider.
+  - Reject duplicate provider.
+- Cap nhat `integrate-plan.md` de FE biet enum payment van chi expose `CASH`, nhung backend da co provider foundation.
+
+### Review truoc commit
+
+- Da xac nhan behavior payment CASH khong doi voi FE.
+- Da xac nhan `provider` va `transactionRef` cua CASH van giu null nhu truoc.
+- Da xac nhan them provider moi sau nay chi can implement `PaymentProvider` va mo enum/flow tuong ung.
+- Da chay `./mvnw.cmd "-Dtest=TripPaymentServiceTests" test`: pass 4 tests.
+- Da chay `./mvnw.cmd test`: pass 193 tests.
+- CodeRabbit CLI chua chay duoc trong moi truong nay vi `coderabbit` command not found.
+
+### Files chinh
+
+- `src/main/java/com/example/goride/payment/provider/PaymentProvider.java`
+- `src/main/java/com/example/goride/payment/provider/CashPaymentProvider.java`
+- `src/main/java/com/example/goride/payment/service/TripPaymentService.java`
+- `src/test/java/com/example/goride/payment/service/TripPaymentServiceTests.java`
+- `integrate-plan.md`
+
+### Viec tiep theo
+
+- Them MoMo/VNPay provider implementation va webhook callback.
+- Them Firebase sender/channel de gui mobile push dua tren token trong Redis.
+
+---
+
 ## Commit: `feat: add notification inbox api`
 
 Branch: `feature/notification-inbox-api`

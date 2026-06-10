@@ -1,6 +1,6 @@
 # GoRide Front-end Integration Plan
 
-Branch da kiem tra: `feature/notification-inbox-api`
+Branch da kiem tra: `feature/payment-provider-foundation`
 
 Muc tieu file nay:
 - Checklist chuc nang backend da co code va co the tich hop FE.
@@ -165,6 +165,8 @@ type PaymentStatus = "PENDING" | "COMPLETED" | "FAILED" | "REFUNDED";
 ### Payment cash
 
 - [x] Tao payment record khi trip completed.
+- [x] Payment record duoc tao qua `PaymentProvider` abstraction.
+- [x] Co `CashPaymentProvider` cho payment method `CASH`.
 - [x] Driver confirm da nhan tien mat.
 - [x] Payment `PENDING -> COMPLETED`, set `paidAt`.
 - [x] Passenger/driver/admin xem payment detail theo trip.
@@ -209,7 +211,7 @@ type PaymentStatus = "PENDING" | "COMPLETED" | "FAILED" | "REFUNDED";
 ### Payment/rating/statistics
 
 - [ ] Payment chi ho tro `CASH`.
-- [ ] Chua co provider MoMo/VNPay.
+- [ ] Chua co provider MoMo/VNPay implementation, checkout URL va webhook callback.
 
 ### Notification/mo rong
 
@@ -704,6 +706,7 @@ FE action:
 ### 4.7 Payment cash
 
 Payment record duoc tao khi driver complete trip. FE khong co endpoint create payment rieng.
+Backend da co provider abstraction noi bo; hien tai provider runtime duy nhat la `CashPaymentProvider`, nen FE van chi gui `paymentMethod = "CASH"`.
 
 Driver confirm cash:
 
