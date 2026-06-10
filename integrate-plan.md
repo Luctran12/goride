@@ -1,6 +1,6 @@
 # GoRide Front-end Integration Plan
 
-Branch da kiem tra: `feature/notification-channel-pipeline`
+Branch da kiem tra: `feature/fcm-push-channel`
 
 Muc tieu file nay:
 - Checklist chuc nang backend da co code va co the tich hop FE.
@@ -196,6 +196,7 @@ type PaymentStatus = "PENDING" | "COMPLETED" | "FAILED" | "REFUNDED";
 - [x] User xoa FCM device token khi logout hoac token invalid.
 - [x] FCM token duoc luu Redis theo key `fcm_token:{userId}`.
 - [x] Notification ca nhan duoc route qua `UserNotificationChannel` pipeline.
+- [x] FCM push channel foundation doc token Redis va build payload push.
 - [x] Notification ca nhan duoc luu DB de lam inbox trong app.
 - [x] User xem danh sach notification inbox va mark read.
 - [x] STOMP `CONNECT` authenticate bang JWT trong header `Authorization`.
@@ -216,7 +217,8 @@ type PaymentStatus = "PENDING" | "COMPLETED" | "FAILED" | "REFUNDED";
 
 ### Notification/mo rong
 
-- [ ] Chua co Firebase sender/channel that su; hien tai pipeline moi co in-app inbox va WebSocket.
+- [ ] Chua co Firebase Admin SDK sender implementation/service account credential.
+- [ ] Chua co xu ly xoa FCM token khi Firebase bao token invalid.
 
 ### Admin module
 
@@ -1244,7 +1246,8 @@ FE action:
 - Goi sau login, sau refresh FCM token, hoac khi Firebase cap token moi.
 - Backend trim token va luu vao Redis key `fcm_token:{userId}`.
 - Token toi da 4096 ky tu; neu token rong backend tra `VALIDATION_ERROR`.
-- Backend da co notification channel pipeline, nhung chua co Firebase sender/channel that su.
+- Backend da co FCM channel foundation: khi backend bat `app.notifications.fcm.enabled=true` va co `FcmPushSender` implementation, notification ca nhan se duoc gui them qua FCM bang token da luu.
+- Hien tai repo chua co Firebase Admin SDK sender implementation/service account credential, nen local/dev van mac dinh khong gui push that.
 
 #### Xoa FCM token
 
@@ -1265,6 +1268,17 @@ Response `data`:
 FE action:
 - Goi khi logout hoac khi Firebase bao token invalid tren client.
 - Sau khi xoa, user van nhan WebSocket notification neu app dang ket noi.
+- Neu app nhan token moi, goi lai `PUT /api/v1/notifications/fcm-token`; backend se overwrite token cu trong Redis.
+
+#### Trang thai backend FCM push
+
+Khong co REST/WebSocket contract moi cho FE. FE chi can dang ky token qua endpoint tren.
+
+Runtime backend:
+- `app.notifications.fcm.enabled=false` theo mac dinh trong code.
+- Khi `enabled=false`, channel FCM bo qua push va khong doc Redis token.
+- Khi `enabled=true` nhung chua co `FcmPushSender` bean, backend log warning va van giu WebSocket/inbox binh thuong.
+- Khi co sender that, backend lay token tu `fcm_token:{userId}`, build payload `{ title, body, data }`, retry theo `app.notifications.fcm.max-attempts` mac dinh `2`.
 
 ---
 
@@ -1313,7 +1327,7 @@ FE action:
 - `page` la 1-based, `size` hop le tu 1 den 100.
 - `data` giu payload theo tung notification type de FE deep link ve trip/payment.
 - Notification moi van duoc gui realtime qua WebSocket; inbox la fallback/history.
-- Noi bo backend dang fan-out `UserNotification` qua `UserNotificationChannel`: hien co channel `in_app` de luu inbox va `websocket` de gui `/user/queue/notifications`. FE khong can doi contract.
+- Noi bo backend dang fan-out `UserNotification` qua `UserNotificationChannel`: hien co channel `in_app` de luu inbox, `websocket` de gui `/user/queue/notifications`, va `fcm` foundation cho mobile push. FE khong can doi contract.
 
 #### Mark notification read
 
