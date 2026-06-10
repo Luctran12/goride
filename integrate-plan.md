@@ -1,6 +1,6 @@
 # GoRide Front-end Integration Plan
 
-Branch da kiem tra: `feature/firebase-admin-push-sender`
+Branch da kiem tra: `feature/payment-checkout-foundation`
 
 Muc tieu file nay:
 - Checklist chuc nang backend da co code va co the tich hop FE.
@@ -167,6 +167,7 @@ type PaymentStatus = "PENDING" | "COMPLETED" | "FAILED" | "REFUNDED";
 - [x] Tao payment record khi trip completed.
 - [x] Payment record duoc tao qua `PaymentProvider` abstraction.
 - [x] Co `CashPaymentProvider` cho payment method `CASH`.
+- [x] Co checkout foundation endpoint cho payment `PENDING`.
 - [x] Driver confirm da nhan tien mat.
 - [x] Payment `PENDING -> COMPLETED`, set `paidAt`.
 - [x] Passenger/driver/admin xem payment detail theo trip.
@@ -215,7 +216,7 @@ type PaymentStatus = "PENDING" | "COMPLETED" | "FAILED" | "REFUNDED";
 ### Payment/rating/statistics
 
 - [ ] Payment chi ho tro `CASH`.
-- [ ] Chua co provider MoMo/VNPay implementation, checkout URL va webhook callback.
+- [ ] Chua co provider MoMo/VNPay implementation/webhook callback; checkout foundation da co endpoint nhung CASH khong can redirect.
 
 ### Notification/mo rong
 
@@ -711,6 +712,35 @@ FE action:
 
 Payment record duoc tao khi driver complete trip. FE khong co endpoint create payment rieng.
 Backend da co provider abstraction noi bo; hien tai provider runtime duy nhat la `CashPaymentProvider`, nen FE van chi gui `paymentMethod = "CASH"`.
+
+#### Lay checkout session theo trip
+
+```http
+GET /api/v1/payments/trips/{tripId}/checkout
+Authorization: Bearer <passengerOrDriverOrAdminToken>
+```
+
+Response `data` voi CASH:
+
+```json
+{
+  "paymentId": 70,
+  "tripId": 99,
+  "amount": 45000,
+  "method": "CASH",
+  "status": "PENDING",
+  "provider": null,
+  "checkoutRequired": false,
+  "checkoutUrl": null,
+  "expiresAt": null
+}
+```
+
+FE action:
+- Goi sau trip `COMPLETED`/payment `PENDING` de biet payment method co can redirect khong.
+- Voi `CASH`, `checkoutRequired=false`, FE hien man hinh thanh toan tien mat va cho driver confirm.
+- Khi sau nay co MoMo/VNPay, neu `checkoutRequired=true`, FE mo `checkoutUrl` va theo doi payment status/webhook flow.
+- Endpoint chi hop le cho payment `PENDING`; neu payment da completed backend tra `PAYMENT_INVALID_STATUS`, FE nen refresh payment detail.
 
 Driver confirm cash:
 

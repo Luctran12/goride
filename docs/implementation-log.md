@@ -6,6 +6,76 @@
 
 ---
 
+## Commit: `feat: add payment checkout foundation`
+
+Branch: `feature/payment-checkout-foundation`
+
+Phase: Phase 6 - Payment module extensibility, theo `docs/TDD.md` muc 6.2 MoMo/VNPay future extension
+
+### Muc tieu
+
+Them contract checkout cho payment `PENDING` de FE co the hoi backend xem payment method hien tai co can redirect/provider checkout hay khong. Commit nay giu runtime payment method chi la `CASH`; CASH khong can checkout URL va van di theo flow driver confirm tien mat hien co.
+
+### Noi dung da trien khai
+
+- Them `PaymentCheckoutSession`:
+  - Mo ta ket qua checkout cua provider: `checkoutRequired`, `checkoutUrl`, `expiresAt`.
+  - Validate checkout URL bat buoc khi provider bao can checkout.
+  - Mac dinh `notRequired()` cho CASH/no redirect.
+- Mo rong `PaymentProvider`:
+  - Them hook `createCheckoutSession(payment)`.
+  - Default provider tra `PaymentCheckoutSession.notRequired()` de CASH khong doi behavior.
+- Them `PaymentProviderRegistry`:
+  - Gom provider theo `PaymentMethod`.
+  - Chan duplicate provider cung method.
+  - Tra `PAYMENT_INVALID_STATUS` neu method chua co provider runtime.
+- Tach `PaymentAccessService`:
+  - Dung chung logic load payment theo trip va check quyen passenger/assigned driver/admin.
+  - `PaymentQueryService` va checkout flow cung dung access rule nay.
+- Them `PaymentCheckoutService`:
+  - Chi cho checkout voi payment `PENDING`.
+  - Lay provider theo `payment.method` va map checkout session ra response.
+- Mo rong `PaymentController`:
+  - Them `GET /api/v1/payments/trips/{tripId}/checkout`.
+- Them `PaymentCheckoutResponse` gom payment core fields va checkout fields.
+- Cap nhat test cho registry, trip payment provider lookup, payment query access va checkout service.
+- Cap nhat `integrate-plan.md` voi checklist va huong dan FE goi checkout endpoint.
+
+### Review truoc commit
+
+- Da xac nhan enum `PaymentMethod` van chi expose `CASH`.
+- Da xac nhan CASH checkout tra `checkoutRequired=false`, `checkoutUrl=null`, `expiresAt=null`.
+- Da xac nhan payment da `COMPLETED` bi chan bang `PAYMENT_INVALID_STATUS`.
+- Da xac nhan duplicate provider van bi chan trong registry.
+- Da chay `./mvnw.cmd "-Dtest=PaymentProviderRegistryTests,TripPaymentServiceTests,PaymentQueryServiceTests,PaymentCheckoutServiceTests" test`: pass 16 tests.
+- Da chay `./mvnw.cmd test`: pass 218 tests.
+- Da chay `git diff --check`: khong co whitespace error.
+- Da quet marker debug/disabled test: khong co ket qua.
+- CodeRabbit CLI chua chay duoc trong moi truong nay vi `coderabbit` command not found.
+
+### Files chinh
+
+- `src/main/java/com/example/goride/payment/controller/PaymentController.java`
+- `src/main/java/com/example/goride/payment/dto/PaymentCheckoutResponse.java`
+- `src/main/java/com/example/goride/payment/provider/PaymentCheckoutSession.java`
+- `src/main/java/com/example/goride/payment/provider/PaymentProvider.java`
+- `src/main/java/com/example/goride/payment/provider/PaymentProviderRegistry.java`
+- `src/main/java/com/example/goride/payment/service/PaymentAccessService.java`
+- `src/main/java/com/example/goride/payment/service/PaymentCheckoutService.java`
+- `src/main/java/com/example/goride/payment/service/PaymentQueryService.java`
+- `src/main/java/com/example/goride/payment/service/TripPaymentService.java`
+- `src/test/java/com/example/goride/payment/provider/PaymentProviderRegistryTests.java`
+- `src/test/java/com/example/goride/payment/service/PaymentCheckoutServiceTests.java`
+- `integrate-plan.md`
+
+### Viec tiep theo
+
+- Them payment method/provider MoMo hoac VNPay.
+- Thiet ke callback/webhook va mapping `provider`/`transactionRef`.
+- Can nhac tach endpoint tao provider checkout thanh `POST` khi provider online co side effect tao order that.
+
+---
+
 ## Commit: `feat: remove invalid fcm tokens`
 
 Branch: `feature/fcm-invalid-token-cleanup`

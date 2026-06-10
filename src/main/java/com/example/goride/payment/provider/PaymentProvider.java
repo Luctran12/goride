@@ -8,4 +8,8 @@ public interface PaymentProvider {
     PaymentMethod paymentMethod();
 
     Payment createPendingPayment(Trip trip);
+
+    default PaymentCheckoutSession createCheckoutSession(Payment payment) {
+        return PaymentCheckoutSession.notRequired();
+    }
 }

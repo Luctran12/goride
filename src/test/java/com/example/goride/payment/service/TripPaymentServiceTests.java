@@ -10,6 +10,7 @@ import com.example.goride.payment.domain.Payment;
 import com.example.goride.payment.domain.PaymentStatus;
 import com.example.goride.payment.provider.CashPaymentProvider;
 import com.example.goride.payment.provider.PaymentProvider;
+import com.example.goride.payment.provider.PaymentProviderRegistry;
 import com.example.goride.payment.repository.PaymentRepository;
 import com.example.goride.user.domain.User;
 import com.example.goride.user.domain.UserRole;
@@ -47,7 +48,10 @@ class TripPaymentServiceTests {
 
     @BeforeEach
     void setUp() {
-        service = new TripPaymentService(paymentRepository, List.of(new CashPaymentProvider()));
+        service = new TripPaymentService(
+                paymentRepository,
+                new PaymentProviderRegistry(List.of(new CashPaymentProvider()))
+        );
     }
 
     @Test
@@ -80,7 +84,10 @@ class TripPaymentServiceTests {
     @Test
     void rejectsPaymentMethodWithoutRegisteredProvider() {
         Trip trip = completedTrip();
-        TripPaymentService serviceWithoutProvider = new TripPaymentService(paymentRepository, List.of());
+        TripPaymentService serviceWithoutProvider = new TripPaymentService(
+                paymentRepository,
+                new PaymentProviderRegistry(List.of())
+        );
         when(paymentRepository.findByTripId(99L)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> serviceWithoutProvider.createPendingPayment(trip))
@@ -97,7 +104,7 @@ class TripPaymentServiceTests {
         PaymentProvider secondProvider = new CashPaymentProvider();
 
         assertThatThrownBy(() ->
-                        new TripPaymentService(paymentRepository, List.of(firstProvider, secondProvider)))
+                        new PaymentProviderRegistry(List.of(firstProvider, secondProvider)))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("Duplicate payment provider");
     }
