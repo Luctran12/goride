@@ -6,6 +6,64 @@
 
 ---
 
+## Commit: `feat: add notification channel pipeline`
+
+Branch: `feature/notification-channel-pipeline`
+
+Phase: Phase 6 - Notification module extensibility, theo `docs/TDD.md` muc 6.4 va huong mo rong FCM push
+
+### Muc tieu
+
+Tach notification ca nhan thanh pipeline channel de giu behavior WebSocket/inbox hien tai, dong thoi co diem cam Firebase push channel o commit sau ma khong phai sua cac flow booking/matching/payment dang goi `TripRealtimeNotifier`.
+
+### Noi dung da trien khai
+
+- Them `UserNotificationChannel` interface:
+  - Khai bao `channelName()`.
+  - Khai bao `send(userId, notification)`.
+- Them `InAppNotificationChannel`:
+  - Channel name `in_app`.
+  - Luu `UserNotification` vao inbox thong qua `NotificationInboxService`.
+  - Duoc order truoc de giu behavior cu: luu inbox truoc khi gui realtime.
+- Them `WebSocketUserNotificationChannel`:
+  - Channel name `websocket`.
+  - Gui `UserNotification` toi `/user/queue/notifications`.
+- Cap nhat `WebSocketTripRealtimeNotifier`:
+  - Inject danh sach `UserNotificationChannel`.
+  - `notifyUser(...)` fan-out notification qua cac channel da cau hinh.
+  - `broadcastTripStatus(...)` van gui `/topic/trip/{tripId}/status` nhu cu.
+- Cap nhat `WebSocketTripRealtimeNotifierTests` va them test rieng cho tung channel.
+- Cap nhat `integrate-plan.md` de FE biet contract khong doi, push Firebase that su van la viec tiep theo.
+
+### Review truoc commit
+
+- Da xac nhan notification ca nhan van duoc luu inbox va gui WebSocket nhu truoc thong qua channel rieng.
+- Da xac nhan khong co thay doi REST/WebSocket contract cho FE.
+- Da xac nhan pipeline du cho commit tiep theo them Firebase channel dua tren token Redis.
+- Da chay `./mvnw.cmd "-Dtest=WebSocketTripRealtimeNotifierTests,InAppNotificationChannelTests,WebSocketUserNotificationChannelTests" test`: pass 4 tests.
+- Da chay `./mvnw.cmd test`: pass 195 tests.
+- Da chay `git diff --check`: khong co whitespace error.
+- Da quet marker debug/disabled test: khong co ket qua.
+- CodeRabbit CLI chua chay duoc trong moi truong nay vi `coderabbit` command not found.
+
+### Files chinh
+
+- `src/main/java/com/example/goride/notification/service/UserNotificationChannel.java`
+- `src/main/java/com/example/goride/notification/service/InAppNotificationChannel.java`
+- `src/main/java/com/example/goride/notification/service/WebSocketUserNotificationChannel.java`
+- `src/main/java/com/example/goride/notification/service/WebSocketTripRealtimeNotifier.java`
+- `src/test/java/com/example/goride/notification/service/InAppNotificationChannelTests.java`
+- `src/test/java/com/example/goride/notification/service/WebSocketUserNotificationChannelTests.java`
+- `src/test/java/com/example/goride/notification/service/WebSocketTripRealtimeNotifierTests.java`
+- `integrate-plan.md`
+
+### Viec tiep theo
+
+- Them Firebase sender/channel de gui mobile push dua tren token trong Redis.
+- Them config credential Firebase va co che disable push khi chua cau hinh.
+
+---
+
 ## Commit: `feat: add payment provider foundation`
 
 Branch: `feature/payment-provider-foundation`
