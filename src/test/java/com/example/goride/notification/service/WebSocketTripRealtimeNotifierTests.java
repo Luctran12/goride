@@ -8,19 +8,22 @@ import org.junit.jupiter.api.Test;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Map;
 
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
 class WebSocketTripRealtimeNotifierTests {
     @Test
-    void sendsPassengerNotificationToUserQueue() {
+    void sendsPassengerNotificationToConfiguredChannelsInOrder() {
         SimpMessagingTemplate messagingTemplate = mock(SimpMessagingTemplate.class);
-        NotificationInboxService notificationInboxService = mock(NotificationInboxService.class);
+        UserNotificationChannel inboxChannel = mock(UserNotificationChannel.class);
+        UserNotificationChannel websocketChannel = mock(UserNotificationChannel.class);
         WebSocketTripRealtimeNotifier notifier = new WebSocketTripRealtimeNotifier(
                 messagingTemplate,
-                notificationInboxService
+                List.of(inboxChannel, websocketChannel)
         );
         UserNotification notification = new UserNotification(
                 NotificationType.TRIP_ACCEPTED,
@@ -32,17 +35,17 @@ class WebSocketTripRealtimeNotifierTests {
 
         notifier.notifyPassenger(10L, notification);
 
-        verify(notificationInboxService).saveInboxNotification(10L, notification);
-        verify(messagingTemplate).convertAndSendToUser("10", "/queue/notifications", notification);
+        var inOrder = inOrder(inboxChannel, websocketChannel);
+        inOrder.verify(inboxChannel).send(10L, notification);
+        inOrder.verify(websocketChannel).send(10L, notification);
     }
 
     @Test
     void broadcastsTripStatusToTopic() {
         SimpMessagingTemplate messagingTemplate = mock(SimpMessagingTemplate.class);
-        NotificationInboxService notificationInboxService = mock(NotificationInboxService.class);
         WebSocketTripRealtimeNotifier notifier = new WebSocketTripRealtimeNotifier(
                 messagingTemplate,
-                notificationInboxService
+                List.of()
         );
         TripStatusNotification notification = new TripStatusNotification(
                 99L,

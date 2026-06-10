@@ -1,6 +1,6 @@
 # GoRide Front-end Integration Plan
 
-Branch da kiem tra: `feature/payment-provider-foundation`
+Branch da kiem tra: `feature/notification-channel-pipeline`
 
 Muc tieu file nay:
 - Checklist chuc nang backend da co code va co the tich hop FE.
@@ -195,6 +195,7 @@ type PaymentStatus = "PENDING" | "COMPLETED" | "FAILED" | "REFUNDED";
 - [x] User dang ky/cap nhat FCM device token sau login.
 - [x] User xoa FCM device token khi logout hoac token invalid.
 - [x] FCM token duoc luu Redis theo key `fcm_token:{userId}`.
+- [x] Notification ca nhan duoc route qua `UserNotificationChannel` pipeline.
 - [x] Notification ca nhan duoc luu DB de lam inbox trong app.
 - [x] User xem danh sach notification inbox va mark read.
 - [x] STOMP `CONNECT` authenticate bang JWT trong header `Authorization`.
@@ -215,7 +216,7 @@ type PaymentStatus = "PENDING" | "COMPLETED" | "FAILED" | "REFUNDED";
 
 ### Notification/mo rong
 
-- [ ] Chua co mobile push notification; hien tai moi co WebSocket.
+- [ ] Chua co Firebase sender/channel that su; hien tai pipeline moi co in-app inbox va WebSocket.
 
 ### Admin module
 
@@ -1243,7 +1244,7 @@ FE action:
 - Goi sau login, sau refresh FCM token, hoac khi Firebase cap token moi.
 - Backend trim token va luu vao Redis key `fcm_token:{userId}`.
 - Token toi da 4096 ky tu; neu token rong backend tra `VALIDATION_ERROR`.
-- Commit nay moi luu token, chua gui push qua Firebase.
+- Backend da co notification channel pipeline, nhung chua co Firebase sender/channel that su.
 
 #### Xoa FCM token
 
@@ -1312,6 +1313,7 @@ FE action:
 - `page` la 1-based, `size` hop le tu 1 den 100.
 - `data` giu payload theo tung notification type de FE deep link ve trip/payment.
 - Notification moi van duoc gui realtime qua WebSocket; inbox la fallback/history.
+- Noi bo backend dang fan-out `UserNotification` qua `UserNotificationChannel`: hien co channel `in_app` de luu inbox va `websocket` de gui `/user/queue/notifications`. FE khong can doi contract.
 
 #### Mark notification read
 
