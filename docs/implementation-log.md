@@ -6,6 +6,69 @@
 
 ---
 
+## Commit: `feat: add fcm push channel foundation`
+
+Branch: `feature/fcm-push-channel`
+
+Phase: Phase 6 - Notification module, theo `docs/TDD.md` muc 5.6 va flow FCM push notification
+
+### Muc tieu
+
+Them nen tang FCM push channel vao notification pipeline da co, de backend co the doc device token tu Redis va gui mobile push khi co Firebase sender implementation. Commit nay khong ep cau hinh Firebase credential ngay: FCM mac dinh disabled/no sender, nen local/dev va app context van chay binh thuong.
+
+### Noi dung da trien khai
+
+- Them `FcmPushProperties` voi prefix `app.notifications.fcm`:
+  - `enabled` mac dinh `false`.
+  - `maxAttempts` mac dinh `2`.
+- Them `NotificationConfig` de enable properties cho notification module.
+- Them `FcmPushMessage`:
+  - Chuan hoa token/title/body/data gui sang FCM.
+  - Convert `UserNotification.data` thanh `Map<String, String>` theo yeu cau FCM data payload.
+- Them `FcmPushSender` interface:
+  - La diem cam Firebase Admin SDK implementation o commit sau.
+- Them `FcmPushSendException` cho sender implementation sau nay nem loi co nghia.
+- Them `FcmUserNotificationChannel`:
+  - Channel name `fcm`.
+  - Chi hoat dong khi `app.notifications.fcm.enabled=true`.
+  - Lay token tu `FcmDeviceTokenStore`/Redis key `fcm_token:{userId}`.
+  - Bo qua neu user chua co token.
+  - Bo qua neu token trong Redis bi rong/blank.
+  - Bo qua va log warning neu chua co `FcmPushSender` bean.
+  - Retry theo `maxAttempts`, khong lam fail pipeline WebSocket/inbox neu push loi.
+- Them test cho payload builder va FCM channel.
+- Cap nhat `integrate-plan.md` de FE biet khong can doi REST/WebSocket contract; push mobile se tu chay khi backend duoc cau hinh sender that.
+
+### Review truoc commit
+
+- Da xac nhan FCM channel khong anh huong behavior WebSocket/inbox hien co khi disabled.
+- Da xac nhan FE van chi can dang ky/xoa token qua endpoint hien co.
+- Da xac nhan commit nay chua gui Firebase that vi chua co Firebase Admin SDK sender implementation.
+- Da chay `./mvnw.cmd "-Dtest=FcmPushMessageTests,FcmUserNotificationChannelTests,WebSocketTripRealtimeNotifierTests" test`: pass 10 tests.
+- Da chay `./mvnw.cmd test`: pass 203 tests.
+- Da chay `git diff --check`: khong co whitespace error.
+- Da quet marker debug/disabled test: khong co ket qua.
+- CodeRabbit CLI chua chay duoc trong moi truong nay vi `coderabbit` command not found.
+
+### Files chinh
+
+- `src/main/java/com/example/goride/notification/config/FcmPushProperties.java`
+- `src/main/java/com/example/goride/notification/config/NotificationConfig.java`
+- `src/main/java/com/example/goride/notification/dto/FcmPushMessage.java`
+- `src/main/java/com/example/goride/notification/service/FcmPushSender.java`
+- `src/main/java/com/example/goride/notification/service/FcmPushSendException.java`
+- `src/main/java/com/example/goride/notification/service/FcmUserNotificationChannel.java`
+- `src/test/java/com/example/goride/notification/dto/FcmPushMessageTests.java`
+- `src/test/java/com/example/goride/notification/service/FcmUserNotificationChannelTests.java`
+- `integrate-plan.md`
+
+### Viec tiep theo
+
+- Them Firebase Admin SDK sender implementation doc service account credential.
+- Them co che xoa token khi Firebase bao token invalid.
+
+---
+
 ## Commit: `feat: add notification channel pipeline`
 
 Branch: `feature/notification-channel-pipeline`
