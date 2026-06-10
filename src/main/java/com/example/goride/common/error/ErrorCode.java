@@ -29,6 +29,7 @@ public enum ErrorCode {
     DRIVER_LOCATION_NOT_FOUND(HttpStatus.NOT_FOUND, "Driver location not found"),
     NOTIFICATION_NOT_FOUND(HttpStatus.NOT_FOUND, "Notification not found"),
     PAYMENT_NOT_FOUND(HttpStatus.NOT_FOUND, "Payment not found"),
+    PAYMENT_PROVIDER_UNSUPPORTED(HttpStatus.UNPROCESSABLE_ENTITY, "Payment provider is not supported"),
     PAYMENT_INVALID_STATUS(HttpStatus.UNPROCESSABLE_ENTITY, "Payment status is invalid"),
     NO_DRIVER_AVAILABLE(HttpStatus.UNPROCESSABLE_ENTITY, "No driver is available nearby"),
     MATCHING_OFFER_NOT_FOUND(HttpStatus.NOT_FOUND, "Matching offer not found"),
