@@ -1,6 +1,6 @@
 # GoRide Front-end Integration Plan
 
-Branch da kiem tra: `feature/payment-completion-workflow`
+Branch da kiem tra: `feature/payment-provider-config`
 
 Muc tieu file nay:
 - Checklist chuc nang backend da co code va co the tich hop FE.
@@ -168,6 +168,7 @@ type PaymentStatus = "PENDING" | "COMPLETED" | "FAILED" | "REFUNDED";
 - [x] Tao payment record khi trip completed.
 - [x] Payment record duoc tao qua `PaymentProvider` abstraction.
 - [x] Co `CashPaymentProvider` cho payment method `CASH`.
+- [x] Co runtime config foundation cho MoMo/VNPay provider, mac dinh disabled.
 - [x] Co checkout foundation endpoint cho payment `PENDING`.
 - [x] Co webhook foundation endpoint cho payment provider external callback.
 - [x] Driver confirm da nhan tien mat.
@@ -219,7 +220,7 @@ type PaymentStatus = "PENDING" | "COMPLETED" | "FAILED" | "REFUNDED";
 ### Payment/rating/statistics
 
 - [ ] Payment chi ho tro `CASH`.
-- [ ] Chua co provider MoMo/VNPay implementation; webhook foundation da co endpoint nhung chua verify signature/provider payload that.
+- [ ] Chua co provider MoMo/VNPay implementation; da co config/webhook/checkout foundation nhung chua verify signature/provider payload that.
 
 ### Notification/mo rong
 
@@ -715,6 +716,35 @@ FE action:
 
 Payment record duoc tao khi driver complete trip. FE khong co endpoint create payment rieng.
 Backend da co provider abstraction noi bo; hien tai provider runtime duy nhat la `CashPaymentProvider`, nen FE van chi gui `paymentMethod = "CASH"`.
+
+#### Runtime config cho provider online
+
+Backend da co config foundation cho MoMo/VNPay, mac dinh disabled va khong lam doi contract FE hien tai.
+
+```yaml
+app:
+  payments:
+    providers:
+      momo:
+        enabled: false
+        sandbox: true
+        merchant-id: ${MOMO_MERCHANT_ID:}
+        secret-key: ${MOMO_SECRET_KEY:}
+        checkout-base-url: ${MOMO_CHECKOUT_BASE_URL:}
+        webhook-secret: ${MOMO_WEBHOOK_SECRET:}
+      vnpay:
+        enabled: false
+        sandbox: true
+        merchant-id: ${VNPAY_MERCHANT_ID:}
+        secret-key: ${VNPAY_SECRET_KEY:}
+        checkout-base-url: ${VNPAY_CHECKOUT_BASE_URL:}
+        webhook-secret: ${VNPAY_WEBHOOK_SECRET:}
+```
+
+FE action:
+- Chua expose `MOMO`/`VNPAY` trong `PaymentMethod`, nen FE van chi gui `CASH`.
+- Khi backend enable provider online o commit sau, FE se can them option payment method va xu ly `checkoutRequired=true`.
+- `sandbox=true` dung cho moi truong test provider; production nen set `sandbox=false` va secret qua env/secret manager.
 
 #### Lay checkout session theo trip
 

@@ -6,6 +6,57 @@
 
 ---
 
+## Commit: `feat: add payment provider config foundation`
+
+Branch: `feature/payment-provider-config`
+
+Phase: Phase 6 - Payment module extensibility, chuan bi config runtime cho MoMo/VNPay provider
+
+### Muc tieu
+
+Them nen tang cau hinh runtime cho payment provider online truoc khi bat provider MoMo/VNPay that. Commit nay khong doi enum `PaymentMethod`, khong expose payment method moi cho FE va khong chinh `application.yml` local; MoMo/VNPay mac dinh disabled.
+
+### Noi dung da trien khai
+
+- Them `PaymentConfig` de enable configuration properties cho payment module.
+- Them `PaymentProviderProperties` voi prefix `app.payments.providers`:
+  - `momo.enabled`, `momo.sandbox`, `momo.merchant-id`, `momo.secret-key`, `momo.checkout-base-url`, `momo.webhook-secret`.
+  - `vnpay.enabled`, `vnpay.sandbox`, `vnpay.merchant-id`, `vnpay.secret-key`, `vnpay.checkout-base-url`, `vnpay.webhook-secret`.
+  - Mac dinh provider online disabled va sandbox mode enabled.
+  - Helper `settingsFor(providerName)` resolve `momo`/`vnpay` case-insensitive.
+  - Helper normalize secret/merchant/base-url/webhook-secret.
+  - Helper check provider co du checkout/webhook config hay chua.
+- Them `PaymentProviderPropertiesTests` cho default, normalize va provider lookup.
+- Cap nhat `integrate-plan.md`:
+  - Ghi provider config foundation da co.
+  - Them YAML mau dung env variables cho MoMo/VNPay.
+  - Ghi ro FE van chi gui `CASH` cho den khi provider online duoc enable o commit sau.
+
+### Review truoc commit
+
+- Da xac nhan commit nay khong them `MOMO`/`VNPAY` vao enum FE.
+- Da xac nhan app context load duoc khi khong co config provider trong `application.yml`.
+- Da xac nhan MoMo/VNPay disabled by default va sandbox=true by default.
+- Da chay `./mvnw.cmd "-Dtest=PaymentProviderPropertiesTests,GorideApplicationTests" test`: pass 5 tests.
+- Da chay `./mvnw.cmd test`: pass 234 tests.
+- Da chay `git diff --check`: khong co whitespace error.
+- Da quet marker debug/disabled test: khong co ket qua.
+- CodeRabbit CLI chua chay duoc trong moi truong nay vi `coderabbit` command not found.
+
+### Files chinh
+
+- `src/main/java/com/example/goride/payment/config/PaymentConfig.java`
+- `src/main/java/com/example/goride/payment/config/PaymentProviderProperties.java`
+- `src/test/java/com/example/goride/payment/config/PaymentProviderPropertiesTests.java`
+- `integrate-plan.md`
+
+### Viec tiep theo
+
+- Them MoMo provider skeleton dung config nay de tao checkout session khi payment method online duoc mo.
+- Them signature verifier/helper cho webhook provider.
+
+---
+
 ## Commit: `feat: extract payment completion workflow`
 
 Branch: `feature/payment-completion-workflow`
