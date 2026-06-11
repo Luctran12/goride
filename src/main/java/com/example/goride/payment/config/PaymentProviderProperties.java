@@ -48,6 +48,9 @@ public class PaymentProviderProperties {
         private String merchantId;
         private String secretKey;
         private String checkoutBaseUrl;
+        private String returnUrl;
+        private String ipnUrl;
+        private String defaultIpAddress = "127.0.0.1";
         private String webhookSecret;
 
         public boolean isEnabled() {
@@ -90,6 +93,30 @@ public class PaymentProviderProperties {
             this.checkoutBaseUrl = checkoutBaseUrl;
         }
 
+        public String getReturnUrl() {
+            return returnUrl;
+        }
+
+        public void setReturnUrl(String returnUrl) {
+            this.returnUrl = returnUrl;
+        }
+
+        public String getIpnUrl() {
+            return ipnUrl;
+        }
+
+        public void setIpnUrl(String ipnUrl) {
+            this.ipnUrl = ipnUrl;
+        }
+
+        public String getDefaultIpAddress() {
+            return defaultIpAddress;
+        }
+
+        public void setDefaultIpAddress(String defaultIpAddress) {
+            this.defaultIpAddress = defaultIpAddress;
+        }
+
         public String getWebhookSecret() {
             return webhookSecret;
         }
@@ -110,6 +137,19 @@ public class PaymentProviderProperties {
             return normalize(checkoutBaseUrl);
         }
 
+        public String normalizedReturnUrl() {
+            return normalize(returnUrl);
+        }
+
+        public String normalizedIpnUrl() {
+            return normalize(ipnUrl);
+        }
+
+        public String normalizedDefaultIpAddress() {
+            String normalizedValue = normalize(defaultIpAddress);
+            return normalizedValue == null ? "127.0.0.1" : normalizedValue;
+        }
+
         public String normalizedWebhookSecret() {
             return normalize(webhookSecret);
         }
@@ -117,7 +157,8 @@ public class PaymentProviderProperties {
         public boolean hasCheckoutConfiguration() {
             return normalizedMerchantId() != null
                     && normalizedSecretKey() != null
-                    && normalizedCheckoutBaseUrl() != null;
+                    && normalizedCheckoutBaseUrl() != null
+                    && normalizedReturnUrl() != null;
         }
 
         public boolean hasWebhookConfiguration() {

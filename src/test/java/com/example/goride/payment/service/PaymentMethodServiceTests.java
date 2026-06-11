@@ -8,6 +8,7 @@ import com.example.goride.payment.dto.PaymentMethodResponse;
 import com.example.goride.payment.provider.CashPaymentProvider;
 import com.example.goride.payment.provider.PaymentProvider;
 import com.example.goride.payment.provider.PaymentProviderRegistry;
+import com.example.goride.payment.provider.VnPayPaymentProvider;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -49,6 +50,7 @@ class PaymentMethodServiceTests {
         momo.setMerchantId("merchant");
         momo.setSecretKey("secret");
         momo.setCheckoutBaseUrl("https://sandbox.momo.example/checkout");
+        momo.setReturnUrl("https://api.goride.example/payments/momo/return");
 
         PaymentMethodService withoutProvider = new PaymentMethodService(
                 new PaymentProviderRegistry(List.of(new CashPaymentProvider())),
@@ -68,6 +70,31 @@ class PaymentMethodServiceTests {
         assertThat(momoResponse.enabled()).isTrue();
         assertThat(momoResponse.providerConfigured()).isTrue();
         assertThat(momoResponse.providerRegistered()).isTrue();
+    }
+
+    @Test
+    void marksVnpayEnabledWhenCheckoutProviderAndConfigExist() {
+        PaymentProviderProperties properties = new PaymentProviderProperties();
+        PaymentProviderProperties.ProviderSettings vnpay = properties.getVnpay();
+        vnpay.setEnabled(true);
+        vnpay.setMerchantId("tmn-code");
+        vnpay.setSecretKey("hash-secret");
+        vnpay.setCheckoutBaseUrl("https://sandbox.vnpayment.vn/paymentv2/vpcpay.html");
+        vnpay.setReturnUrl("https://api.goride.example/payments/vnpay/return");
+
+        PaymentMethodService service = new PaymentMethodService(
+                new PaymentProviderRegistry(List.of(
+                        new CashPaymentProvider(),
+                        new VnPayPaymentProvider(properties, java.time.Clock.systemUTC())
+                )),
+                properties
+        );
+
+        PaymentMethodResponse vnpayResponse = find(service.listPaymentMethods(), PaymentMethod.VNPAY);
+
+        assertThat(vnpayResponse.enabled()).isTrue();
+        assertThat(vnpayResponse.providerConfigured()).isTrue();
+        assertThat(vnpayResponse.providerRegistered()).isTrue();
     }
 
     private PaymentMethodResponse find(List<PaymentMethodResponse> methods, PaymentMethod method) {

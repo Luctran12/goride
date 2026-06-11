@@ -6,6 +6,65 @@
 
 ---
 
+## Commit: `feat: add vnpay checkout provider`
+
+Branch: `feature/vnpay-checkout-provider`
+
+Phase: Phase 7 - Payment provider completion, VNPAY checkout sandbox foundation
+
+### Muc tieu
+
+Them provider runtime cho VNPAY de backend co the tao signed checkout URL khi payment method `VNPAY` duoc enable bang config. Commit nay chua xu ly return callback/IPN/webhook signature; cac phan do se tach commit sau de review rieng.
+
+### Noi dung da trien khai
+
+- Mo rong `PaymentProviderProperties.ProviderSettings`:
+  - Them `returnUrl`, `ipnUrl`, `defaultIpAddress`.
+  - `hasCheckoutConfiguration()` yeu cau them `returnUrl`.
+  - `defaultIpAddress` fallback `127.0.0.1` neu config blank/missing.
+- Them `VnPayPaymentProvider`:
+  - `paymentMethod()` tra `PaymentMethod.VNPAY`.
+  - Tao pending payment bang `Payment.createPending(trip)`.
+  - Tao checkout URL tu `checkoutBaseUrl` voi cac field VNPAY co ban: `vnp_Version`, `vnp_Command`, `vnp_TmnCode`, `vnp_Amount`, `vnp_TxnRef`, `vnp_OrderInfo`, `vnp_ReturnUrl`, `vnp_IpAddr`, `vnp_CreateDate`, `vnp_ExpireDate`.
+  - Ky URL bang `vnp_SecureHash` HMAC-SHA512 tren sorted query params.
+  - Checkout session het han sau 15 phut.
+- Cap nhat payment method metadata:
+  - Khi VNPAY provider bean co trong registry va config checkout day du, `GET /api/v1/payments/methods` co the tra `VNPAY.enabled=true`.
+  - MoMo van disabled cho den khi co provider implementation that.
+- Cap nhat `integrate-plan.md`:
+  - Ghi VNPAY da co checkout provider.
+  - Them config `return-url`, `ipn-url`, `default-ip-address`.
+  - Ghi FE chi hien VNPAY khi metadata tra `enabled=true`.
+
+### Review truoc commit
+
+- Da xac nhan provider khong tao checkout neu `enabled=false` hoac thieu config checkout.
+- Da xac nhan `vnp_Amount` nhan 100 theo format VNPAY.
+- Da xac nhan `vnp_CreateDate`/`vnp_ExpireDate` dung timezone `Asia/Ho_Chi_Minh`.
+- Da xac nhan URL co `vnp_SecureHash` HMAC-SHA512 va test verify lai chu ky.
+- Da chay `./mvnw.cmd '-Dtest=VnPayPaymentProviderTests,PaymentProviderPropertiesTests,PaymentMethodServiceTests,PaymentCheckoutServiceTests' test`: pass 13 tests.
+- Da chay `./mvnw.cmd test`: pass 241 tests.
+- Da chay `git diff --check`: khong co whitespace error.
+- Da review diff thu cong: them guard separator `?`/`&` cho `checkoutBaseUrl` co san query string.
+- CodeRabbit CLI chua chay duoc trong moi truong nay vi `coderabbit` command not found.
+
+### Files chinh
+
+- `src/main/java/com/example/goride/payment/provider/VnPayPaymentProvider.java`
+- `src/main/java/com/example/goride/payment/config/PaymentProviderProperties.java`
+- `src/test/java/com/example/goride/payment/provider/VnPayPaymentProviderTests.java`
+- `src/test/java/com/example/goride/payment/config/PaymentProviderPropertiesTests.java`
+- `src/test/java/com/example/goride/payment/service/PaymentMethodServiceTests.java`
+- `integrate-plan.md`
+
+### Viec tiep theo
+
+- Them VNPAY return/IPN handling va verify `vnp_SecureHash` callback.
+- Implement MoMo checkout provider.
+- Cap nhat `docs/pland.xlsx` theo trang thai partial/open cua payment providers.
+
+---
+
 ## Commit: `feat: expose payment method metadata`
 
 Branch: `feature/payment-method-metadata`

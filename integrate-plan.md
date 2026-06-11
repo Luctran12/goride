@@ -223,7 +223,7 @@ type PaymentStatus = "PENDING" | "COMPLETED" | "FAILED" | "REFUNDED";
 ### Payment/rating/statistics
 
 - [x] Payment method metadata da expose `CASH`, `MOMO`, `VNPAY`; hien chi `CASH` enabled mac dinh.
-- [ ] Chua co provider MoMo/VNPay implementation; da co config/webhook/checkout foundation nhung chua verify signature/provider payload that.
+- [ ] Chua co provider MoMo implementation; VNPAY da co checkout URL provider, nhung webhook signature/provider payload sandbox van chua hoan tat.
 
 ### Notification/mo rong
 
@@ -718,7 +718,7 @@ FE action:
 ### 4.7 Payment cash
 
 Payment record duoc tao khi driver complete trip. FE khong co endpoint create payment rieng.
-Backend da co provider abstraction noi bo; hien tai provider runtime duy nhat la `CashPaymentProvider`, nen `CASH` la method duy nhat enabled mac dinh.
+Backend da co provider abstraction noi bo. `CASH` enabled mac dinh; `VNPAY` chi enabled khi backend co du config checkout; `MOMO` van disabled cho den khi co provider implementation rieng.
 
 #### Lay danh sach payment methods
 
@@ -748,7 +748,7 @@ Response `data`:
     "checkoutRequired": true,
     "sandbox": true,
     "providerConfigured": false,
-    "providerRegistered": false
+    "providerRegistered": true
   },
   {
     "method": "VNPAY",
@@ -783,6 +783,9 @@ app:
         merchant-id: ${MOMO_MERCHANT_ID:}
         secret-key: ${MOMO_SECRET_KEY:}
         checkout-base-url: ${MOMO_CHECKOUT_BASE_URL:}
+        return-url: ${MOMO_RETURN_URL:}
+        ipn-url: ${MOMO_IPN_URL:}
+        default-ip-address: ${PAYMENT_DEFAULT_IP_ADDRESS:127.0.0.1}
         webhook-secret: ${MOMO_WEBHOOK_SECRET:}
       vnpay:
         enabled: false
@@ -790,12 +793,16 @@ app:
         merchant-id: ${VNPAY_MERCHANT_ID:}
         secret-key: ${VNPAY_SECRET_KEY:}
         checkout-base-url: ${VNPAY_CHECKOUT_BASE_URL:}
+        return-url: ${VNPAY_RETURN_URL:}
+        ipn-url: ${VNPAY_IPN_URL:}
+        default-ip-address: ${PAYMENT_DEFAULT_IP_ADDRESS:127.0.0.1}
         webhook-secret: ${VNPAY_WEBHOOK_SECRET:}
 ```
 
 FE action:
-- `MOMO`/`VNPAY` da co trong enum va metadata endpoint nhung `enabled=false` cho den khi backend co provider implementation that va du config.
-- Khi backend enable provider online o commit sau, FE can xu ly `checkoutRequired=true`.
+- `VNPAY` da co provider tao checkout URL; FE chi hien option nay khi metadata tra `enabled=true`.
+- `MOMO` da co trong enum/metadata nhung van `enabled=false` cho den khi backend co provider implementation that.
+- Khi provider online enabled, FE can xu ly `checkoutRequired=true`.
 - `sandbox=true` dung cho moi truong test provider; production nen set `sandbox=false` va secret qua env/secret manager.
 
 #### Lay checkout session theo trip
@@ -824,7 +831,8 @@ Response `data` voi CASH:
 FE action:
 - Goi sau trip `COMPLETED`/payment `PENDING` de biet payment method co can redirect khong.
 - Voi `CASH`, `checkoutRequired=false`, FE hien man hinh thanh toan tien mat va cho driver confirm.
-- Khi sau nay co MoMo/VNPay, neu `checkoutRequired=true`, FE mo `checkoutUrl` va theo doi payment status/webhook flow.
+- Voi `VNPAY`, neu `checkoutRequired=true`, FE mo `checkoutUrl` va theo doi payment status/webhook flow.
+- Voi `MOMO`, tiep tuc disable cho den khi backend expose `enabled=true`.
 - Endpoint chi hop le cho payment `PENDING`; neu payment da completed backend tra `PAYMENT_INVALID_STATUS`, FE nen refresh payment detail.
 
 #### Provider webhook callback
