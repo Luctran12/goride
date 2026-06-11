@@ -5,34 +5,26 @@ import com.example.goride.booking.domain.Trip;
 import com.example.goride.booking.domain.TripStatus;
 import com.example.goride.common.error.BusinessException;
 import com.example.goride.common.error.ErrorCode;
-import com.example.goride.matching.service.DriverCandidateStore;
-import com.example.goride.notification.dto.UserNotification;
-import com.example.goride.notification.service.TripRealtimeNotifier;
 import com.example.goride.payment.domain.Payment;
 import com.example.goride.payment.domain.PaymentStatus;
 import com.example.goride.payment.dto.PaymentConfirmationResponse;
 import com.example.goride.payment.repository.PaymentRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.util.Objects;
 
 @Service
 public class CashPaymentConfirmationService {
     private final PaymentRepository paymentRepository;
-    private final DriverCandidateStore driverCandidateStore;
-    private final TripRealtimeNotifier tripRealtimeNotifier;
+    private final PaymentCompletionWorkflow paymentCompletionWorkflow;
 
     public CashPaymentConfirmationService(
             PaymentRepository paymentRepository,
-            DriverCandidateStore driverCandidateStore,
-            TripRealtimeNotifier tripRealtimeNotifier
+            PaymentCompletionWorkflow paymentCompletionWorkflow
     ) {
         this.paymentRepository = paymentRepository;
-        this.driverCandidateStore = driverCandidateStore;
-        this.tripRealtimeNotifier = tripRealtimeNotifier;
+        this.paymentCompletionWorkflow = paymentCompletionWorkflow;
     }
 
     @Transactional
@@ -45,7 +37,7 @@ public class CashPaymentConfirmationService {
 
         payment.markCompleted();
         Payment savedPayment = paymentRepository.save(payment);
-        notifyPaymentCompleted(savedPayment);
+        paymentCompletionWorkflow.handleCompletedPayment(savedPayment);
         return PaymentConfirmationResponse.from(savedPayment);
     }
 
@@ -71,31 +63,5 @@ public class CashPaymentConfirmationService {
                     "Only pending payment can be confirmed"
             );
         }
-    }
-
-    private void notifyPaymentCompleted(Payment payment) {
-        Trip trip = payment.getTrip();
-        Long passengerId = trip.getPassenger().getId();
-        Long driverId = trip.getDriver().getId();
-        UserNotification notification = UserNotification.paymentCompleted(trip, payment);
-        runAfterCommit(() -> {
-            driverCandidateStore.markCandidateAvailable(driverId);
-            tripRealtimeNotifier.notifyPassenger(passengerId, notification);
-            tripRealtimeNotifier.notifyUser(driverId, notification);
-        });
-    }
-
-    private void runAfterCommit(Runnable action) {
-        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
-            action.run();
-            return;
-        }
-
-        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-            @Override
-            public void afterCommit() {
-                action.run();
-            }
-        });
     }
 }
