@@ -38,6 +38,9 @@ class PaymentProviderPropertiesTests {
         settings.setMerchantId(" merchant-001 ");
         settings.setSecretKey(" secret-key ");
         settings.setCheckoutBaseUrl(" https://sandbox.pay.example/checkout ");
+        settings.setReturnUrl(" https://api.goride.example/payments/return ");
+        settings.setIpnUrl(" https://api.goride.example/payments/ipn ");
+        settings.setDefaultIpAddress(" 10.0.0.1 ");
         settings.setWebhookSecret(" webhook-secret ");
 
         assertThat(settings.isEnabled()).isTrue();
@@ -45,9 +48,30 @@ class PaymentProviderPropertiesTests {
         assertThat(settings.normalizedMerchantId()).isEqualTo("merchant-001");
         assertThat(settings.normalizedSecretKey()).isEqualTo("secret-key");
         assertThat(settings.normalizedCheckoutBaseUrl()).isEqualTo("https://sandbox.pay.example/checkout");
+        assertThat(settings.normalizedReturnUrl()).isEqualTo("https://api.goride.example/payments/return");
+        assertThat(settings.normalizedIpnUrl()).isEqualTo("https://api.goride.example/payments/ipn");
+        assertThat(settings.normalizedDefaultIpAddress()).isEqualTo("10.0.0.1");
         assertThat(settings.normalizedWebhookSecret()).isEqualTo("webhook-secret");
         assertThat(settings.hasCheckoutConfiguration()).isTrue();
         assertThat(settings.hasWebhookConfiguration()).isTrue();
+    }
+
+    @Test
+    void checkoutConfigurationRequiresReturnUrlAndHasDefaultIpAddressFallback() {
+        PaymentProviderProperties.ProviderSettings settings = new PaymentProviderProperties.ProviderSettings();
+
+        settings.setMerchantId("merchant");
+        settings.setSecretKey("secret");
+        settings.setCheckoutBaseUrl("https://sandbox.pay.example/checkout");
+
+        assertThat(settings.hasCheckoutConfiguration()).isFalse();
+        assertThat(settings.normalizedDefaultIpAddress()).isEqualTo("127.0.0.1");
+
+        settings.setReturnUrl("https://api.goride.example/payments/return");
+        settings.setDefaultIpAddress(" ");
+
+        assertThat(settings.hasCheckoutConfiguration()).isTrue();
+        assertThat(settings.normalizedDefaultIpAddress()).isEqualTo("127.0.0.1");
     }
 
     @Test
