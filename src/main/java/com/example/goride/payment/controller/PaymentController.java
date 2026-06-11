@@ -4,8 +4,10 @@ import com.example.goride.common.api.ApiResponse;
 import com.example.goride.common.security.CurrentUser;
 import com.example.goride.payment.dto.PaymentCheckoutResponse;
 import com.example.goride.payment.dto.PaymentDetailResponse;
+import com.example.goride.payment.dto.PaymentMethodResponse;
 import com.example.goride.payment.dto.PaymentWebhookResponse;
 import com.example.goride.payment.service.PaymentCheckoutService;
+import com.example.goride.payment.service.PaymentMethodService;
 import com.example.goride.payment.service.PaymentQueryService;
 import com.example.goride.payment.service.PaymentWebhookService;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -18,6 +20,7 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -25,19 +28,27 @@ import java.util.Map;
 public class PaymentController {
     private final PaymentQueryService paymentQueryService;
     private final PaymentCheckoutService paymentCheckoutService;
+    private final PaymentMethodService paymentMethodService;
     private final PaymentWebhookService paymentWebhookService;
     private final CurrentUser currentUser;
 
     public PaymentController(
             PaymentQueryService paymentQueryService,
             PaymentCheckoutService paymentCheckoutService,
+            PaymentMethodService paymentMethodService,
             PaymentWebhookService paymentWebhookService,
             CurrentUser currentUser
     ) {
         this.paymentQueryService = paymentQueryService;
         this.paymentCheckoutService = paymentCheckoutService;
+        this.paymentMethodService = paymentMethodService;
         this.paymentWebhookService = paymentWebhookService;
         this.currentUser = currentUser;
+    }
+
+    @GetMapping("/methods")
+    public ApiResponse<List<PaymentMethodResponse>> listPaymentMethods() {
+        return ApiResponse.ok(paymentMethodService.listPaymentMethods());
     }
 
     @GetMapping("/trips/{tripId}")

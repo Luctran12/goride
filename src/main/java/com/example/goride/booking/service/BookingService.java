@@ -18,6 +18,7 @@ import com.example.goride.booking.service.distance.DistanceEstimate;
 import com.example.goride.booking.service.distance.DistanceService;
 import com.example.goride.common.error.BusinessException;
 import com.example.goride.common.error.ErrorCode;
+import com.example.goride.payment.service.PaymentMethodService;
 import com.example.goride.user.domain.User;
 import com.example.goride.user.domain.UserRole;
 import com.example.goride.user.repository.UserRepository;
@@ -49,6 +50,7 @@ public class BookingService {
     private final TripRepository tripRepository;
     private final TripStatusHistoryRepository tripStatusHistoryRepository;
     private final DistanceService distanceService;
+    private final PaymentMethodService paymentMethodService;
     private final ApplicationEventPublisher eventPublisher;
 
     public BookingService(
@@ -57,6 +59,7 @@ public class BookingService {
             TripRepository tripRepository,
             TripStatusHistoryRepository tripStatusHistoryRepository,
             DistanceService distanceService,
+            PaymentMethodService paymentMethodService,
             ApplicationEventPublisher eventPublisher
     ) {
         this.userRepository = userRepository;
@@ -64,6 +67,7 @@ public class BookingService {
         this.tripRepository = tripRepository;
         this.tripStatusHistoryRepository = tripStatusHistoryRepository;
         this.distanceService = distanceService;
+        this.paymentMethodService = paymentMethodService;
         this.eventPublisher = eventPublisher;
     }
 
@@ -87,6 +91,12 @@ public class BookingService {
         }
         if (tripRepository.existsByPassengerIdAndStatusInAndDeletedAtIsNull(passengerId, TripStatus.activeStatuses())) {
             throw new BusinessException(ErrorCode.PASSENGER_HAS_ACTIVE_TRIP);
+        }
+        if (!paymentMethodService.isPaymentMethodEnabled(request.paymentMethod())) {
+            throw new BusinessException(
+                    ErrorCode.PAYMENT_PROVIDER_UNSUPPORTED,
+                    "Payment method is not available: " + request.paymentMethod()
+            );
         }
 
         FareCalculation calculation = calculateFare(request.toEstimateRequest());

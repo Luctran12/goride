@@ -19,6 +19,7 @@ import com.example.goride.booking.service.distance.Location;
 import com.example.goride.common.error.BusinessException;
 import com.example.goride.common.error.ErrorCode;
 import com.example.goride.driver.domain.VehicleType;
+import com.example.goride.payment.service.PaymentMethodService;
 import com.example.goride.user.domain.User;
 import com.example.goride.user.domain.UserRole;
 import com.example.goride.user.repository.UserRepository;
@@ -62,6 +63,9 @@ class BookingServiceTests {
     private DistanceService distanceService;
 
     @Mock
+    private PaymentMethodService paymentMethodService;
+
+    @Mock
     private ApplicationEventPublisher eventPublisher;
 
     @InjectMocks
@@ -102,6 +106,7 @@ class BookingServiceTests {
                 .thenReturn(Optional.of(pricingConfig()));
         when(distanceService.estimate(any(Location.class), any(Location.class)))
                 .thenReturn(new DistanceEstimate(BigDecimal.valueOf(5.5), 20));
+        when(paymentMethodService.isPaymentMethodEnabled(PaymentMethod.CASH)).thenReturn(true);
         when(tripRepository.save(any(Trip.class))).thenAnswer(invocation -> withTripId(invocation.getArgument(0), 99L));
 
         var response = bookingService.createBooking(10L, createRequest());
@@ -153,6 +158,23 @@ class BookingServiceTests {
                 .isInstanceOfSatisfying(BusinessException.class, exception ->
                         assertThat(exception.errorCode()).isEqualTo(ErrorCode.PASSENGER_HAS_ACTIVE_TRIP)
                 );
+        verify(tripRepository, never()).save(any(Trip.class));
+    }
+
+    @Test
+    void createBookingRejectsUnavailablePaymentMethod() {
+        User passenger = withUserId(
+                User.create("Passenger", "0900000000", null, "hash", Set.of(UserRole.PASSENGER)),
+                10L
+        );
+        when(userRepository.findByIdAndDeletedAtIsNull(10L)).thenReturn(Optional.of(passenger));
+        when(paymentMethodService.isPaymentMethodEnabled(PaymentMethod.MOMO)).thenReturn(false);
+
+        assertThatThrownBy(() -> bookingService.createBooking(10L, createRequest(PaymentMethod.MOMO)))
+                .isInstanceOfSatisfying(BusinessException.class, exception ->
+                        assertThat(exception.errorCode()).isEqualTo(ErrorCode.PAYMENT_PROVIDER_UNSUPPORTED)
+                );
+        verify(distanceService, never()).estimate(any(Location.class), any(Location.class));
         verify(tripRepository, never()).save(any(Trip.class));
     }
 
@@ -298,11 +320,15 @@ class BookingServiceTests {
     }
 
     private BookingCreateRequest createRequest() {
+        return createRequest(PaymentMethod.CASH);
+    }
+
+    private BookingCreateRequest createRequest(PaymentMethod paymentMethod) {
         return new BookingCreateRequest(
                 estimateRequest().pickup(),
                 estimateRequest().dropoff(),
                 VehicleType.MOTORBIKE,
-                PaymentMethod.CASH
+                paymentMethod
         );
     }
 
