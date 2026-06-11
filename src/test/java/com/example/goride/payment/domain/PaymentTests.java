@@ -65,6 +65,61 @@ class PaymentTests {
                 .hasMessage("Payment can only be completed from pending status");
     }
 
+    @Test
+    void markCompletedByProviderStoresProviderReference() {
+        Payment payment = Payment.createPending(completedTrip());
+
+        payment.markCompletedByProvider(" momo ", " txn-123 ");
+
+        assertThat(payment.getStatus()).isEqualTo(PaymentStatus.COMPLETED);
+        assertThat(payment.getProvider()).isEqualTo("momo");
+        assertThat(payment.getTransactionRef()).isEqualTo("txn-123");
+        assertThat(payment.getPaidAt()).isNotNull();
+    }
+
+    @Test
+    void markCompletedByProviderIsIdempotentForSameReference() {
+        Payment payment = Payment.createPending(completedTrip());
+        payment.markCompletedByProvider("momo", "txn-123");
+        Instant firstPaidAt = payment.getPaidAt();
+
+        payment.markCompletedByProvider("momo", "txn-123");
+
+        assertThat(payment.getStatus()).isEqualTo(PaymentStatus.COMPLETED);
+        assertThat(payment.getPaidAt()).isEqualTo(firstPaidAt);
+    }
+
+    @Test
+    void markCompletedByProviderRejectsDifferentReferenceAfterCompleted() {
+        Payment payment = Payment.createPending(completedTrip());
+        payment.markCompletedByProvider("momo", "txn-123");
+
+        assertThatThrownBy(() -> payment.markCompletedByProvider("momo", "txn-999"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("Payment provider callback does not match existing provider reference");
+    }
+
+    @Test
+    void markFailedByProviderStoresProviderReference() {
+        Payment payment = Payment.createPending(completedTrip());
+
+        payment.markFailedByProvider("vnpay", "txn-456");
+
+        assertThat(payment.getStatus()).isEqualTo(PaymentStatus.FAILED);
+        assertThat(payment.getProvider()).isEqualTo("vnpay");
+        assertThat(payment.getTransactionRef()).isEqualTo("txn-456");
+        assertThat(payment.getPaidAt()).isNull();
+    }
+
+    @Test
+    void providerReferenceRejectsBlankValues() {
+        Payment payment = Payment.createPending(completedTrip());
+
+        assertThatThrownBy(() -> payment.markCompletedByProvider(" ", "txn-123"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("provider must not be blank");
+    }
+
     private Trip completedTrip() {
         Trip trip = sampleTrip();
         trip.accept(driver());

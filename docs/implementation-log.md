@@ -6,6 +6,80 @@
 
 ---
 
+## Commit: `feat: add payment webhook foundation`
+
+Branch: `feature/payment-webhook-foundation`
+
+Phase: Phase 6 - Payment module extensibility, theo `docs/TDD.md` muc 6.2 webhook callback cho MoMo/VNPay tuong lai
+
+### Muc tieu
+
+Them nen tang webhook/callback cho external payment provider de MoMo/VNPay sau nay co the goi ve backend. Commit nay chua bat provider online that, chua verify signature MoMo/VNPay that va van giu enum FE `PaymentMethod = CASH`; muc tieu la tao contract/service extension point nho, an toan de provider sau chi implement logic rieng.
+
+### Noi dung da trien khai
+
+- Mo rong `Payment` domain:
+  - Them `markCompletedByProvider(provider, transactionRef)`.
+  - Them `markFailedByProvider(provider, transactionRef)`.
+  - Luu `provider` va `transactionRef` sau khi callback provider duoc xu ly.
+  - Cho phep callback lap lai idempotent neu trung provider/reference.
+  - Chan callback mau thuan neu payment da completed/failed voi reference khac.
+- Mo rong `PaymentProvider`:
+  - Them `providerName()` mac dinh theo payment method.
+  - Them hook `handleWebhook(request)` de provider sau nay parse payload, verify signature va cap nhat payment.
+  - Default provider tra `PAYMENT_PROVIDER_UNSUPPORTED` neu chua support webhook.
+- Mo rong `PaymentProviderRegistry`:
+  - Tra provider theo `PaymentMethod`.
+  - Tra provider theo path `providerName` case-insensitive cho webhook.
+  - Tra `PAYMENT_PROVIDER_UNSUPPORTED` neu provider name chua duoc enable.
+- Them webhook model/response:
+  - `PaymentWebhookRequest` gom provider name, headers, raw payload va received timestamp.
+  - `PaymentWebhookResult` gom accepted/payment/status/transactionRef/message.
+  - `PaymentWebhookResponse` map ket qua tra ve provider.
+- Them `PaymentWebhookService` de dispatch callback toi provider tuong ung.
+- Mo rong `PaymentController`:
+  - Them public endpoint `POST /api/v1/payments/providers/{providerName}/webhook`.
+- Cap nhat `SecurityConfig` permit public webhook path; provider implementation sau phai verify signature rieng trong `handleWebhook`.
+- Them unit test cho domain callback, provider registry lookup by name, webhook service dispatch va unsupported provider.
+- Cap nhat `integrate-plan.md` voi endpoint webhook, public route va error code moi.
+
+### Review truoc commit
+
+- Da xac nhan FE enum `PaymentMethod` van chi la `CASH`.
+- Da xac nhan FE app khong goi webhook truc tiep; endpoint nay danh cho provider external callback.
+- Da xac nhan `CashPaymentProvider` chua support webhook va tra `PAYMENT_PROVIDER_UNSUPPORTED`.
+- Da xac nhan callback provider completed/failed ghi provider/reference va lap lai cung reference thi idempotent.
+- Da chay `./mvnw.cmd "-Dtest=PaymentTests,PaymentProviderRegistryTests,PaymentWebhookServiceTests,PaymentCheckoutServiceTests" test`: pass 20 tests.
+- Da chay `./mvnw.cmd test`: pass 228 tests.
+- Da chay `git diff --check`: khong co whitespace error.
+- Da quet marker debug/disabled test: khong co ket qua.
+- CodeRabbit CLI chua chay duoc trong moi truong nay vi `coderabbit` command not found.
+
+### Files chinh
+
+- `src/main/java/com/example/goride/auth/config/SecurityConfig.java`
+- `src/main/java/com/example/goride/common/error/ErrorCode.java`
+- `src/main/java/com/example/goride/payment/controller/PaymentController.java`
+- `src/main/java/com/example/goride/payment/domain/Payment.java`
+- `src/main/java/com/example/goride/payment/dto/PaymentWebhookResponse.java`
+- `src/main/java/com/example/goride/payment/provider/PaymentProvider.java`
+- `src/main/java/com/example/goride/payment/provider/PaymentProviderRegistry.java`
+- `src/main/java/com/example/goride/payment/provider/PaymentWebhookRequest.java`
+- `src/main/java/com/example/goride/payment/provider/PaymentWebhookResult.java`
+- `src/main/java/com/example/goride/payment/service/PaymentWebhookService.java`
+- `src/test/java/com/example/goride/payment/domain/PaymentTests.java`
+- `src/test/java/com/example/goride/payment/provider/PaymentProviderRegistryTests.java`
+- `src/test/java/com/example/goride/payment/service/PaymentWebhookServiceTests.java`
+- `integrate-plan.md`
+
+### Viec tiep theo
+
+- Them provider MoMo hoac VNPay that su: tao checkout URL, verify signature, parse callback payload.
+- Can thiet ke cau hinh secret/key theo provider va sandbox/production mode.
+- Sau khi co provider online, bo sung notification/payment status polling docs cho FE.
+
+---
+
 ## Commit: `feat: add payment checkout foundation`
 
 Branch: `feature/payment-checkout-foundation`

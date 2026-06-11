@@ -19,6 +19,7 @@ import jakarta.persistence.Table;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.Objects;
 
 @Entity
 @Table(name = "payments")
@@ -86,6 +87,56 @@ public class Payment {
 
         status = PaymentStatus.COMPLETED;
         paidAt = Instant.now();
+    }
+
+    public void markCompletedByProvider(String provider, String transactionRef) {
+        String normalizedProvider = requireReferenceValue(provider, "provider", 30);
+        String normalizedTransactionRef = requireReferenceValue(transactionRef, "transactionRef", 100);
+        if (status == PaymentStatus.COMPLETED) {
+            assertSameProviderReference(normalizedProvider, normalizedTransactionRef);
+            return;
+        }
+        if (status != PaymentStatus.PENDING) {
+            throw new IllegalStateException("Payment can only be completed from pending status");
+        }
+
+        this.provider = normalizedProvider;
+        this.transactionRef = normalizedTransactionRef;
+        status = PaymentStatus.COMPLETED;
+        paidAt = Instant.now();
+    }
+
+    public void markFailedByProvider(String provider, String transactionRef) {
+        String normalizedProvider = requireReferenceValue(provider, "provider", 30);
+        String normalizedTransactionRef = requireReferenceValue(transactionRef, "transactionRef", 100);
+        if (status == PaymentStatus.FAILED) {
+            assertSameProviderReference(normalizedProvider, normalizedTransactionRef);
+            return;
+        }
+        if (status != PaymentStatus.PENDING) {
+            throw new IllegalStateException("Payment can only be failed from pending status");
+        }
+
+        this.provider = normalizedProvider;
+        this.transactionRef = normalizedTransactionRef;
+        status = PaymentStatus.FAILED;
+    }
+
+    private String requireReferenceValue(String value, String fieldName, int maxLength) {
+        if (value == null || value.isBlank()) {
+            throw new IllegalArgumentException(fieldName + " must not be blank");
+        }
+        String normalizedValue = value.strip();
+        if (normalizedValue.length() > maxLength) {
+            throw new IllegalArgumentException(fieldName + " must not exceed " + maxLength + " characters");
+        }
+        return normalizedValue;
+    }
+
+    private void assertSameProviderReference(String provider, String transactionRef) {
+        if (!Objects.equals(this.provider, provider) || !Objects.equals(this.transactionRef, transactionRef)) {
+            throw new IllegalStateException("Payment provider callback does not match existing provider reference");
+        }
     }
 
     @PrePersist

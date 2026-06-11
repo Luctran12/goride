@@ -1,6 +1,6 @@
 # GoRide Front-end Integration Plan
 
-Branch da kiem tra: `feature/payment-checkout-foundation`
+Branch da kiem tra: `feature/payment-webhook-foundation`
 
 Muc tieu file nay:
 - Checklist chuc nang backend da co code va co the tich hop FE.
@@ -73,6 +73,7 @@ API public hien co:
 - `POST /api/v1/auth/refresh`
 - `POST /api/v1/auth/logout`
 - `GET /api/v1/drivers/{driverId}/ratings`
+- `POST /api/v1/payments/providers/{providerName}/webhook`
 - Swagger/OpenAPI routes
 
 ### Enum FE can dong bo
@@ -168,6 +169,7 @@ type PaymentStatus = "PENDING" | "COMPLETED" | "FAILED" | "REFUNDED";
 - [x] Payment record duoc tao qua `PaymentProvider` abstraction.
 - [x] Co `CashPaymentProvider` cho payment method `CASH`.
 - [x] Co checkout foundation endpoint cho payment `PENDING`.
+- [x] Co webhook foundation endpoint cho payment provider external callback.
 - [x] Driver confirm da nhan tien mat.
 - [x] Payment `PENDING -> COMPLETED`, set `paidAt`.
 - [x] Passenger/driver/admin xem payment detail theo trip.
@@ -216,7 +218,7 @@ type PaymentStatus = "PENDING" | "COMPLETED" | "FAILED" | "REFUNDED";
 ### Payment/rating/statistics
 
 - [ ] Payment chi ho tro `CASH`.
-- [ ] Chua co provider MoMo/VNPay implementation/webhook callback; checkout foundation da co endpoint nhung CASH khong can redirect.
+- [ ] Chua co provider MoMo/VNPay implementation; webhook foundation da co endpoint nhung chua verify signature/provider payload that.
 
 ### Notification/mo rong
 
@@ -741,6 +743,35 @@ FE action:
 - Voi `CASH`, `checkoutRequired=false`, FE hien man hinh thanh toan tien mat va cho driver confirm.
 - Khi sau nay co MoMo/VNPay, neu `checkoutRequired=true`, FE mo `checkoutUrl` va theo doi payment status/webhook flow.
 - Endpoint chi hop le cho payment `PENDING`; neu payment da completed backend tra `PAYMENT_INVALID_STATUS`, FE nen refresh payment detail.
+
+#### Provider webhook callback
+
+```http
+POST /api/v1/payments/providers/{providerName}/webhook
+Content-Type: application/json
+```
+
+Request body: raw JSON callback cua provider.
+
+Response `data`:
+
+```json
+{
+  "provider": "momo",
+  "accepted": true,
+  "paymentId": 70,
+  "tripId": 99,
+  "status": "COMPLETED",
+  "transactionRef": "provider-transaction-ref",
+  "message": "processed"
+}
+```
+
+FE action:
+- FE app khong goi endpoint nay truc tiep; day la endpoint public de MoMo/VNPay callback vao backend.
+- Khi tich hop provider that, FE chi mo `checkoutUrl` neu checkout response bao `checkoutRequired=true`, sau do theo doi payment detail/notification.
+- Hien tai `CASH` khong support webhook; goi `/providers/cash/webhook` se tra `PAYMENT_PROVIDER_UNSUPPORTED`.
+- Moi provider sau nay phai tu verify signature/header/payload trong `PaymentProvider.handleWebhook(...)`.
 
 Driver confirm cash:
 
@@ -1500,6 +1531,7 @@ Subscribe vao `/topic/trip/{tripId}/status` va `/topic/trip/{tripId}/location` c
 | `MATCHING_OFFER_NOT_FOUND`, `MATCHING_OFFER_EXPIRED` | Driver: dong offer hien tai. |
 | `TRIP_STATUS_INVALID_TRANSITION` | Refresh trip state va disable nut sai flow. |
 | `PAYMENT_INVALID_STATUS`, `PAYMENT_NOT_FOUND` | Refresh payment/trip, tranh double confirm. |
+| `PAYMENT_PROVIDER_UNSUPPORTED` | Provider payment chua duoc backend enable; refresh/cau hinh lai payment method. |
 | `TRIP_ALREADY_RATED` | An rating form, coi trip da danh gia. |
 | `DRIVER_LOCATION_NOT_FOUND` | Hien "Dang cho vi tri tai xe". |
 | `NOTIFICATION_NOT_FOUND` | Refresh inbox; notification khong ton tai hoac khong thuoc user. |
