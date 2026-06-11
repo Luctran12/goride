@@ -6,13 +6,11 @@ import com.example.goride.common.error.BusinessException;
 import com.example.goride.common.error.ErrorCode;
 import com.example.goride.payment.domain.Payment;
 
-import java.util.Locale;
-
 public interface PaymentProvider {
     PaymentMethod paymentMethod();
 
     default String providerName() {
-        return paymentMethod().name().toLowerCase(Locale.ROOT);
+        return paymentMethod().providerName();
     }
 
     Payment createPendingPayment(Trip trip);

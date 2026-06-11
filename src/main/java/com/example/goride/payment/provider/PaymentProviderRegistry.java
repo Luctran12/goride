@@ -32,6 +32,10 @@ public class PaymentProviderRegistry {
         return provider;
     }
 
+    public boolean supports(PaymentMethod paymentMethod) {
+        return paymentProviders.containsKey(paymentMethod);
+    }
+
     public PaymentProvider requireProvider(String providerName) {
         String normalizedProviderName = normalizeProviderName(providerName);
         PaymentProvider provider = paymentProvidersByName.get(normalizedProviderName);

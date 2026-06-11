@@ -6,6 +6,70 @@
 
 ---
 
+## Commit: `feat: expose payment method metadata`
+
+Branch: `feature/payment-method-metadata`
+
+Phase: Phase 7 - Payment provider completion, expose payment method availability cho FE
+
+### Muc tieu
+
+Cho FE lay danh sach payment method tu backend thay vi hardcode `CASH`/MoMo/VNPay, dong thoi chan booking neu client gui payment method chua duoc backend enable. Commit nay chua implement provider MoMo/VNPay that; hai method online chi duoc expose o metadata voi `enabled=false` cho den khi co provider bean va config day du.
+
+### Noi dung da trien khai
+
+- Mo rong `PaymentMethod`:
+  - Them `MOMO` va `VNPAY`.
+  - Them metadata noi bo: `providerName`, `displayName`, `checkoutRequired`.
+- Them `PaymentMethodResponse` de FE doc method/provider/display/status:
+  - `method`, `provider`, `displayName`.
+  - `enabled`, `checkoutRequired`, `sandbox`.
+  - `providerConfigured`, `providerRegistered`.
+- Them `PaymentMethodService`:
+  - `CASH` enabled khi co provider runtime registered.
+  - `MOMO`/`VNPAY` chi enabled khi provider da registered va config `enabled=true` + du checkout config.
+  - Mac dinh MoMo/VNPay van disabled, dung voi plan P0 payment method exposure.
+- Them endpoint public:
+  - `GET /api/v1/payments/methods`.
+  - Cap nhat `SecurityConfig` permit endpoint nay de FE co the goi truoc flow booking.
+- Cap nhat `BookingService`:
+  - Check `paymentMethodService.isPaymentMethodEnabled(...)` truoc khi tinh fare/tao trip.
+  - Tra `PAYMENT_PROVIDER_UNSUPPORTED` neu client gui method chua enabled.
+- Cap nhat docs:
+  - `integrate-plan.md` them enum `CASH | MOMO | VNPAY`, endpoint payment methods va FE action.
+  - `docs/pland.xlsx` them status tracking ro hon, danh dau task Payment methods la `Done`.
+
+### Review truoc commit
+
+- Da xac nhan MoMo/VNPay duoc expose cho FE nhung khong the tao booking khi chua co provider implementation that.
+- Da xac nhan provider online chi enabled khi co ca runtime provider bean va config checkout day du.
+- Da xac nhan endpoint payment methods la public, khong expose secret provider.
+- Da chay `./mvnw.cmd '-Dtest=PaymentMethodServiceTests,BookingServiceTests,PaymentProviderRegistryTests' test`: pass 18 tests.
+- Da chay `./mvnw.cmd test`: pass 237 tests.
+- Da chay `git diff --check`: khong co whitespace error.
+- Da review diff thu cong: khong thay blocker/regression trong scope payment metadata.
+- CodeRabbit CLI chua chay duoc trong moi truong nay vi `coderabbit` command not found.
+
+### Files chinh
+
+- `src/main/java/com/example/goride/booking/domain/PaymentMethod.java`
+- `src/main/java/com/example/goride/payment/service/PaymentMethodService.java`
+- `src/main/java/com/example/goride/payment/dto/PaymentMethodResponse.java`
+- `src/main/java/com/example/goride/payment/controller/PaymentController.java`
+- `src/main/java/com/example/goride/booking/service/BookingService.java`
+- `src/test/java/com/example/goride/payment/service/PaymentMethodServiceTests.java`
+- `src/test/java/com/example/goride/booking/service/BookingServiceTests.java`
+- `integrate-plan.md`
+- `docs/pland.xlsx`
+
+### Viec tiep theo
+
+- Implement MoMo/VNPay provider sandbox that.
+- Them signature verifier cho webhook provider.
+- Cap nhat metadata endpoint khi online provider co redirect/deeplink that.
+
+---
+
 ## Commit: `feat: add payment provider config foundation`
 
 Branch: `feature/payment-provider-config`

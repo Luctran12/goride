@@ -1,6 +1,6 @@
 # GoRide Front-end Integration Plan
 
-Branch da kiem tra: `feature/payment-provider-config`
+Branch da kiem tra: `feature/payment-method-metadata`
 
 Muc tieu file nay:
 - Checklist chuc nang backend da co code va co the tich hop FE.
@@ -73,6 +73,7 @@ API public hien co:
 - `POST /api/v1/auth/refresh`
 - `POST /api/v1/auth/logout`
 - `GET /api/v1/drivers/{driverId}/ratings`
+- `GET /api/v1/payments/methods`
 - `POST /api/v1/payments/providers/{providerName}/webhook`
 - Swagger/OpenAPI routes
 
@@ -81,7 +82,7 @@ API public hien co:
 ```ts
 type UserRole = "PASSENGER" | "DRIVER" | "ADMIN";
 type VehicleType = "MOTORBIKE" | "CAR_4_SEAT" | "CAR_7_SEAT";
-type PaymentMethod = "CASH";
+type PaymentMethod = "CASH" | "MOMO" | "VNPAY";
 type TripStatus =
   | "SEARCHING"
   | "ACCEPTED"
@@ -169,6 +170,8 @@ type PaymentStatus = "PENDING" | "COMPLETED" | "FAILED" | "REFUNDED";
 - [x] Payment record duoc tao qua `PaymentProvider` abstraction.
 - [x] Co `CashPaymentProvider` cho payment method `CASH`.
 - [x] Co runtime config foundation cho MoMo/VNPay provider, mac dinh disabled.
+- [x] FE co the lay danh sach payment method/provider metadata tu backend.
+- [x] Backend reject booking neu `paymentMethod` chua duoc enable.
 - [x] Co checkout foundation endpoint cho payment `PENDING`.
 - [x] Co webhook foundation endpoint cho payment provider external callback.
 - [x] Driver confirm da nhan tien mat.
@@ -219,7 +222,7 @@ type PaymentStatus = "PENDING" | "COMPLETED" | "FAILED" | "REFUNDED";
 
 ### Payment/rating/statistics
 
-- [ ] Payment chi ho tro `CASH`.
+- [x] Payment method metadata da expose `CASH`, `MOMO`, `VNPAY`; hien chi `CASH` enabled mac dinh.
 - [ ] Chua co provider MoMo/VNPay implementation; da co config/webhook/checkout foundation nhung chua verify signature/provider payload that.
 
 ### Notification/mo rong
@@ -715,11 +718,60 @@ FE action:
 ### 4.7 Payment cash
 
 Payment record duoc tao khi driver complete trip. FE khong co endpoint create payment rieng.
-Backend da co provider abstraction noi bo; hien tai provider runtime duy nhat la `CashPaymentProvider`, nen FE van chi gui `paymentMethod = "CASH"`.
+Backend da co provider abstraction noi bo; hien tai provider runtime duy nhat la `CashPaymentProvider`, nen `CASH` la method duy nhat enabled mac dinh.
+
+#### Lay danh sach payment methods
+
+```http
+GET /api/v1/payments/methods
+```
+
+Response `data`:
+
+```json
+[
+  {
+    "method": "CASH",
+    "provider": "cash",
+    "displayName": "Cash",
+    "enabled": true,
+    "checkoutRequired": false,
+    "sandbox": false,
+    "providerConfigured": true,
+    "providerRegistered": true
+  },
+  {
+    "method": "MOMO",
+    "provider": "momo",
+    "displayName": "MoMo",
+    "enabled": false,
+    "checkoutRequired": true,
+    "sandbox": true,
+    "providerConfigured": false,
+    "providerRegistered": false
+  },
+  {
+    "method": "VNPAY",
+    "provider": "vnpay",
+    "displayName": "VNPay",
+    "enabled": false,
+    "checkoutRequired": true,
+    "sandbox": true,
+    "providerConfigured": false,
+    "providerRegistered": false
+  }
+]
+```
+
+FE action:
+- Goi endpoint nay khi mo booking/payment screen de render option payment method, khong hardcode availability.
+- Chi cho user chon method co `enabled=true`.
+- Neu backend tra `enabled=false`, disable/hide option hoac hien "Coming soon".
+- Backend cung reject booking neu client gui method chua enabled bang `PAYMENT_PROVIDER_UNSUPPORTED`.
 
 #### Runtime config cho provider online
 
-Backend da co config foundation cho MoMo/VNPay, mac dinh disabled va khong lam doi contract FE hien tai.
+Backend da co config foundation cho MoMo/VNPay, mac dinh disabled.
 
 ```yaml
 app:
@@ -742,8 +794,8 @@ app:
 ```
 
 FE action:
-- Chua expose `MOMO`/`VNPAY` trong `PaymentMethod`, nen FE van chi gui `CASH`.
-- Khi backend enable provider online o commit sau, FE se can them option payment method va xu ly `checkoutRequired=true`.
+- `MOMO`/`VNPAY` da co trong enum va metadata endpoint nhung `enabled=false` cho den khi backend co provider implementation that va du config.
+- Khi backend enable provider online o commit sau, FE can xu ly `checkoutRequired=true`.
 - `sandbox=true` dung cho moi truong test provider; production nen set `sandbox=false` va secret qua env/secret manager.
 
 #### Lay checkout session theo trip
