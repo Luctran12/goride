@@ -6,6 +6,59 @@
 
 ---
 
+## Commit: `feat: extract payment completion workflow`
+
+Branch: `feature/payment-completion-workflow`
+
+Phase: Phase 6 - Payment module extensibility, chuan bi dung chung payment completed side effects cho CASH va provider online sau nay
+
+### Muc tieu
+
+Tach cac side effect sau khi payment completed thanh workflow rieng de cash confirmation va MoMo/VNPay webhook sau nay co the dung chung. Commit nay khong doi REST/WebSocket contract voi FE; behavior hien tai van la: khi driver confirm cash thanh cong, payment completed se notify passenger/driver va dua driver ve `AVAILABLE`.
+
+### Noi dung da trien khai
+
+- Them `PaymentCompletionWorkflow`:
+  - Chi chap nhan payment status `COMPLETED`.
+  - Kiem tra payment thuoc trip da co assigned driver.
+  - Tao `PAYMENT_COMPLETED` notification dung payload hien co.
+  - Sau transaction commit, mark driver `AVAILABLE` trong Redis matching store.
+  - Sau transaction commit, notify passenger va driver qua realtime notification pipeline.
+- Refactor `CashPaymentConfirmationService`:
+  - Giu validation driver ownership, trip completed, method `CASH`, payment `PENDING`.
+  - Sau khi `payment.markCompleted()` va save, goi `PaymentCompletionWorkflow.handleCompletedPayment(...)`.
+  - Loai bo logic notify/driver availability duplicate khoi service cash.
+- Them `PaymentCompletionWorkflowTests` de bao phu notification va driver availability side effects.
+- Cap nhat `CashPaymentConfirmationServiceTests` de assert cash service goi workflow.
+- Cap nhat `integrate-plan.md` ghi ro workflow dung chung cho cash va provider callback sau nay.
+
+### Review truoc commit
+
+- Da xac nhan response/endpoint cash confirm khong doi.
+- Da xac nhan driver chi duoc dua ve `AVAILABLE` sau transaction commit nhu behavior cu.
+- Da xac nhan notification `PAYMENT_COMPLETED` giu payload cu cho passenger va driver.
+- Da xac nhan workflow reject payment chua completed bang `PAYMENT_INVALID_STATUS`.
+- Da chay `./mvnw.cmd "-Dtest=CashPaymentConfirmationServiceTests,PaymentCompletionWorkflowTests,PaymentWebhookServiceTests" test`: pass 10 tests.
+- Da chay `./mvnw.cmd test`: pass 230 tests.
+- Da chay `git diff --check`: khong co whitespace error.
+- Da quet marker debug/disabled test: khong co ket qua.
+- CodeRabbit CLI chua chay duoc trong moi truong nay vi `coderabbit` command not found.
+
+### Files chinh
+
+- `src/main/java/com/example/goride/payment/service/PaymentCompletionWorkflow.java`
+- `src/main/java/com/example/goride/payment/service/CashPaymentConfirmationService.java`
+- `src/test/java/com/example/goride/payment/service/PaymentCompletionWorkflowTests.java`
+- `src/test/java/com/example/goride/payment/service/CashPaymentConfirmationServiceTests.java`
+- `integrate-plan.md`
+
+### Viec tiep theo
+
+- Khi them MoMo/VNPay provider, provider webhook sau khi mark payment completed se goi workflow nay.
+- Them provider config/client sandbox cho payment online.
+
+---
+
 ## Commit: `feat: add payment webhook foundation`
 
 Branch: `feature/payment-webhook-foundation`

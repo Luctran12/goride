@@ -1,6 +1,6 @@
 # GoRide Front-end Integration Plan
 
-Branch da kiem tra: `feature/payment-webhook-foundation`
+Branch da kiem tra: `feature/payment-completion-workflow`
 
 Muc tieu file nay:
 - Checklist chuc nang backend da co code va co the tich hop FE.
@@ -172,6 +172,7 @@ type PaymentStatus = "PENDING" | "COMPLETED" | "FAILED" | "REFUNDED";
 - [x] Co webhook foundation endpoint cho payment provider external callback.
 - [x] Driver confirm da nhan tien mat.
 - [x] Payment `PENDING -> COMPLETED`, set `paidAt`.
+- [x] Payment completed workflow dung chung de notify va dua driver ve `AVAILABLE`.
 - [x] Passenger/driver/admin xem payment detail theo trip.
 - [x] Notify passenger va driver khi payment completed.
 - [x] Set Redis driver status ve `AVAILABLE` sau payment completed.
@@ -772,6 +773,7 @@ FE action:
 - Khi tich hop provider that, FE chi mo `checkoutUrl` neu checkout response bao `checkoutRequired=true`, sau do theo doi payment detail/notification.
 - Hien tai `CASH` khong support webhook; goi `/providers/cash/webhook` se tra `PAYMENT_PROVIDER_UNSUPPORTED`.
 - Moi provider sau nay phai tu verify signature/header/payload trong `PaymentProvider.handleWebhook(...)`.
+- Sau khi provider webhook mark payment `COMPLETED`, backend provider implementation nen goi shared payment completion workflow de notify passenger/driver va dua driver ve `AVAILABLE`.
 
 Driver confirm cash:
 

@@ -3,14 +3,9 @@ package com.example.goride.payment.service;
 import com.example.goride.booking.domain.PaymentMethod;
 import com.example.goride.booking.domain.PricingConfig;
 import com.example.goride.booking.domain.Trip;
-import com.example.goride.booking.domain.TripStatus;
 import com.example.goride.common.error.BusinessException;
 import com.example.goride.common.error.ErrorCode;
 import com.example.goride.driver.domain.VehicleType;
-import com.example.goride.matching.service.DriverCandidateStore;
-import com.example.goride.notification.domain.NotificationType;
-import com.example.goride.notification.dto.UserNotification;
-import com.example.goride.notification.service.TripRealtimeNotifier;
 import com.example.goride.payment.domain.Payment;
 import com.example.goride.payment.domain.PaymentStatus;
 import com.example.goride.payment.repository.PaymentRepository;
@@ -22,7 +17,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.GeometryFactory;
 import org.locationtech.jts.geom.PrecisionModel;
-import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -35,7 +29,6 @@ import java.util.Set;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -49,20 +42,17 @@ class CashPaymentConfirmationServiceTests {
     private PaymentRepository paymentRepository;
 
     @Mock
-    private DriverCandidateStore driverCandidateStore;
-
-    @Mock
-    private TripRealtimeNotifier tripRealtimeNotifier;
+    private PaymentCompletionWorkflow paymentCompletionWorkflow;
 
     private CashPaymentConfirmationService service;
 
     @BeforeEach
     void setUp() {
-        service = new CashPaymentConfirmationService(paymentRepository, driverCandidateStore, tripRealtimeNotifier);
+        service = new CashPaymentConfirmationService(paymentRepository, paymentCompletionWorkflow);
     }
 
     @Test
-    void confirmsPendingCashPaymentAndMarksDriverAvailable() {
+    void confirmsPendingCashPaymentAndRunsCompletionWorkflow() {
         Trip trip = completedTrip(driver(20L));
         Payment payment = Payment.createPending(trip);
         when(paymentRepository.findByTripIdForUpdate(99L)).thenReturn(Optional.of(payment));
@@ -71,14 +61,13 @@ class CashPaymentConfirmationServiceTests {
         var response = service.confirmCashPayment(20L, 99L);
 
         verify(paymentRepository).save(payment);
-        verify(driverCandidateStore).markCandidateAvailable(20L);
+        verify(paymentCompletionWorkflow).handleCompletedPayment(payment);
         assertThat(payment.getStatus()).isEqualTo(PaymentStatus.COMPLETED);
         assertThat(payment.getPaidAt()).isNotNull();
         assertThat(response.tripId()).isEqualTo(99L);
         assertThat(response.status()).isEqualTo(PaymentStatus.COMPLETED);
         assertThat(response.amount()).isEqualByComparingTo(BigDecimal.valueOf(20000));
         assertThat(response.paidAt()).isEqualTo(payment.getPaidAt());
-        verifyPaymentCompletedNotification();
     }
 
     @Test
@@ -91,7 +80,7 @@ class CashPaymentConfirmationServiceTests {
                 );
 
         verify(paymentRepository, never()).save(any());
-        verifyNoInteractions(driverCandidateStore, tripRealtimeNotifier);
+        verifyNoInteractions(paymentCompletionWorkflow);
     }
 
     @Test
@@ -106,7 +95,7 @@ class CashPaymentConfirmationServiceTests {
                 );
 
         verify(paymentRepository, never()).save(any());
-        verifyNoInteractions(driverCandidateStore, tripRealtimeNotifier);
+        verifyNoInteractions(paymentCompletionWorkflow);
     }
 
     @Test
@@ -122,7 +111,7 @@ class CashPaymentConfirmationServiceTests {
                 );
 
         verify(paymentRepository, never()).save(any());
-        verifyNoInteractions(driverCandidateStore, tripRealtimeNotifier);
+        verifyNoInteractions(paymentCompletionWorkflow);
     }
 
     @Test
@@ -137,26 +126,7 @@ class CashPaymentConfirmationServiceTests {
                 );
 
         verify(paymentRepository, never()).save(any());
-        verifyNoInteractions(driverCandidateStore, tripRealtimeNotifier);
-    }
-
-    private void verifyPaymentCompletedNotification() {
-        ArgumentCaptor<UserNotification> passengerNotification = ArgumentCaptor.forClass(UserNotification.class);
-        ArgumentCaptor<UserNotification> driverNotification = ArgumentCaptor.forClass(UserNotification.class);
-        verify(tripRealtimeNotifier).notifyPassenger(eq(10L), passengerNotification.capture());
-        verify(tripRealtimeNotifier).notifyUser(eq(20L), driverNotification.capture());
-        assertPaymentNotification(passengerNotification.getValue());
-        assertPaymentNotification(driverNotification.getValue());
-    }
-
-    private void assertPaymentNotification(UserNotification notification) {
-        assertThat(notification.type()).isEqualTo(NotificationType.PAYMENT_COMPLETED);
-        assertThat(notification.data())
-                .containsEntry("tripId", 99L)
-                .containsEntry("status", TripStatus.COMPLETED.name())
-                .containsEntry("driverId", 20L)
-                .containsEntry("amount", BigDecimal.valueOf(20000))
-                .containsEntry("paymentStatus", PaymentStatus.COMPLETED.name());
+        verifyNoInteractions(paymentCompletionWorkflow);
     }
 
     private Payment paymentForTripWithoutCompletion(Trip trip) {
