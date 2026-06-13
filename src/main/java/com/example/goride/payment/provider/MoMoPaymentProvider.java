@@ -6,6 +6,9 @@ import com.example.goride.common.error.BusinessException;
 import com.example.goride.common.error.ErrorCode;
 import com.example.goride.payment.config.PaymentProviderProperties;
 import com.example.goride.payment.domain.Payment;
+import com.example.goride.payment.domain.PaymentStatus;
+import com.example.goride.payment.repository.PaymentRepository;
+import com.example.goride.payment.service.PaymentCompletionWorkflow;
 import org.springframework.stereotype.Component;
 
 import javax.crypto.Mac;
@@ -25,16 +28,24 @@ public class MoMoPaymentProvider implements PaymentProvider {
     private static final String REQUEST_ID_PREFIX = "GORIDE-CREATE-";
     private static final long MINIMUM_AMOUNT = 1_000L;
     private static final long MAXIMUM_AMOUNT = 50_000_000L;
+    private static final int SUCCESS_RESULT_CODE = 0;
+    private static final int AUTHORIZED_RESULT_CODE = 9000;
 
     private final PaymentProviderProperties paymentProviderProperties;
     private final MoMoPaymentClient paymentClient;
+    private final PaymentRepository paymentRepository;
+    private final PaymentCompletionWorkflow paymentCompletionWorkflow;
 
     public MoMoPaymentProvider(
             PaymentProviderProperties paymentProviderProperties,
-            MoMoPaymentClient paymentClient
+            MoMoPaymentClient paymentClient,
+            PaymentRepository paymentRepository,
+            PaymentCompletionWorkflow paymentCompletionWorkflow
     ) {
         this.paymentProviderProperties = paymentProviderProperties;
         this.paymentClient = paymentClient;
+        this.paymentRepository = paymentRepository;
+        this.paymentCompletionWorkflow = paymentCompletionWorkflow;
     }
 
     @Override
@@ -88,6 +99,48 @@ public class MoMoPaymentProvider implements PaymentProvider {
         );
         validateResponse(settings, request, response);
         return new PaymentCheckoutSession(true, response.payUrl(), null);
+    }
+
+    @Override
+    public PaymentWebhookResult handleWebhook(PaymentWebhookRequest request) {
+        PaymentProviderProperties.ProviderSettings settings =
+                paymentProviderProperties.settingsFor(providerName());
+        if (!settings.isEnabled() || !settings.hasMomoWebhookConfiguration()) {
+            throw new BusinessException(
+                    ErrorCode.PAYMENT_PROVIDER_UNSUPPORTED,
+                    "MoMo webhook is not configured"
+            );
+        }
+
+        MoMoPaymentNotification notification = paymentNotification(request);
+        verifyNotificationSignature(settings, notification);
+        Long paymentId = paymentId(notification.orderId());
+        Payment payment = paymentRepository.findByIdForUpdate(paymentId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.PAYMENT_NOT_FOUND));
+        validateNotification(settings, notification, payment);
+
+        PaymentStatus previousStatus = payment.getStatus();
+        String transactionRef = Long.toString(notification.transId());
+        boolean successful = isSuccessfulResultCode(notification.resultCode());
+        if (successful) {
+            payment.markCompletedByProvider(providerName(), transactionRef);
+        } else {
+            payment.markFailedByProvider(providerName(), transactionRef);
+        }
+        Payment savedPayment = paymentRepository.save(payment);
+        if (successful && previousStatus != PaymentStatus.COMPLETED) {
+            paymentCompletionWorkflow.handleCompletedPayment(savedPayment);
+        }
+        return new PaymentWebhookResult(
+                true,
+                savedPayment.getId(),
+                savedPayment.getTrip().getId(),
+                savedPayment.getStatus(),
+                savedPayment.getTransactionRef(),
+                successful
+                        ? "MoMo payment completed"
+                        : "MoMo payment failed"
+        );
     }
 
     private long momoAmount(BigDecimal amount) {
@@ -200,6 +253,130 @@ public class MoMoPaymentProvider implements PaymentProvider {
         }
     }
 
+    private MoMoPaymentNotification paymentNotification(PaymentWebhookRequest request) {
+        return new MoMoPaymentNotification(
+                requiredString(request, "partnerCode"),
+                requiredString(request, "orderId"),
+                requiredString(request, "requestId"),
+                requiredLong(request, "amount"),
+                requiredString(request, "orderInfo"),
+                requiredString(request, "orderType"),
+                requiredLong(request, "transId"),
+                requiredInt(request, "resultCode"),
+                stringValue(request, "message", true),
+                requiredString(request, "payType"),
+                requiredLong(request, "responseTime"),
+                stringValue(request, "extraData", true),
+                requiredString(request, "signature")
+        );
+    }
+
+    private void verifyNotificationSignature(
+            PaymentProviderProperties.ProviderSettings settings,
+            MoMoPaymentNotification notification
+    ) {
+        String rawSignature = "accessKey=" + settings.normalizedAccessKey()
+                + "&amount=" + notification.amount()
+                + "&extraData=" + notification.extraData()
+                + "&message=" + notification.message()
+                + "&orderId=" + notification.orderId()
+                + "&orderInfo=" + notification.orderInfo()
+                + "&orderType=" + notification.orderType()
+                + "&partnerCode=" + notification.partnerCode()
+                + "&payType=" + notification.payType()
+                + "&requestId=" + notification.requestId()
+                + "&responseTime=" + notification.responseTime()
+                + "&resultCode=" + notification.resultCode()
+                + "&transId=" + notification.transId();
+        String actualSignature = hmacSha256(settings.normalizedSecretKey(), rawSignature);
+        if (!MessageDigest.isEqual(
+                actualSignature.getBytes(StandardCharsets.UTF_8),
+                notification.signature().toLowerCase(Locale.ROOT).getBytes(StandardCharsets.UTF_8)
+        )) {
+            throw validationError("Invalid MoMo IPN signature");
+        }
+    }
+
+    private void validateNotification(
+            PaymentProviderProperties.ProviderSettings settings,
+            MoMoPaymentNotification notification,
+            Payment payment
+    ) {
+        if (payment.getMethod() != PaymentMethod.MOMO) {
+            throw validationError("Payment method is not MoMo");
+        }
+        long expectedAmount = momoAmount(payment.getAmount());
+        String expectedOrderId = orderId(payment);
+        String expectedRequestId = requestId(payment);
+        String expectedOrderInfo = orderInfo(payment);
+        if (!settings.normalizedMerchantId().equals(notification.partnerCode())
+                || !expectedOrderId.equals(notification.orderId())
+                || !expectedRequestId.equals(notification.requestId())
+                || expectedAmount != notification.amount()
+                || !expectedOrderInfo.equals(notification.orderInfo())
+                || !EXTRA_DATA.equals(notification.extraData())) {
+            throw validationError("MoMo IPN data does not match the payment");
+        }
+        if (notification.transId() <= 0 || notification.responseTime() <= 0) {
+            throw validationError("MoMo IPN transaction metadata is invalid");
+        }
+    }
+
+    private Long paymentId(String orderId) {
+        if (!orderId.startsWith(ORDER_ID_PREFIX)) {
+            throw validationError("MoMo orderId is invalid");
+        }
+        try {
+            return Long.parseLong(orderId.substring(ORDER_ID_PREFIX.length()));
+        } catch (NumberFormatException exception) {
+            throw validationError("MoMo orderId is invalid");
+        }
+    }
+
+    private boolean isSuccessfulResultCode(int resultCode) {
+        return resultCode == SUCCESS_RESULT_CODE || resultCode == AUTHORIZED_RESULT_CODE;
+    }
+
+    private String requiredString(PaymentWebhookRequest request, String fieldName) {
+        return stringValue(request, fieldName, false);
+    }
+
+    private String stringValue(
+            PaymentWebhookRequest request,
+            String fieldName,
+            boolean allowEmpty
+    ) {
+        Object value = request.payload().get(fieldName);
+        if (!(value instanceof String stringValue)
+                || (!allowEmpty && stringValue.isBlank())) {
+            throw validationError("MoMo IPN field is invalid: " + fieldName);
+        }
+        return stringValue;
+    }
+
+    private long requiredLong(PaymentWebhookRequest request, String fieldName) {
+        Object value = request.payload().get(fieldName);
+        try {
+            if (value instanceof Number number) {
+                return new BigDecimal(number.toString()).longValueExact();
+            }
+            if (value instanceof String stringValue && !stringValue.isBlank()) {
+                return new BigDecimal(stringValue).longValueExact();
+            }
+        } catch (ArithmeticException | NumberFormatException exception) {
+            throw validationError("MoMo IPN field is invalid: " + fieldName);
+        }
+        throw validationError("MoMo IPN field is invalid: " + fieldName);
+    }
+
+    private int requiredInt(PaymentWebhookRequest request, String fieldName) {
+        long value = requiredLong(request, fieldName);
+        if (value < Integer.MIN_VALUE || value > Integer.MAX_VALUE) {
+            throw validationError("MoMo IPN field is invalid: " + fieldName);
+        }
+        return (int) value;
+    }
+
     private boolean isValidPayUrl(String payUrl) {
         if (isBlank(payUrl)) {
             return false;
@@ -238,5 +415,26 @@ public class MoMoPaymentProvider implements PaymentProvider {
 
     private BusinessException providerError(String message) {
         return new BusinessException(ErrorCode.PAYMENT_PROVIDER_ERROR, message);
+    }
+
+    private BusinessException validationError(String message) {
+        return new BusinessException(ErrorCode.VALIDATION_ERROR, message);
+    }
+
+    private record MoMoPaymentNotification(
+            String partnerCode,
+            String orderId,
+            String requestId,
+            long amount,
+            String orderInfo,
+            String orderType,
+            long transId,
+            int resultCode,
+            String message,
+            String payType,
+            long responseTime,
+            String extraData,
+            String signature
+    ) {
     }
 }

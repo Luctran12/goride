@@ -14,6 +14,7 @@ import com.example.goride.payment.service.PaymentQueryService;
 import com.example.goride.payment.service.PaymentWebhookService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -84,16 +85,20 @@ public class PaymentController {
     }
 
     @PostMapping("/providers/{providerName}/webhook")
-    public ApiResponse<PaymentWebhookResponse> handleProviderWebhook(
+    public Object handleProviderWebhook(
             @PathVariable String providerName,
             @RequestHeader Map<String, String> headers,
             @RequestBody(required = false) Map<String, Object> payload
     ) {
-        return ApiResponse.ok(paymentWebhookService.handleProviderWebhook(
+        PaymentWebhookResponse response = paymentWebhookService.handleProviderWebhook(
                 providerName,
                 headers,
                 payload
-        ));
+        );
+        if ("momo".equalsIgnoreCase(providerName)) {
+            return ResponseEntity.noContent().build();
+        }
+        return ApiResponse.ok(response);
     }
 
     @GetMapping("/providers/{providerName}/webhook")

@@ -67,7 +67,12 @@ class PaymentMethodServiceTests {
         PaymentMethodService withProvider = new PaymentMethodService(
                 new PaymentProviderRegistry(List.of(
                         new CashPaymentProvider(),
-                        new MoMoPaymentProvider(properties, mock(MoMoPaymentClient.class))
+                        new MoMoPaymentProvider(
+                                properties,
+                                mock(MoMoPaymentClient.class),
+                                mock(PaymentRepository.class),
+                                mock(PaymentCompletionWorkflow.class)
+                        )
                 )),
                 properties
         );

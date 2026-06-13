@@ -6,12 +6,12 @@ Generated: 2026-06-13, Asia/Bangkok
 
 | Item | Status |
 | --- | --- |
-| Working branch | `feature/momo-checkout-provider` |
-| Latest merged feature on develop | `feature/vnpay-webhook-verification` |
-| Develop merge commit | `04c2606` (`merge: vnpay webhook verification`) |
-| Test status | `./mvnw.cmd test`: pass 262 tests on 2026-06-13 |
+| Working branch | `feature/momo-webhook-verification` |
+| Latest merged feature on develop | `feature/momo-checkout-provider` |
+| Develop merge commit | `d04d3c4` (`merge: momo checkout provider`) |
+| Test status | `./mvnw.cmd test`: pass 275 tests on 2026-06-13 |
 | Diff hygiene | `git diff --check`: pass on 2026-06-13 |
-| CodeRabbit CLI | Blocked: CLI missing and official installer execution was rejected by the environment security policy |
+| CodeRabbit CLI | Blocked: CLI missing and official installer execution is disallowed by the environment security policy |
 | Publish status | Feature branch in review flow; merge to `develop` after user review |
 | Local config | `src/main/resources/application.yml` is environment-specific and must stay uncommitted |
 
@@ -29,7 +29,7 @@ Generated: 2026-06-13, Asia/Bangkok
 | WebSocket security | JWT-authenticated STOMP `CONNECT`, trip topic authorization, user-specific messaging | WebSocket/STOMP endpoints and trip subscription topics | Prevents unauthorized trip subscription access. |
 | Realtime tracking | Driver location updates, REST fallback for latest location/history, trip location notifications | `POST /api/v1/tracking/trips/{tripId}/driver-location`, WebSocket driver location channel | Stores latest driver location in Redis and tracking history in persistence. |
 | Cash payment | Cash payment record, payment detail, cash confirmation, payment completion workflow | `/api/v1/payments/trips/{tripId}`, driver payment confirmation endpoint | CASH path is implemented end to end enough for MVP trip completion. |
-| Payment checkout and webhook foundation | Payment provider registry/config properties, checkout entry point, webhook entry point, payment method metadata, signed VNPAY checkout/callback flow, signed MoMo create-payment checkout | `/api/v1/payments/methods`, `/api/v1/payments/trips/{tripId}/checkout`, `/api/v1/payments/providers/{providerName}/webhook` | CASH works end to end; VNPAY supports signed checkout and callbacks; MoMo can create and verify a signed checkout response with stable idempotent IDs, but MoMo IPN/payment completion remains open. |
+| Payment checkout and webhook foundation | Payment provider registry/config properties, checkout entry point, webhook entry point, payment method metadata, signed VNPAY and MoMo checkout/callback flows | `/api/v1/payments/methods`, `/api/v1/payments/trips/{tripId}/checkout`, `/api/v1/payments/providers/{providerName}/webhook` | CASH works end to end; VNPAY supports signed checkout and callbacks; MoMo supports signed checkout, signature-verified IPN, idempotent completion/failure mapping and HTTP 204 acknowledgement. |
 | Rating | Passenger trip rating, duplicate prevention/status, driver public ratings, Redis rating sync | `/api/v1/ratings`, `/api/v1/ratings/trips/{tripId}/me`, `/api/v1/drivers/{driverId}/ratings` | Rating data is available for frontend review displays. |
 | Notifications | Notification inbox, mark-read flow, in-app/WebSocket notification delivery, FCM token CRUD | `/api/v1/notifications`, FCM token endpoints | Includes FCM sender channel and invalid-token cleanup path. |
 | Admin trip operations | Admin trip list/filter/detail-like views and dashboard metrics | `/api/v1/admin/trips`, `/api/v1/admin/dashboard` | Supports basic operations dashboard and trip monitoring. |
@@ -39,9 +39,9 @@ Generated: 2026-06-13, Asia/Bangkok
 
 | Priority | Area | Work To Complete | Dependencies | Acceptance Criteria |
 | --- | --- | --- | --- | --- |
-| P0 | Payment providers | Complete MoMo IPN/webhook and payment completion; finish MoMo/VNPAY sandbox E2E validation against real merchant flows | Sandbox merchant accounts, provider API specs, callback URLs | Both providers return usable checkout URLs; successful sandbox payments update GoRide payment/trip state; failed/cancelled payments are persisted correctly. |
-| P0 | Webhook security | Add MoMo IPN signature verification and provider request freshness/replay checks; VNPAY `vnp_SecureHash` and MoMo create-response signatures are implemented | Provider secret keys, canonical signature algorithms, reliable provider timestamp/nonce policy | Invalid signatures are rejected; replay/expired callbacks are rejected where provider data supports it; valid callbacks are idempotent. |
-| P0 | Webhook sandbox handling | Implement MoMo callback parsing and run real sandbox callback tests for MoMo and VNPAY | Sandbox callback payload examples and merchant test accounts | Sandbox success/failure/refund-like statuses map to internal payment states with tests. |
+| P0 | Payment providers | Finish MoMo/VNPAY sandbox E2E validation against real merchant flows | Sandbox merchant accounts, callback URLs, provider test apps | Both online providers return usable checkout URLs and real sandbox success/failure callbacks reconcile internal payment/trip state. |
+| P0 | Webhook security | Define provider freshness policy beyond current signature verification, pessimistic locking and transaction-reference idempotency | Reliable provider retry/freshness guarantees and optional callback event store | Valid duplicate callbacks remain idempotent; stale or conflicting callbacks are rejected without blocking legitimate provider retries. |
+| P0 | Webhook sandbox handling | Run real sandbox callback tests for MoMo and VNPAY; unit mapping for both providers is implemented | Sandbox callback payloads and merchant test accounts | Sandbox success/failure statuses map to internal payment states and provider acknowledgements meet real gateway expectations. |
 | P0 | Maps and distance | Replace `MockDistanceService` with a real maps/distance provider | Google Maps, Mapbox, HERE, or local routing service key | Estimates and completed-trip fare use real route distance/time; provider failures fall back predictably. |
 | P1 | Driver heartbeat | Add periodic driver heartbeat and automatic offline timeout | Redis TTL policy, scheduler/job config | Drivers who stop heartbeating become unavailable for matching without manual offline action. |
 | P1 | Firebase production setup | Finalize Firebase Admin service account and secret loading for production | Secure secret storage, env-specific config | FCM works in staging/prod without committing credentials; missing secrets fail clearly. |
@@ -69,7 +69,7 @@ Generated: 2026-06-13, Asia/Bangkok
 | Driver offers | Driver trip offer APIs and user-specific WebSocket notifications | Display incoming offer countdown, accept/reject, handle timeout. |
 | Trip status | Driver trip status endpoints and trip WebSocket topic | Render status timeline: accepted, arrived, in progress, completed/cancelled. |
 | Realtime tracking | WebSocket location topic, REST fallback tracking endpoints | Subscribe for live driver location and poll REST fallback on reconnect. |
-| Payment | `/api/v1/payments/methods`, `/api/v1/payments/trips/{tripId}`, `/checkout`, webhook-driven state | Support CASH fully; show VNPAY/MoMo only when provider metadata says enabled; open returned checkout URL. VNPAY can complete through callback, while MoMo must remain operationally disabled until its IPN commit. |
+| Payment | `/api/v1/payments/methods`, `/api/v1/payments/trips/{tripId}`, `/checkout`, webhook-driven state | Support CASH fully; show VNPAY/MoMo only when provider metadata says enabled; open returned checkout URL and refresh payment detail after redirect while signed callbacks update state. |
 | Rating | `/api/v1/ratings`, rating status/list endpoints | Prompt passenger after completed trip, hide form after already rated. |
 | Notifications | `/api/v1/notifications`, FCM token endpoints, WebSocket notification channel | Register FCM token, render inbox/badge, mark notifications read. |
 | Admin trips/dashboard | `/api/v1/admin/trips`, `/api/v1/admin/dashboard` | Build admin operational dashboard and trip filter pages. |
@@ -78,7 +78,7 @@ Generated: 2026-06-13, Asia/Bangkok
 
 | Phase | Goal | Main Deliverables |
 | --- | --- | --- |
-| Phase 1 | Payment provider completion | MoMo IPN/webhook and payment completion, MoMo/VNPAY sandbox E2E validation, webhook replay/freshness policy, sandbox tests. |
+| Phase 1 | Payment provider completion | MoMo/VNPAY sandbox E2E validation, webhook replay/freshness policy, real merchant callback tests. |
 | Phase 2 | Real-world routing | Real distance/maps provider, route estimate tests, fallback and provider error handling. |
 | Phase 3 | Driver availability reliability | Heartbeat API/job, automatic offline timeout, matching tests around stale drivers. |
 | Phase 4 | Production readiness | Firebase secrets, environment profiles, CORS/rate limits, observability, release SQL strategy. |
@@ -89,8 +89,8 @@ Generated: 2026-06-13, Asia/Bangkok
 
 | Risk | Impact | Mitigation |
 | --- | --- | --- |
-| Online payment providers are still not production-complete | Frontend should not expose MoMo/VNPAY in production without real sandbox/UAT validation | Keep CASH as MVP; expose online methods only when backend metadata says enabled and the full provider callback flow is configured. |
-| Webhook protection is partial by provider | MoMo checkout response verification exists, but MoMo IPN and replay/freshness checks are still open | Keep provider secrets out of git, keep VNPAY signature checks enabled, add MoMo IPN verification and replay policy before public launch. |
+| Online payment providers are still not production-complete | Frontend should not expose MoMo/VNPAY in production without real sandbox/UAT validation | Keep CASH as MVP; enable online methods first in sandbox and only after full callback/UAT validation. |
+| Webhook freshness policy is incomplete | Both provider signatures and duplicate handling exist, but there is no explicit stale-callback window/event ledger | Keep pessimistic locking and transaction-reference checks; define provider-safe freshness/replay policy before public launch. |
 | Mock distance provider remains in use | Fare estimates may be inaccurate | Integrate real maps provider before real-money launch. |
 | Drivers can stay online without heartbeat | Matching may dispatch to unavailable drivers | Add heartbeat/offline timeout before broad driver testing. |
 | Production secrets are not finalized | Deployments may fail or leak credentials if handled manually | Use environment-specific secret storage and never commit provider/Firebase credentials. |
