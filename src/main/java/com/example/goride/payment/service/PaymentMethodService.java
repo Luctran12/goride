@@ -40,7 +40,11 @@ public class PaymentMethodService {
 
         PaymentProviderProperties.ProviderSettings settings =
                 paymentProviderProperties.settingsFor(paymentMethod.providerName());
-        boolean providerConfigured = settings.isEnabled() && settings.hasCheckoutConfiguration();
+        boolean providerConfigured = settings.isEnabled() && switch (paymentMethod) {
+            case MOMO -> settings.hasMomoCheckoutConfiguration();
+            case VNPAY -> settings.hasVnPayCheckoutConfiguration();
+            case CASH -> true;
+        };
         boolean enabled = providerRegistered && providerConfigured;
         return PaymentMethodResponse.of(
                 paymentMethod,
