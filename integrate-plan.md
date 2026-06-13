@@ -1,6 +1,6 @@
 # GoRide Front-end Integration Plan
 
-Branch da kiem tra: `feature/payment-method-metadata`
+Branch da kiem tra: `feature/vnpay-webhook-verification`
 
 Muc tieu file nay:
 - Checklist chuc nang backend da co code va co the tich hop FE.
@@ -75,6 +75,7 @@ API public hien co:
 - `GET /api/v1/drivers/{driverId}/ratings`
 - `GET /api/v1/payments/methods`
 - `POST /api/v1/payments/providers/{providerName}/webhook`
+- `GET /api/v1/payments/providers/{providerName}/webhook`
 - Swagger/OpenAPI routes
 
 ### Enum FE can dong bo
@@ -174,6 +175,9 @@ type PaymentStatus = "PENDING" | "COMPLETED" | "FAILED" | "REFUNDED";
 - [x] Backend reject booking neu `paymentMethod` chua duoc enable.
 - [x] Co checkout foundation endpoint cho payment `PENDING`.
 - [x] Co webhook foundation endpoint cho payment provider external callback.
+- [x] VNPAY co signed checkout URL provider khi du config sandbox.
+- [x] VNPAY webhook/callback verify `vnp_SecureHash`, merchant code va amount truoc khi cap nhat payment.
+- [x] VNPAY callback success chay shared payment completion workflow; callback lap lai cung transaction reference khong chay workflow lan nua.
 - [x] Driver confirm da nhan tien mat.
 - [x] Payment `PENDING -> COMPLETED`, set `paidAt`.
 - [x] Payment completed workflow dung chung de notify va dua driver ve `AVAILABLE`.
@@ -223,7 +227,7 @@ type PaymentStatus = "PENDING" | "COMPLETED" | "FAILED" | "REFUNDED";
 ### Payment/rating/statistics
 
 - [x] Payment method metadata da expose `CASH`, `MOMO`, `VNPAY`; hien chi `CASH` enabled mac dinh.
-- [ ] Chua co provider MoMo implementation; VNPAY da co checkout URL provider, nhung webhook signature/provider payload sandbox van chua hoan tat.
+- [ ] Chua co provider MoMo implementation; VNPAY da co checkout URL va webhook signature/provider payload sandbox foundation, nhung van can sandbox account/E2E callback test that.
 
 ### Notification/mo rong
 
@@ -758,7 +762,7 @@ Response `data`:
     "checkoutRequired": true,
     "sandbox": true,
     "providerConfigured": false,
-    "providerRegistered": false
+    "providerRegistered": true
   }
 ]
 ```
@@ -801,6 +805,7 @@ app:
 
 FE action:
 - `VNPAY` da co provider tao checkout URL; FE chi hien option nay khi metadata tra `enabled=true`.
+- `VNPAY` da co callback/webhook verifier; backend tu cap nhat payment khi provider redirect/IPN ve endpoint webhook.
 - `MOMO` da co trong enum/metadata nhung van `enabled=false` cho den khi backend co provider implementation that.
 - Khi provider online enabled, FE can xu ly `checkoutRequired=true`.
 - `sandbox=true` dung cho moi truong test provider; production nen set `sandbox=false` va secret qua env/secret manager.
@@ -842,28 +847,55 @@ POST /api/v1/payments/providers/{providerName}/webhook
 Content-Type: application/json
 ```
 
-Request body: raw JSON callback cua provider.
+Hoac voi provider gui query params kieu VNPAY:
 
-Response `data`:
+```http
+GET /api/v1/payments/providers/{providerName}/webhook?vnp_TxnRef=GORIDE-PAY-70&vnp_ResponseCode=00&...
+```
+
+Request body/query: raw callback params cua provider.
+
+POST generic provider response van dung `ApiResponse`:
 
 ```json
 {
-  "provider": "momo",
-  "accepted": true,
-  "paymentId": 70,
-  "tripId": 99,
-  "status": "COMPLETED",
-  "transactionRef": "provider-transaction-ref",
-  "message": "processed"
+  "success": true,
+  "data": {
+    "provider": "vnpay",
+    "accepted": true,
+    "paymentId": 70,
+    "tripId": 99,
+    "status": "COMPLETED",
+    "transactionRef": "provider-transaction-ref",
+    "message": "processed"
+  }
 }
 ```
+
+VNPAY GET/IPN response tra raw JSON theo contract provider, khong boc `ApiResponse`:
+
+```json
+{
+  "RspCode": "00",
+  "Message": "Confirm Success"
+}
+```
+
+Mapping IPN response:
+- `00`: callback da duoc xu ly.
+- `01`: khong tim thay payment/order.
+- `04`: amount callback khong khop payment.
+- `97`: `vnp_SecureHash` khong hop le.
+- `99`: loi/validation khac.
 
 FE action:
 - FE app khong goi endpoint nay truc tiep; day la endpoint public de MoMo/VNPay callback vao backend.
 - Khi tich hop provider that, FE chi mo `checkoutUrl` neu checkout response bao `checkoutRequired=true`, sau do theo doi payment detail/notification.
+- Voi `VNPAY`, sau khi user quay ve app/web tu `vnp_ReturnUrl`, FE nen refresh payment detail theo trip va hien trang thai moi. Backend xu ly callback khi provider goi `/providers/vnpay/webhook` bang GET query params hoac POST JSON.
 - Hien tai `CASH` khong support webhook; goi `/providers/cash/webhook` se tra `PAYMENT_PROVIDER_UNSUPPORTED`.
-- Moi provider sau nay phai tu verify signature/header/payload trong `PaymentProvider.handleWebhook(...)`.
-- Sau khi provider webhook mark payment `COMPLETED`, backend provider implementation nen goi shared payment completion workflow de notify passenger/driver va dua driver ve `AVAILABLE`.
+- `VNPAY` verify `vnp_SecureHash` khong phan biet uppercase/lowercase, `vnp_TmnCode`, `vnp_Amount` va map `vnp_ResponseCode=00` + `vnp_TransactionStatus=00` thanh `COMPLETED`; cac status khac thanh `FAILED`.
+- MoMo provider sau nay phai tu verify signature/header/payload trong `PaymentProvider.handleWebhook(...)`.
+- Sau khi provider webhook mark payment `COMPLETED`, backend goi shared payment completion workflow de notify passenger/driver va dua driver ve `AVAILABLE`.
 
 Driver confirm cash:
 

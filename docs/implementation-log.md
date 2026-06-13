@@ -6,6 +6,72 @@
 
 ---
 
+## Commit: `feat: verify vnpay webhook callbacks`
+
+Branch: `feature/vnpay-webhook-verification`
+
+Phase: Phase 7 - Payment provider completion, VNPAY callback/IPN verification
+
+### Muc tieu
+
+Hoan thien phan webhook/callback sandbox cho VNPAY de backend co the nhan ket qua thanh toan, verify `vnp_SecureHash`, cap nhat payment va chay shared payment completion workflow. Commit nay van chua implement MoMo provider va chua them replay-window/freshness check.
+
+### Noi dung da trien khai
+
+- Mo rong `VnPayPaymentProvider`:
+  - Parse cac tham so `vnp_*` tu webhook payload.
+  - Verify `vnp_SecureHash` bang HMAC-SHA512 tren sorted query params, bo qua `vnp_SecureHash` va `vnp_SecureHashType`; chap nhan hex uppercase/lowercase.
+  - Lay payment id tu `vnp_TxnRef` format `GORIDE-PAY-{paymentId}`.
+  - Load payment bang pessimistic lock de xu ly callback idempotent/an toan hon.
+  - Kiem tra payment method la `VNPAY`.
+  - Kiem tra `vnp_TmnCode` khop merchant config va `vnp_Amount` khop payment amount x 100.
+  - Map `vnp_ResponseCode=00` va `vnp_TransactionStatus=00` thanh payment `COMPLETED`; cac trang thai khac thanh `FAILED`.
+  - Goi `PaymentCompletionWorkflow` khi payment moi chuyen sang `COMPLETED`.
+- Mo rong `PaymentController`:
+  - Them `GET /api/v1/payments/providers/{providerName}/webhook` de nhan callback/query params kieu VNPAY.
+  - VNPAY GET/IPN tra raw JSON `RspCode`/`Message` theo contract provider: `00` confirm success, `01` order not found, `04` invalid amount, `97` invalid signature, `99` unknown error.
+  - Giu `POST /api/v1/payments/providers/{providerName}/webhook` cho provider gui JSON callback.
+- Mo rong `PaymentRepository`:
+  - Them `findByIdForUpdate(...)` co `PESSIMISTIC_WRITE` va fetch trip/passenger/driver.
+- Cap nhat docs:
+  - `integrate-plan.md` ghi ro VNPAY callback GET/POST, FE khong goi webhook truc tiep va nen poll/refresh payment detail sau redirect.
+  - `plan.md` danh dau VNPAY webhook sandbox/signature da partial/done trong pham vi VNPAY, MoMo van open.
+  - `docs/pland.xlsx` cap nhat status tracking cho payment provider/webhook.
+
+### Review truoc commit
+
+- Da xac nhan invalid `vnp_SecureHash` bi reject truoc khi load payment.
+- Da xac nhan secure hash uppercase/lowercase deu duoc verify dung.
+- Da xac nhan callback sai amount/merchant khong cap nhat payment.
+- Da xac nhan callback success lap lai cung transaction reference khong chay lai completion workflow.
+- Da xac nhan VNPAY IPN response tra `RspCode=00` khi xu ly thanh cong va `RspCode=97` khi signature sai.
+- Da chay `./mvnw.cmd '-Dtest=PaymentControllerTests,VnPayPaymentProviderTests,PaymentWebhookServiceTests,PaymentMethodServiceTests' test`: pass 16 tests.
+- Da chay `./mvnw.cmd test`: pass 249 tests.
+- Da chay `git diff --check`: khong co whitespace error.
+- CodeRabbit CLI chua chay duoc trong moi truong nay vi `coderabbit` command not found.
+- Da review diff thu cong: khong thay blocker trong scope VNPAY webhook verification.
+
+### Files chinh
+
+- `src/main/java/com/example/goride/payment/provider/VnPayPaymentProvider.java`
+- `src/main/java/com/example/goride/payment/controller/PaymentController.java`
+- `src/main/java/com/example/goride/payment/dto/VnPayIpnResponse.java`
+- `src/main/java/com/example/goride/payment/repository/PaymentRepository.java`
+- `src/test/java/com/example/goride/payment/controller/PaymentControllerTests.java`
+- `src/test/java/com/example/goride/payment/provider/VnPayPaymentProviderTests.java`
+- `src/test/java/com/example/goride/payment/service/PaymentMethodServiceTests.java`
+- `integrate-plan.md`
+- `plan.md`
+- `docs/pland.xlsx`
+
+### Viec tiep theo
+
+- Implement MoMo checkout/webhook provider.
+- Them replay-window/freshness check neu provider cung cap timestamp du tin cay.
+- Hoan thien sandbox callback/end-to-end test voi VNPAY account that.
+
+---
+
 ## Commit: `feat: add vnpay checkout provider`
 
 Branch: `feature/vnpay-checkout-provider`

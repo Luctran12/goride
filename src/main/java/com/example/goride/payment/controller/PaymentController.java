@@ -1,15 +1,19 @@
 package com.example.goride.payment.controller;
 
 import com.example.goride.common.api.ApiResponse;
+import com.example.goride.common.error.BusinessException;
 import com.example.goride.common.security.CurrentUser;
 import com.example.goride.payment.dto.PaymentCheckoutResponse;
 import com.example.goride.payment.dto.PaymentDetailResponse;
 import com.example.goride.payment.dto.PaymentMethodResponse;
 import com.example.goride.payment.dto.PaymentWebhookResponse;
+import com.example.goride.payment.dto.VnPayIpnResponse;
 import com.example.goride.payment.service.PaymentCheckoutService;
 import com.example.goride.payment.service.PaymentMethodService;
 import com.example.goride.payment.service.PaymentQueryService;
 import com.example.goride.payment.service.PaymentWebhookService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -18,14 +22,18 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
 @RestController
 @RequestMapping("/api/v1/payments")
 public class PaymentController {
+    private static final Logger log = LoggerFactory.getLogger(PaymentController.class);
+
     private final PaymentQueryService paymentQueryService;
     private final PaymentCheckoutService paymentCheckoutService;
     private final PaymentMethodService paymentMethodService;
@@ -86,5 +94,40 @@ public class PaymentController {
                 headers,
                 payload
         ));
+    }
+
+    @GetMapping("/providers/{providerName}/webhook")
+    public Object handleProviderWebhookQuery(
+            @PathVariable String providerName,
+            @RequestHeader Map<String, String> headers,
+            @RequestParam Map<String, String> queryParams
+    ) {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.putAll(queryParams);
+        if ("vnpay".equalsIgnoreCase(providerName)) {
+            return handleVnPayIpn(providerName, headers, payload);
+        }
+        return ApiResponse.ok(paymentWebhookService.handleProviderWebhook(
+                providerName,
+                headers,
+                payload
+        ));
+    }
+
+    private VnPayIpnResponse handleVnPayIpn(
+            String providerName,
+            Map<String, String> headers,
+            Map<String, Object> payload
+    ) {
+        try {
+            paymentWebhookService.handleProviderWebhook(providerName, headers, payload);
+            return VnPayIpnResponse.confirmSuccess();
+        } catch (BusinessException exception) {
+            log.warn("Rejected VNPay IPN callback: {}", exception.getMessage());
+            return VnPayIpnResponse.from(exception);
+        } catch (Exception exception) {
+            log.error("Failed to process VNPay IPN callback", exception);
+            return VnPayIpnResponse.unknownError();
+        }
     }
 }
