@@ -7,6 +7,7 @@ import com.example.goride.payment.provider.CashPaymentProvider;
 import com.example.goride.payment.provider.MoMoPaymentClient;
 import com.example.goride.payment.provider.MoMoPaymentProvider;
 import com.example.goride.payment.provider.PaymentProviderRegistry;
+import com.example.goride.payment.provider.PaymentWebhookFreshnessPolicy;
 import com.example.goride.payment.provider.VnPayPaymentProvider;
 import com.example.goride.payment.repository.PaymentRepository;
 import com.example.goride.payment.service.PaymentCompletionWorkflow;
@@ -68,11 +69,12 @@ class PaymentMethodServiceTests {
                 new PaymentProviderRegistry(List.of(
                         new CashPaymentProvider(),
                         new MoMoPaymentProvider(
-                                properties,
-                                mock(MoMoPaymentClient.class),
-                                mock(PaymentRepository.class),
-                                mock(PaymentCompletionWorkflow.class)
-                        )
+                                 properties,
+                                 mock(MoMoPaymentClient.class),
+                                 mock(PaymentRepository.class),
+                                 mock(PaymentCompletionWorkflow.class),
+                                 new PaymentWebhookFreshnessPolicy()
+                         )
                 )),
                 properties
         );
@@ -98,11 +100,12 @@ class PaymentMethodServiceTests {
                 new PaymentProviderRegistry(List.of(
                         new CashPaymentProvider(),
                         new VnPayPaymentProvider(
-                                properties,
-                                java.time.Clock.systemUTC(),
-                                mock(PaymentRepository.class),
-                                mock(PaymentCompletionWorkflow.class)
-                        )
+                                 properties,
+                                 java.time.Clock.systemUTC(),
+                                 mock(PaymentRepository.class),
+                                 mock(PaymentCompletionWorkflow.class),
+                                 new PaymentWebhookFreshnessPolicy()
+                         )
                 )),
                 properties
         );

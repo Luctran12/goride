@@ -17,6 +17,7 @@ import java.math.BigDecimal;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.time.Instant;
 import java.util.Locale;
 
 @Component
@@ -35,17 +36,20 @@ public class MoMoPaymentProvider implements PaymentProvider {
     private final MoMoPaymentClient paymentClient;
     private final PaymentRepository paymentRepository;
     private final PaymentCompletionWorkflow paymentCompletionWorkflow;
+    private final PaymentWebhookFreshnessPolicy webhookFreshnessPolicy;
 
     public MoMoPaymentProvider(
             PaymentProviderProperties paymentProviderProperties,
             MoMoPaymentClient paymentClient,
             PaymentRepository paymentRepository,
-            PaymentCompletionWorkflow paymentCompletionWorkflow
+            PaymentCompletionWorkflow paymentCompletionWorkflow,
+            PaymentWebhookFreshnessPolicy webhookFreshnessPolicy
     ) {
         this.paymentProviderProperties = paymentProviderProperties;
         this.paymentClient = paymentClient;
         this.paymentRepository = paymentRepository;
         this.paymentCompletionWorkflow = paymentCompletionWorkflow;
+        this.webhookFreshnessPolicy = webhookFreshnessPolicy;
     }
 
     @Override
@@ -121,6 +125,12 @@ public class MoMoPaymentProvider implements PaymentProvider {
 
         PaymentStatus previousStatus = payment.getStatus();
         String transactionRef = Long.toString(notification.transId());
+        webhookFreshnessPolicy.validate(
+                Instant.ofEpochMilli(notification.responseTime()),
+                request,
+                settings,
+                isIdempotentReplay(payment, transactionRef)
+        );
         boolean successful = isSuccessfulResultCode(notification.resultCode());
         if (successful) {
             payment.markCompletedByProvider(providerName(), transactionRef);
@@ -335,6 +345,12 @@ public class MoMoPaymentProvider implements PaymentProvider {
 
     private boolean isSuccessfulResultCode(int resultCode) {
         return resultCode == SUCCESS_RESULT_CODE || resultCode == AUTHORIZED_RESULT_CODE;
+    }
+
+    private boolean isIdempotentReplay(Payment payment, String transactionRef) {
+        return payment.getStatus() != PaymentStatus.PENDING
+                && providerName().equals(payment.getProvider())
+                && transactionRef.equals(payment.getTransactionRef());
     }
 
     private String requiredString(PaymentWebhookRequest request, String fieldName) {
