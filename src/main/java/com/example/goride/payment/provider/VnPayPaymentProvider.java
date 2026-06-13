@@ -6,18 +6,23 @@ import com.example.goride.common.error.BusinessException;
 import com.example.goride.common.error.ErrorCode;
 import com.example.goride.payment.config.PaymentProviderProperties;
 import com.example.goride.payment.domain.Payment;
+import com.example.goride.payment.domain.PaymentStatus;
+import com.example.goride.payment.repository.PaymentRepository;
+import com.example.goride.payment.service.PaymentCompletionWorkflow;
 import org.springframework.stereotype.Component;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.security.MessageDigest;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.util.Locale;
 import java.util.Map;
 import java.util.TreeMap;
 
@@ -26,13 +31,23 @@ public class VnPayPaymentProvider implements PaymentProvider {
     private static final DateTimeFormatter VNPAY_TIME_FORMAT =
             DateTimeFormatter.ofPattern("yyyyMMddHHmmss").withZone(ZoneId.of("Asia/Ho_Chi_Minh"));
     private static final int CHECKOUT_EXPIRY_MINUTES = 15;
+    private static final String TRANSACTION_REFERENCE_PREFIX = "GORIDE-PAY-";
 
     private final PaymentProviderProperties paymentProviderProperties;
     private final Clock clock;
+    private final PaymentRepository paymentRepository;
+    private final PaymentCompletionWorkflow paymentCompletionWorkflow;
 
-    public VnPayPaymentProvider(PaymentProviderProperties paymentProviderProperties, Clock clock) {
+    public VnPayPaymentProvider(
+            PaymentProviderProperties paymentProviderProperties,
+            Clock clock,
+            PaymentRepository paymentRepository,
+            PaymentCompletionWorkflow paymentCompletionWorkflow
+    ) {
         this.paymentProviderProperties = paymentProviderProperties;
         this.clock = clock;
+        this.paymentRepository = paymentRepository;
+        this.paymentCompletionWorkflow = paymentCompletionWorkflow;
     }
 
     @Override
@@ -64,6 +79,52 @@ public class VnPayPaymentProvider implements PaymentProvider {
                 true,
                 settings.normalizedCheckoutBaseUrl() + querySeparator(settings.normalizedCheckoutBaseUrl()) + signedQuery,
                 expiresAt
+        );
+    }
+
+    @Override
+    public PaymentWebhookResult handleWebhook(PaymentWebhookRequest request) {
+        PaymentProviderProperties.ProviderSettings settings =
+                paymentProviderProperties.settingsFor(providerName());
+        if (!settings.isEnabled()
+                || !settings.hasWebhookConfiguration()
+                || settings.normalizedMerchantId() == null) {
+            throw new BusinessException(
+                    ErrorCode.PAYMENT_PROVIDER_UNSUPPORTED,
+                    "VNPay webhook is not configured"
+            );
+        }
+
+        Map<String, String> params = vnpayPayload(request.payload());
+        verifySecureHash(params, settings.normalizedWebhookSecret());
+
+        Long paymentId = paymentId(params.get("vnp_TxnRef"));
+        Payment payment = paymentRepository.findByIdForUpdate(paymentId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.PAYMENT_NOT_FOUND));
+        assertVnpayPayment(payment);
+        assertMerchantAndAmount(params, settings, payment);
+
+        String transactionRef = transactionReferenceFromWebhook(params);
+        boolean success = "00".equals(params.get("vnp_ResponseCode"))
+                && "00".equals(params.get("vnp_TransactionStatus"));
+        PaymentStatus previousStatus = payment.getStatus();
+        if (success) {
+            payment.markCompletedByProvider(providerName(), transactionRef);
+        } else {
+            payment.markFailedByProvider(providerName(), transactionRef);
+        }
+        Payment savedPayment = paymentRepository.save(payment);
+        if (success && previousStatus != PaymentStatus.COMPLETED) {
+            paymentCompletionWorkflow.handleCompletedPayment(savedPayment);
+        }
+
+        return new PaymentWebhookResult(
+                true,
+                savedPayment.getId(),
+                savedPayment.getTrip().getId(),
+                savedPayment.getStatus(),
+                savedPayment.getTransactionRef(),
+                success ? "VNPay payment completed" : "VNPay payment failed"
         );
     }
 
@@ -101,7 +162,7 @@ public class VnPayPaymentProvider implements PaymentProvider {
                     "Payment id is required before creating VNPay checkout"
             );
         }
-        return "GORIDE-PAY-" + payment.getId();
+        return TRANSACTION_REFERENCE_PREFIX + payment.getId();
     }
 
     private String vnpayAmount(BigDecimal amount) {
@@ -114,7 +175,7 @@ public class VnPayPaymentProvider implements PaymentProvider {
         StringBuilder hashData = new StringBuilder();
         StringBuilder query = new StringBuilder();
         for (Map.Entry<String, String> entry : params.entrySet()) {
-            if (entry.getValue() == null || entry.getValue().isBlank()) {
+            if (shouldSkipForSignature(entry)) {
                 continue;
             }
             appendParam(hashData, entry.getKey(), entry.getValue());
@@ -122,6 +183,92 @@ public class VnPayPaymentProvider implements PaymentProvider {
         }
         String secureHash = hmacSha512(secretKey, trimTrailingAmpersand(hashData).toString());
         return trimTrailingAmpersand(query).append("&vnp_SecureHash=").append(secureHash).toString();
+    }
+
+    private Map<String, String> vnpayPayload(Map<String, Object> payload) {
+        Map<String, String> params = new TreeMap<>();
+        payload.forEach((key, value) -> {
+            if (key != null && key.startsWith("vnp_") && value != null) {
+                params.put(key, value.toString());
+            }
+        });
+        if (params.isEmpty()) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "VNPay payload is required");
+        }
+        return params;
+    }
+
+    private void verifySecureHash(Map<String, String> params, String secretKey) {
+        String expectedSecureHash = params.get("vnp_SecureHash");
+        if (expectedSecureHash == null || expectedSecureHash.isBlank()) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "VNPay secure hash is required");
+        }
+        String actualSecureHash = hmacSha512(secretKey, hashData(params));
+        if (!MessageDigest.isEqual(
+                actualSecureHash.getBytes(StandardCharsets.UTF_8),
+                expectedSecureHash.toLowerCase(Locale.ROOT).getBytes(StandardCharsets.UTF_8)
+        )) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "Invalid VNPay secure hash");
+        }
+    }
+
+    private String hashData(Map<String, String> params) {
+        StringBuilder hashData = new StringBuilder();
+        for (Map.Entry<String, String> entry : params.entrySet()) {
+            if (shouldSkipForSignature(entry)) {
+                continue;
+            }
+            appendParam(hashData, entry.getKey(), entry.getValue());
+        }
+        return hashData.toString();
+    }
+
+    private boolean shouldSkipForSignature(Map.Entry<String, String> entry) {
+        return entry.getValue() == null
+                || entry.getValue().isBlank()
+                || "vnp_SecureHash".equals(entry.getKey())
+                || "vnp_SecureHashType".equals(entry.getKey());
+    }
+
+    private Long paymentId(String transactionReference) {
+        if (transactionReference == null || !transactionReference.startsWith(TRANSACTION_REFERENCE_PREFIX)) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "VNPay transaction reference is invalid");
+        }
+        try {
+            return Long.parseLong(transactionReference.substring(TRANSACTION_REFERENCE_PREFIX.length()));
+        } catch (NumberFormatException exception) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "VNPay transaction reference is invalid");
+        }
+    }
+
+    private void assertVnpayPayment(Payment payment) {
+        if (payment.getMethod() != PaymentMethod.VNPAY) {
+            throw new BusinessException(
+                    ErrorCode.PAYMENT_INVALID_STATUS,
+                    "Payment method does not match VNPay callback"
+            );
+        }
+    }
+
+    private void assertMerchantAndAmount(
+            Map<String, String> params,
+            PaymentProviderProperties.ProviderSettings settings,
+            Payment payment
+    ) {
+        if (!settings.normalizedMerchantId().equals(params.get("vnp_TmnCode"))) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "VNPay merchant code is invalid");
+        }
+        if (!vnpayAmount(payment.getAmount()).equals(params.get("vnp_Amount"))) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "VNPay amount is invalid");
+        }
+    }
+
+    private String transactionReferenceFromWebhook(Map<String, String> params) {
+        String transactionNo = params.get("vnp_TransactionNo");
+        if (transactionNo != null && !transactionNo.isBlank() && !"0".equals(transactionNo)) {
+            return transactionNo;
+        }
+        return params.get("vnp_TxnRef");
     }
 
     private void appendParam(StringBuilder builder, String key, String value) {

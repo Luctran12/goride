@@ -9,11 +9,14 @@ import com.example.goride.payment.provider.CashPaymentProvider;
 import com.example.goride.payment.provider.PaymentProvider;
 import com.example.goride.payment.provider.PaymentProviderRegistry;
 import com.example.goride.payment.provider.VnPayPaymentProvider;
+import com.example.goride.payment.repository.PaymentRepository;
+import com.example.goride.payment.service.PaymentCompletionWorkflow;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
 
 class PaymentMethodServiceTests {
 
@@ -85,7 +88,12 @@ class PaymentMethodServiceTests {
         PaymentMethodService service = new PaymentMethodService(
                 new PaymentProviderRegistry(List.of(
                         new CashPaymentProvider(),
-                        new VnPayPaymentProvider(properties, java.time.Clock.systemUTC())
+                        new VnPayPaymentProvider(
+                                properties,
+                                java.time.Clock.systemUTC(),
+                                mock(PaymentRepository.class),
+                                mock(PaymentCompletionWorkflow.class)
+                        )
                 )),
                 properties
         );
