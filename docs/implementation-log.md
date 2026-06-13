@@ -6,6 +6,70 @@
 
 ---
 
+## Commit: `feat: add real distance routing provider`
+
+Branch: `feature/real-distance-provider`
+
+Phase: Phase 8 - Real-world routing and fare estimation
+
+### Muc tieu
+
+Thay `MockDistanceService` bang routing provider OSRM-compatible cho fare estimate va booking creation. Provider duoc bat/tat bang config, co timeout va fallback Haversine ro rang de local/dev van hoat dong khi chua co routing server.
+
+### Noi dung da trien khai
+
+- Them `RoutingDistanceService` lam `DistanceService` duy nhat:
+  - Goi OSRM-compatible `GET /route/v1/{profile}/{longitude,latitude;longitude,latitude}`.
+  - Dung `overview=false&steps=false` de chi lay distance/duration can cho pricing.
+  - Chuyen `distance` tu meter sang km, lam tron 2 chu so.
+  - Chuyen `duration` tu giay sang phut va lam tron len.
+- Them `RoutingProperties` voi prefix `app.routing`:
+  - `enabled`, mac dinh `false`.
+  - `base-url`, mac dinh `https://router.project-osrm.org`.
+  - `profile`, mac dinh `driving`.
+  - `timeout-seconds`, mac dinh `5`.
+  - `fallback-enabled`, mac dinh `true`.
+  - Validate HTTP base URL, safe profile va timeout duong; fail fast khi provider enabled nhung config sai.
+- Fallback:
+  - Giu cong thuc Haversine x 1.25 va toc do thanh pho 25 km/h lam fallback noi bo.
+  - Provider timeout, HTTP error, `NoRoute`, empty/invalid route se log warning va fallback neu enabled.
+  - Neu `fallback-enabled=false`, tra `ROUTING_PROVIDER_ERROR` HTTP 502.
+- Khong doi API contract:
+  - `POST /api/v1/bookings/estimate` va booking create van tra distance km, duration minutes va fare nhu cu.
+  - Final fare sau trip van dung actual tracking history va actual duration, khong goi routing provider.
+
+### Review truoc commit
+
+- Da xac nhan OSRM request dung thu tu `longitude,latitude`.
+- Da xac nhan 5425.6 meter map thanh 5.43 km va 987.1 giay map thanh 17 phut.
+- Da xac nhan provider `NoRoute`, timeout va HTTP error co fallback.
+- Da xac nhan fallback disabled tra `ROUTING_PROVIDER_ERROR`.
+- Da xac nhan provider enabled voi config URL sai fail fast.
+- Da chay targeted tests: pass 20 tests.
+- Da chay `./mvnw.cmd test`: pass 297 tests.
+- Da chay `git diff --check`: khong co whitespace error.
+- CodeRabbit khong chay duoc: CLI chua cai va environment security policy khong cho thuc thi official downloaded installer script; khong gan nhan CodeRabbit cho ket qua review khac.
+
+### Files chinh
+
+- `src/main/java/com/example/goride/booking/config/RoutingConfig.java`
+- `src/main/java/com/example/goride/booking/service/distance/RoutingProperties.java`
+- `src/main/java/com/example/goride/booking/service/distance/RoutingDistanceService.java`
+- `src/main/java/com/example/goride/common/error/ErrorCode.java`
+- `src/test/java/com/example/goride/booking/service/distance/RoutingPropertiesTests.java`
+- `src/test/java/com/example/goride/booking/service/distance/RoutingDistanceServiceTests.java`
+- `integrate-plan.md`
+- `plan.md`
+- `docs/pland.xlsx`
+
+### Viec tiep theo
+
+- Chay UAT voi OSRM self-hosted hoac routing endpoint duoc chon cho production.
+- Theo doi fallback warning va dieu chinh timeout/profile theo ha tang that.
+- Tiep tuc Phase 3 driver heartbeat/offline timeout.
+
+---
+
 ## Commit: `feat: enforce payment webhook freshness`
 
 Branch: `feature/payment-webhook-freshness`
