@@ -46,6 +46,7 @@ public class PaymentProviderProperties {
         private boolean enabled;
         private boolean sandbox = true;
         private String merchantId;
+        private String accessKey;
         private String secretKey;
         private String checkoutBaseUrl;
         private String returnUrl;
@@ -75,6 +76,14 @@ public class PaymentProviderProperties {
 
         public void setMerchantId(String merchantId) {
             this.merchantId = merchantId;
+        }
+
+        public String getAccessKey() {
+            return accessKey;
+        }
+
+        public void setAccessKey(String accessKey) {
+            this.accessKey = accessKey;
         }
 
         public String getSecretKey() {
@@ -129,6 +138,10 @@ public class PaymentProviderProperties {
             return normalize(merchantId);
         }
 
+        public String normalizedAccessKey() {
+            return normalize(accessKey);
+        }
+
         public String normalizedSecretKey() {
             return normalize(secretKey);
         }
@@ -154,11 +167,20 @@ public class PaymentProviderProperties {
             return normalize(webhookSecret);
         }
 
-        public boolean hasCheckoutConfiguration() {
+        public boolean hasVnPayCheckoutConfiguration() {
             return normalizedMerchantId() != null
                     && normalizedSecretKey() != null
                     && normalizedCheckoutBaseUrl() != null
                     && normalizedReturnUrl() != null;
+        }
+
+        public boolean hasMomoCheckoutConfiguration() {
+            return normalizedMerchantId() != null
+                    && normalizedAccessKey() != null
+                    && normalizedSecretKey() != null
+                    && normalizedCheckoutBaseUrl() != null
+                    && normalizedReturnUrl() != null
+                    && normalizedIpnUrl() != null;
         }
 
         public boolean hasWebhookConfiguration() {

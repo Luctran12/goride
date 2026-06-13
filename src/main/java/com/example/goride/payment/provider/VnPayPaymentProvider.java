@@ -64,7 +64,7 @@ public class VnPayPaymentProvider implements PaymentProvider {
     public PaymentCheckoutSession createCheckoutSession(Payment payment) {
         PaymentProviderProperties.ProviderSettings settings =
                 paymentProviderProperties.settingsFor(providerName());
-        if (!settings.isEnabled() || !settings.hasCheckoutConfiguration()) {
+        if (!settings.isEnabled() || !settings.hasVnPayCheckoutConfiguration()) {
             throw new BusinessException(
                     ErrorCode.PAYMENT_PROVIDER_UNSUPPORTED,
                     "VNPay checkout is not configured"

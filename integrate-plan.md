@@ -1,6 +1,6 @@
 # GoRide Front-end Integration Plan
 
-Branch da kiem tra: `feature/vnpay-webhook-verification`
+Branch da kiem tra: `feature/momo-checkout-provider`
 
 Muc tieu file nay:
 - Checklist chuc nang backend da co code va co the tich hop FE.
@@ -178,6 +178,8 @@ type PaymentStatus = "PENDING" | "COMPLETED" | "FAILED" | "REFUNDED";
 - [x] VNPAY co signed checkout URL provider khi du config sandbox.
 - [x] VNPAY webhook/callback verify `vnp_SecureHash`, merchant code va amount truoc khi cap nhat payment.
 - [x] VNPAY callback success chay shared payment completion workflow; callback lap lai cung transaction reference khong chay workflow lan nua.
+- [x] MoMo co create-payment provider ky HMAC-SHA256, dung stable `orderId`/`requestId` va verify chu ky + du lieu response.
+- [x] MoMo checkout tra `payUrl` qua checkout API khi provider registered, enabled va du config.
 - [x] Driver confirm da nhan tien mat.
 - [x] Payment `PENDING -> COMPLETED`, set `paidAt`.
 - [x] Payment completed workflow dung chung de notify va dua driver ve `AVAILABLE`.
@@ -227,7 +229,7 @@ type PaymentStatus = "PENDING" | "COMPLETED" | "FAILED" | "REFUNDED";
 ### Payment/rating/statistics
 
 - [x] Payment method metadata da expose `CASH`, `MOMO`, `VNPAY`; hien chi `CASH` enabled mac dinh.
-- [ ] Chua co provider MoMo implementation; VNPAY da co checkout URL va webhook signature/provider payload sandbox foundation, nhung van can sandbox account/E2E callback test that.
+- [ ] MoMo checkout da co; chua co MoMo IPN/webhook va payment completion. VNPAY da co checkout/webhook foundation; ca hai van can sandbox account/E2E test that.
 
 ### Notification/mo rong
 
@@ -722,7 +724,7 @@ FE action:
 ### 4.7 Payment cash
 
 Payment record duoc tao khi driver complete trip. FE khong co endpoint create payment rieng.
-Backend da co provider abstraction noi bo. `CASH` enabled mac dinh; `VNPAY` chi enabled khi backend co du config checkout; `MOMO` van disabled cho den khi co provider implementation rieng.
+Backend da co provider abstraction noi bo. `CASH` enabled mac dinh; `VNPAY` va `MOMO` chi enabled khi provider bean da registered, config `enabled=true` va du config checkout rieng cho tung provider. MoMo nen tiep tuc disabled o runtime cho den khi IPN/webhook duoc implement.
 
 #### Lay danh sach payment methods
 
@@ -785,6 +787,7 @@ app:
         enabled: false
         sandbox: true
         merchant-id: ${MOMO_MERCHANT_ID:}
+        access-key: ${MOMO_ACCESS_KEY:}
         secret-key: ${MOMO_SECRET_KEY:}
         checkout-base-url: ${MOMO_CHECKOUT_BASE_URL:}
         return-url: ${MOMO_RETURN_URL:}
@@ -806,7 +809,9 @@ app:
 FE action:
 - `VNPAY` da co provider tao checkout URL; FE chi hien option nay khi metadata tra `enabled=true`.
 - `VNPAY` da co callback/webhook verifier; backend tu cap nhat payment khi provider redirect/IPN ve endpoint webhook.
-- `MOMO` da co trong enum/metadata nhung van `enabled=false` cho den khi backend co provider implementation that.
+- `MOMO` da co provider tao create-payment request `captureWallet`, verify response va tra `payUrl`; stable ID la `GORIDE-PAY-{paymentId}` va `GORIDE-CREATE-{paymentId}`.
+- `MOMO` can `merchant-id`, `access-key`, `secret-key`, create URL, return URL va IPN URL. Nen giu `enabled=false` cho den commit MoMo IPN/webhook.
+- MoMo HTTP client dung connect/read timeout 30 giay; loi mang, timeout, provider reject, sai chu ky hoac response khong khop tra `PAYMENT_PROVIDER_ERROR` (HTTP 502).
 - Khi provider online enabled, FE can xu ly `checkoutRequired=true`.
 - `sandbox=true` dung cho moi truong test provider; production nen set `sandbox=false` va secret qua env/secret manager.
 
@@ -837,7 +842,7 @@ FE action:
 - Goi sau trip `COMPLETED`/payment `PENDING` de biet payment method co can redirect khong.
 - Voi `CASH`, `checkoutRequired=false`, FE hien man hinh thanh toan tien mat va cho driver confirm.
 - Voi `VNPAY`, neu `checkoutRequired=true`, FE mo `checkoutUrl` va theo doi payment status/webhook flow.
-- Voi `MOMO`, tiep tuc disable cho den khi backend expose `enabled=true`.
+- Voi `MOMO`, neu backend expose `enabled=true`, FE mo `checkoutUrl` (`payUrl`) tu response. Trong phase hien tai nen giu config disabled vi MoMo IPN/payment completion chua co.
 - Endpoint chi hop le cho payment `PENDING`; neu payment da completed backend tra `PAYMENT_INVALID_STATUS`, FE nen refresh payment detail.
 
 #### Provider webhook callback
@@ -894,7 +899,7 @@ FE action:
 - Voi `VNPAY`, sau khi user quay ve app/web tu `vnp_ReturnUrl`, FE nen refresh payment detail theo trip va hien trang thai moi. Backend xu ly callback khi provider goi `/providers/vnpay/webhook` bang GET query params hoac POST JSON.
 - Hien tai `CASH` khong support webhook; goi `/providers/cash/webhook` se tra `PAYMENT_PROVIDER_UNSUPPORTED`.
 - `VNPAY` verify `vnp_SecureHash` khong phan biet uppercase/lowercase, `vnp_TmnCode`, `vnp_Amount` va map `vnp_ResponseCode=00` + `vnp_TransactionStatus=00` thanh `COMPLETED`; cac status khac thanh `FAILED`.
-- MoMo provider sau nay phai tu verify signature/header/payload trong `PaymentProvider.handleWebhook(...)`.
+- MoMo checkout da verify chu ky response; MoMo IPN sau nay van phai verify signature/header/payload trong `PaymentProvider.handleWebhook(...)`.
 - Sau khi provider webhook mark payment `COMPLETED`, backend goi shared payment completion workflow de notify passenger/driver va dua driver ve `AVAILABLE`.
 
 Driver confirm cash:
@@ -1656,6 +1661,7 @@ Subscribe vao `/topic/trip/{tripId}/status` va `/topic/trip/{tripId}/location` c
 | `TRIP_STATUS_INVALID_TRANSITION` | Refresh trip state va disable nut sai flow. |
 | `PAYMENT_INVALID_STATUS`, `PAYMENT_NOT_FOUND` | Refresh payment/trip, tranh double confirm. |
 | `PAYMENT_PROVIDER_UNSUPPORTED` | Provider payment chua duoc backend enable; refresh/cau hinh lai payment method. |
+| `PAYMENT_PROVIDER_ERROR` | Hien loi tam thoi cua cong thanh toan, cho retry checkout; khong danh dau payment da thanh cong. |
 | `TRIP_ALREADY_RATED` | An rating form, coi trip da danh gia. |
 | `DRIVER_LOCATION_NOT_FOUND` | Hien "Dang cho vi tri tai xe". |
 | `NOTIFICATION_NOT_FOUND` | Refresh inbox; notification khong ton tai hoac khong thuoc user. |

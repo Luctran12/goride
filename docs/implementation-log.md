@@ -6,6 +6,73 @@
 
 ---
 
+## Commit: `feat: add momo checkout provider`
+
+Branch: `feature/momo-checkout-provider`
+
+Phase: Phase 7 - Payment provider completion, MoMo create-payment checkout foundation
+
+### Muc tieu
+
+Them MoMo create-payment provider cho checkout API hien tai. Commit nay chi tao checkout session va verify response cua MoMo; chua xu ly IPN/webhook, payment completion hoac provider HTTP 204.
+
+### Noi dung da trien khai
+
+- Mo rong payment provider config:
+  - Them `access-key`.
+  - Tach dieu kien config day du cho VNPAY va MoMo.
+  - MoMo can partner code, access key, secret key, create URL, redirect URL va IPN URL.
+- Them `MoMoPaymentProvider`:
+  - Gui request `captureWallet`, amount VND, `extraData=""`, `lang=vi`.
+  - Dung stable ID `GORIDE-PAY-{paymentId}` va `GORIDE-CREATE-{paymentId}` de provider idempotency hoat dong khi retry.
+  - Ky request HMAC-SHA256 theo canonical order cua MoMo.
+  - Verify HMAC-SHA256 response va doi chieu partner code, order ID, request ID, amount.
+  - Chi chap nhan `resultCode=0` va `payUrl` HTTP/HTTPS hop le; checkout response co `expiresAt=null`.
+  - Validate amount la so VND nguyen trong khoang 1.000 den 50.000.000.
+- Them `RestClientMoMoPaymentClient`:
+  - POST JSON den create-payment endpoint.
+  - Connect/read timeout 30 giay.
+  - Map timeout, HTTP error, URL config sai va response rong thanh `PAYMENT_PROVIDER_ERROR` HTTP 502.
+- Cap nhat payment method metadata:
+  - `MOMO.enabled=true` chi khi provider registered, config `enabled=true` va du config MoMo.
+  - Mac dinh van disabled de khong expose flow chua co IPN.
+- Cap nhat `plan.md`, `integrate-plan.md` va `docs/pland.xlsx`; MoMo checkout la done, payment provider tong the van partial va MoMo webhook van open.
+
+### Review truoc commit
+
+- Da doi chieu canonical signature request/response voi tai lieu MoMo create-payment.
+- Da xac nhan retry cung payment giu nguyen order ID va request ID.
+- Da xac nhan reject config thieu, amount ngoai range, response sai signature/du lieu, provider reject va pay URL khong hop le.
+- Da xac nhan timeout, HTTP error va checkout URL sai duoc map thanh `PAYMENT_PROVIDER_ERROR`.
+- Da chay targeted tests: pass 21 tests.
+- Da chay `./mvnw.cmd test`: pass 262 tests.
+- Da chay `git diff --check`: khong co whitespace error.
+- CodeRabbit khong chay duoc: CLI chua cai va he thong bao mat tu choi lenh tai/thuc thi official installer script; khong gan nhan CodeRabbit cho ket qua review khac.
+
+### Files chinh
+
+- `src/main/java/com/example/goride/payment/config/PaymentProviderProperties.java`
+- `src/main/java/com/example/goride/payment/provider/MoMoPaymentProvider.java`
+- `src/main/java/com/example/goride/payment/provider/MoMoPaymentClient.java`
+- `src/main/java/com/example/goride/payment/provider/RestClientMoMoPaymentClient.java`
+- `src/main/java/com/example/goride/payment/provider/MoMoCreatePaymentRequest.java`
+- `src/main/java/com/example/goride/payment/provider/MoMoCreatePaymentResponse.java`
+- `src/main/java/com/example/goride/payment/service/PaymentMethodService.java`
+- `src/main/java/com/example/goride/common/error/ErrorCode.java`
+- `src/test/java/com/example/goride/payment/provider/MoMoPaymentProviderTests.java`
+- `src/test/java/com/example/goride/payment/provider/RestClientMoMoPaymentClientTests.java`
+- `integrate-plan.md`
+- `plan.md`
+- `docs/pland.xlsx`
+
+### Viec tiep theo
+
+- Implement MoMo IPN/webhook signature verification va shared payment completion workflow.
+- Chay MoMo/VNPAY sandbox E2E voi merchant account that.
+- Them callback replay/freshness policy neu provider payload co du du lieu.
+
+---
+
 ## Commit: `feat: verify vnpay webhook callbacks`
 
 Branch: `feature/vnpay-webhook-verification`

@@ -1,12 +1,11 @@
 package com.example.goride.payment.service;
 
 import com.example.goride.booking.domain.PaymentMethod;
-import com.example.goride.booking.domain.Trip;
 import com.example.goride.payment.config.PaymentProviderProperties;
-import com.example.goride.payment.domain.Payment;
 import com.example.goride.payment.dto.PaymentMethodResponse;
 import com.example.goride.payment.provider.CashPaymentProvider;
-import com.example.goride.payment.provider.PaymentProvider;
+import com.example.goride.payment.provider.MoMoPaymentClient;
+import com.example.goride.payment.provider.MoMoPaymentProvider;
 import com.example.goride.payment.provider.PaymentProviderRegistry;
 import com.example.goride.payment.provider.VnPayPaymentProvider;
 import com.example.goride.payment.repository.PaymentRepository;
@@ -51,9 +50,11 @@ class PaymentMethodServiceTests {
         PaymentProviderProperties.ProviderSettings momo = properties.getMomo();
         momo.setEnabled(true);
         momo.setMerchantId("merchant");
+        momo.setAccessKey("access-key");
         momo.setSecretKey("secret");
         momo.setCheckoutBaseUrl("https://sandbox.momo.example/checkout");
         momo.setReturnUrl("https://api.goride.example/payments/momo/return");
+        momo.setIpnUrl("https://api.goride.example/payments/momo/ipn");
 
         PaymentMethodService withoutProvider = new PaymentMethodService(
                 new PaymentProviderRegistry(List.of(new CashPaymentProvider())),
@@ -64,7 +65,10 @@ class PaymentMethodServiceTests {
         assertThat(find(withoutProvider.listPaymentMethods(), PaymentMethod.MOMO).providerRegistered()).isFalse();
 
         PaymentMethodService withProvider = new PaymentMethodService(
-                new PaymentProviderRegistry(List.of(new CashPaymentProvider(), providerFor(PaymentMethod.MOMO))),
+                new PaymentProviderRegistry(List.of(
+                        new CashPaymentProvider(),
+                        new MoMoPaymentProvider(properties, mock(MoMoPaymentClient.class))
+                )),
                 properties
         );
         PaymentMethodResponse momoResponse = find(withProvider.listPaymentMethods(), PaymentMethod.MOMO);
@@ -110,19 +114,5 @@ class PaymentMethodServiceTests {
                 .filter(response -> response.method() == method)
                 .findFirst()
                 .orElseThrow();
-    }
-
-    private PaymentProvider providerFor(PaymentMethod paymentMethod) {
-        return new PaymentProvider() {
-            @Override
-            public PaymentMethod paymentMethod() {
-                return paymentMethod;
-            }
-
-            @Override
-            public Payment createPendingPayment(Trip trip) {
-                return Payment.createPending(trip);
-            }
-        };
     }
 }
