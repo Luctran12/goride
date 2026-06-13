@@ -8,9 +8,14 @@ import com.example.goride.common.error.ErrorCode;
 import com.example.goride.driver.domain.VehicleType;
 import com.example.goride.payment.config.PaymentProviderProperties;
 import com.example.goride.payment.domain.Payment;
+import com.example.goride.payment.domain.PaymentStatus;
+import com.example.goride.payment.repository.PaymentRepository;
+import com.example.goride.payment.service.PaymentCompletionWorkflow;
 import com.example.goride.user.domain.User;
 import com.example.goride.user.domain.UserRole;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.GeometryFactory;
 import org.locationtech.jts.geom.PrecisionModel;
@@ -22,6 +27,9 @@ import javax.crypto.spec.SecretKeySpec;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -45,7 +53,7 @@ class MoMoPaymentProviderTests {
         MoMoPaymentClient paymentClient = mock(MoMoPaymentClient.class);
         when(paymentClient.createPayment(eq(CHECKOUT_URL), any(MoMoCreatePaymentRequest.class)))
                 .thenAnswer(invocation -> successfulResponse(invocation.getArgument(1), PAY_URL));
-        MoMoPaymentProvider provider = new MoMoPaymentProvider(properties, paymentClient);
+        MoMoPaymentProvider provider = provider(properties, paymentClient);
 
         PaymentCheckoutSession session = provider.createCheckoutSession(payment(BigDecimal.valueOf(20000)));
 
@@ -77,7 +85,7 @@ class MoMoPaymentProviderTests {
         MoMoPaymentClient paymentClient = mock(MoMoPaymentClient.class);
         when(paymentClient.createPayment(eq(CHECKOUT_URL), any(MoMoCreatePaymentRequest.class)))
                 .thenAnswer(invocation -> successfulResponse(invocation.getArgument(1), PAY_URL));
-        MoMoPaymentProvider provider = new MoMoPaymentProvider(properties(), paymentClient);
+        MoMoPaymentProvider provider = provider(properties(), paymentClient);
         Payment payment = payment(BigDecimal.valueOf(20000));
 
         provider.createCheckoutSession(payment);
@@ -97,10 +105,7 @@ class MoMoPaymentProviderTests {
     @Test
     void rejectsCheckoutWhenProviderIsNotConfigured() {
         MoMoPaymentClient paymentClient = mock(MoMoPaymentClient.class);
-        MoMoPaymentProvider provider = new MoMoPaymentProvider(
-                new PaymentProviderProperties(),
-                paymentClient
-        );
+        MoMoPaymentProvider provider = provider(new PaymentProviderProperties(), paymentClient);
 
         assertThatThrownBy(() -> provider.createCheckoutSession(payment(BigDecimal.valueOf(20000))))
                 .isInstanceOfSatisfying(BusinessException.class, exception ->
@@ -112,7 +117,7 @@ class MoMoPaymentProviderTests {
     @Test
     void rejectsAmountOutsideMomoLimits() {
         MoMoPaymentClient paymentClient = mock(MoMoPaymentClient.class);
-        MoMoPaymentProvider provider = new MoMoPaymentProvider(properties(), paymentClient);
+        MoMoPaymentProvider provider = provider(properties(), paymentClient);
 
         assertProviderError(() -> provider.createCheckoutSession(payment(BigDecimal.valueOf(999))));
         assertProviderError(() -> provider.createCheckoutSession(payment(BigDecimal.valueOf(50_000_001))));
@@ -128,7 +133,7 @@ class MoMoPaymentProviderTests {
                             successfulResponse(invocation.getArgument(1), PAY_URL);
                     return responseWith(response, response.amount(), response.resultCode(), PAY_URL, "invalid");
                 });
-        MoMoPaymentProvider provider = new MoMoPaymentProvider(properties(), paymentClient);
+        MoMoPaymentProvider provider = provider(properties(), paymentClient);
 
         assertProviderError(() -> provider.createCheckoutSession(payment(BigDecimal.valueOf(20000))));
     }
@@ -148,7 +153,7 @@ class MoMoPaymentProviderTests {
                             PAY_URL
                     );
                 });
-        MoMoPaymentProvider provider = new MoMoPaymentProvider(properties(), paymentClient);
+        MoMoPaymentProvider provider = provider(properties(), paymentClient);
 
         assertProviderError(() -> provider.createCheckoutSession(payment(BigDecimal.valueOf(20000))));
     }
@@ -168,7 +173,7 @@ class MoMoPaymentProviderTests {
                             ""
                     );
                 });
-        MoMoPaymentProvider provider = new MoMoPaymentProvider(properties(), paymentClient);
+        MoMoPaymentProvider provider = provider(properties(), paymentClient);
 
         assertProviderError(() -> provider.createCheckoutSession(payment(BigDecimal.valueOf(20000))));
     }
@@ -188,9 +193,165 @@ class MoMoPaymentProviderTests {
                             ""
                     );
                 });
-        MoMoPaymentProvider provider = new MoMoPaymentProvider(properties(), paymentClient);
+        MoMoPaymentProvider provider = provider(properties(), paymentClient);
 
         assertProviderError(() -> provider.createCheckoutSession(payment(BigDecimal.valueOf(20000))));
+    }
+
+    @Test
+    void handlesSuccessfulIpnAndRunsCompletionWorkflow() {
+        Payment payment = payment(BigDecimal.valueOf(20000));
+        PaymentRepository paymentRepository = mock(PaymentRepository.class);
+        PaymentCompletionWorkflow paymentCompletionWorkflow = mock(PaymentCompletionWorkflow.class);
+        when(paymentRepository.findByIdForUpdate(70L)).thenReturn(Optional.of(payment));
+        when(paymentRepository.save(any(Payment.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        MoMoPaymentProvider provider = provider(
+                properties(),
+                mock(MoMoPaymentClient.class),
+                paymentRepository,
+                paymentCompletionWorkflow
+        );
+
+        PaymentWebhookResult result = provider.handleWebhook(webhookRequest(ipnPayload(0, 4088878653L)));
+
+        assertThat(result.accepted()).isTrue();
+        assertThat(result.paymentId()).isEqualTo(70L);
+        assertThat(result.tripId()).isEqualTo(99L);
+        assertThat(result.status()).isEqualTo(PaymentStatus.COMPLETED);
+        assertThat(result.transactionRef()).isEqualTo("4088878653");
+        assertThat(payment.getStatus()).isEqualTo(PaymentStatus.COMPLETED);
+        assertThat(payment.getProvider()).isEqualTo("momo");
+        verify(paymentCompletionWorkflow).handleCompletedPayment(payment);
+    }
+
+    @Test
+    void acceptsDuplicateSuccessfulIpnWithoutRunningCompletionWorkflowAgain() {
+        Payment payment = payment(BigDecimal.valueOf(20000));
+        payment.markCompletedByProvider("momo", "4088878653");
+        PaymentRepository paymentRepository = mock(PaymentRepository.class);
+        PaymentCompletionWorkflow paymentCompletionWorkflow = mock(PaymentCompletionWorkflow.class);
+        when(paymentRepository.findByIdForUpdate(70L)).thenReturn(Optional.of(payment));
+        when(paymentRepository.save(any(Payment.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        MoMoPaymentProvider provider = provider(
+                properties(),
+                mock(MoMoPaymentClient.class),
+                paymentRepository,
+                paymentCompletionWorkflow
+        );
+
+        PaymentWebhookResult result = provider.handleWebhook(webhookRequest(ipnPayload(0, 4088878653L)));
+
+        assertThat(result.status()).isEqualTo(PaymentStatus.COMPLETED);
+        verify(paymentCompletionWorkflow, never()).handleCompletedPayment(any(Payment.class));
+    }
+
+    @Test
+    void handlesFailedIpnWithoutCompletionWorkflow() {
+        Payment payment = payment(BigDecimal.valueOf(20000));
+        PaymentRepository paymentRepository = mock(PaymentRepository.class);
+        PaymentCompletionWorkflow paymentCompletionWorkflow = mock(PaymentCompletionWorkflow.class);
+        when(paymentRepository.findByIdForUpdate(70L)).thenReturn(Optional.of(payment));
+        when(paymentRepository.save(any(Payment.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        MoMoPaymentProvider provider = provider(
+                properties(),
+                mock(MoMoPaymentClient.class),
+                paymentRepository,
+                paymentCompletionWorkflow
+        );
+
+        PaymentWebhookResult result = provider.handleWebhook(webhookRequest(ipnPayload(1006, 4088878654L)));
+
+        assertThat(result.status()).isEqualTo(PaymentStatus.FAILED);
+        assertThat(result.transactionRef()).isEqualTo("4088878654");
+        verify(paymentCompletionWorkflow, never()).handleCompletedPayment(any(Payment.class));
+    }
+
+    @Test
+    void treatsAuthorizedIpnAsSuccessfulForAutoCaptureCheckout() {
+        Payment payment = payment(BigDecimal.valueOf(20000));
+        PaymentRepository paymentRepository = mock(PaymentRepository.class);
+        PaymentCompletionWorkflow paymentCompletionWorkflow = mock(PaymentCompletionWorkflow.class);
+        when(paymentRepository.findByIdForUpdate(70L)).thenReturn(Optional.of(payment));
+        when(paymentRepository.save(any(Payment.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        MoMoPaymentProvider provider = provider(
+                properties(),
+                mock(MoMoPaymentClient.class),
+                paymentRepository,
+                paymentCompletionWorkflow
+        );
+
+        PaymentWebhookResult result = provider.handleWebhook(webhookRequest(ipnPayload(9000, 4088878655L)));
+
+        assertThat(result.status()).isEqualTo(PaymentStatus.COMPLETED);
+        verify(paymentCompletionWorkflow).handleCompletedPayment(payment);
+    }
+
+    @Test
+    void rejectsInvalidIpnSignatureBeforeLoadingPayment() {
+        PaymentRepository paymentRepository = mock(PaymentRepository.class);
+        MoMoPaymentProvider provider = provider(
+                properties(),
+                mock(MoMoPaymentClient.class),
+                paymentRepository,
+                mock(PaymentCompletionWorkflow.class)
+        );
+        Map<String, Object> payload = ipnPayload(0, 4088878653L);
+        payload.put("signature", "invalid");
+
+        assertValidationError(() -> provider.handleWebhook(webhookRequest(payload)));
+
+        verify(paymentRepository, never()).findByIdForUpdate(any());
+    }
+
+    @Test
+    void acceptsUppercaseIpnSignature() {
+        Payment payment = payment(BigDecimal.valueOf(20000));
+        PaymentRepository paymentRepository = mock(PaymentRepository.class);
+        when(paymentRepository.findByIdForUpdate(70L)).thenReturn(Optional.of(payment));
+        when(paymentRepository.save(any(Payment.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        MoMoPaymentProvider provider = provider(
+                properties(),
+                mock(MoMoPaymentClient.class),
+                paymentRepository,
+                mock(PaymentCompletionWorkflow.class)
+        );
+        Map<String, Object> payload = ipnPayload(0, 4088878653L);
+        payload.computeIfPresent(
+                "signature",
+                (key, value) -> value.toString().toUpperCase(Locale.ROOT)
+        );
+
+        PaymentWebhookResult result = provider.handleWebhook(webhookRequest(payload));
+
+        assertThat(result.status()).isEqualTo(PaymentStatus.COMPLETED);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "partnerCode",
+            "orderId",
+            "requestId",
+            "amount",
+            "orderInfo",
+            "extraData"
+    })
+    void rejectsIpnDataThatDoesNotMatchPayment(String mismatchedField) {
+        Payment payment = payment(BigDecimal.valueOf(20000));
+        PaymentRepository paymentRepository = mock(PaymentRepository.class);
+        when(paymentRepository.findByIdForUpdate(70L)).thenReturn(Optional.of(payment));
+        MoMoPaymentProvider provider = provider(
+                properties(),
+                mock(MoMoPaymentClient.class),
+                paymentRepository,
+                mock(PaymentCompletionWorkflow.class)
+        );
+        Map<String, Object> payload = ipnPayload(0, 4088878653L);
+        payload.put(mismatchedField, mismatchedValue(mismatchedField));
+        payload.put("signature", notificationSignature(payload));
+
+        assertValidationError(() -> provider.handleWebhook(webhookRequest(payload)));
+
+        verify(paymentRepository, never()).save(any(Payment.class));
     }
 
     private PaymentProviderProperties properties() {
@@ -204,6 +365,32 @@ class MoMoPaymentProviderTests {
         momo.setReturnUrl("https://app.goride.test/payments/momo/return");
         momo.setIpnUrl("https://api.goride.test/api/v1/payments/providers/momo/webhook");
         return properties;
+    }
+
+    private MoMoPaymentProvider provider(
+            PaymentProviderProperties properties,
+            MoMoPaymentClient paymentClient
+    ) {
+        return provider(
+                properties,
+                paymentClient,
+                mock(PaymentRepository.class),
+                mock(PaymentCompletionWorkflow.class)
+        );
+    }
+
+    private MoMoPaymentProvider provider(
+            PaymentProviderProperties properties,
+            MoMoPaymentClient paymentClient,
+            PaymentRepository paymentRepository,
+            PaymentCompletionWorkflow paymentCompletionWorkflow
+    ) {
+        return new MoMoPaymentProvider(
+                properties,
+                paymentClient,
+                paymentRepository,
+                paymentCompletionWorkflow
+        );
     }
 
     private MoMoCreatePaymentResponse successfulResponse(
@@ -293,6 +480,69 @@ class MoMoPaymentProviderTests {
                 .isInstanceOfSatisfying(BusinessException.class, exception ->
                         assertThat(exception.errorCode()).isEqualTo(ErrorCode.PAYMENT_PROVIDER_ERROR)
                 );
+    }
+
+    private void assertValidationError(Runnable action) {
+        assertThatThrownBy(action::run)
+                .isInstanceOfSatisfying(BusinessException.class, exception ->
+                        assertThat(exception.errorCode()).isEqualTo(ErrorCode.VALIDATION_ERROR)
+                );
+    }
+
+    private PaymentWebhookRequest webhookRequest(Map<String, Object> payload) {
+        return new PaymentWebhookRequest(
+                "momo",
+                Map.of("content-type", "application/json"),
+                payload,
+                Instant.parse("2026-06-13T06:00:00Z")
+        );
+    }
+
+    private Map<String, Object> ipnPayload(int resultCode, long transId) {
+        Map<String, Object> payload = new java.util.LinkedHashMap<>();
+        payload.put("partnerCode", "GORIDE");
+        payload.put("orderId", "GORIDE-PAY-70");
+        payload.put("requestId", "GORIDE-CREATE-70");
+        payload.put("amount", 20000L);
+        payload.put("orderInfo", "GoRide trip 99 payment 70");
+        payload.put("orderType", "momo_wallet");
+        payload.put("transId", transId);
+        payload.put("resultCode", resultCode);
+        payload.put("message", resultCode == 0 ? "Successful." : "Transaction denied");
+        payload.put("payType", "qr");
+        payload.put("responseTime", 1781300000000L);
+        payload.put("extraData", "");
+        payload.put("signature", notificationSignature(payload));
+        return payload;
+    }
+
+    private String notificationSignature(Map<String, Object> payload) {
+        String rawSignature = "accessKey=momo-access"
+                + "&amount=" + payload.get("amount")
+                + "&extraData=" + payload.get("extraData")
+                + "&message=" + payload.get("message")
+                + "&orderId=" + payload.get("orderId")
+                + "&orderInfo=" + payload.get("orderInfo")
+                + "&orderType=" + payload.get("orderType")
+                + "&partnerCode=" + payload.get("partnerCode")
+                + "&payType=" + payload.get("payType")
+                + "&requestId=" + payload.get("requestId")
+                + "&responseTime=" + payload.get("responseTime")
+                + "&resultCode=" + payload.get("resultCode")
+                + "&transId=" + payload.get("transId");
+        return hmacSha256("momo-secret", rawSignature);
+    }
+
+    private Object mismatchedValue(String fieldName) {
+        return switch (fieldName) {
+            case "partnerCode" -> "OTHER";
+            case "orderId" -> "GORIDE-PAY-070";
+            case "requestId" -> "OTHER";
+            case "amount" -> 21000L;
+            case "orderInfo" -> "Other order";
+            case "extraData" -> "unexpected";
+            default -> throw new IllegalArgumentException("Unexpected field: " + fieldName);
+        };
     }
 
     private String hmacSha256(String secretKey, String data) {

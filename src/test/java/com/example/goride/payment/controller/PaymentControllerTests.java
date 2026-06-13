@@ -12,6 +12,8 @@ import com.example.goride.payment.service.PaymentQueryService;
 import com.example.goride.payment.service.PaymentWebhookService;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 
 import java.util.Map;
 
@@ -23,6 +25,32 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class PaymentControllerTests {
+
+    @Test
+    void returnsNoContentForHandledMomoIpn() {
+        PaymentWebhookService paymentWebhookService = mock(PaymentWebhookService.class);
+        when(paymentWebhookService.handleProviderWebhook(eq("momo"), anyMap(), anyMap()))
+                .thenReturn(new PaymentWebhookResponse(
+                        "momo",
+                        true,
+                        70L,
+                        99L,
+                        PaymentStatus.COMPLETED,
+                        "4088878653",
+                        "MoMo payment completed"
+                ));
+        PaymentController controller = controller(paymentWebhookService);
+
+        Object response = controller.handleProviderWebhook(
+                "momo",
+                Map.of("content-type", "application/json"),
+                Map.of("orderId", "GORIDE-PAY-70")
+        );
+
+        assertThat(response).isInstanceOf(ResponseEntity.class);
+        assertThat(((ResponseEntity<?>) response).getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
+        assertThat(((ResponseEntity<?>) response).getBody()).isNull();
+    }
 
     @Test
     void returnsVnPayConfirmSuccessResponseForHandledIpn() {

@@ -183,6 +183,12 @@ public class PaymentProviderProperties {
                     && normalizedIpnUrl() != null;
         }
 
+        public boolean hasMomoWebhookConfiguration() {
+            return normalizedMerchantId() != null
+                    && normalizedAccessKey() != null
+                    && normalizedSecretKey() != null;
+        }
+
         public boolean hasWebhookConfiguration() {
             return normalizedWebhookSecret() != null;
         }

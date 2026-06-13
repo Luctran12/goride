@@ -56,6 +56,7 @@ class PaymentProviderPropertiesTests {
         assertThat(settings.normalizedWebhookSecret()).isEqualTo("webhook-secret");
         assertThat(settings.hasVnPayCheckoutConfiguration()).isTrue();
         assertThat(settings.hasMomoCheckoutConfiguration()).isTrue();
+        assertThat(settings.hasMomoWebhookConfiguration()).isTrue();
         assertThat(settings.hasWebhookConfiguration()).isTrue();
     }
 
@@ -92,6 +93,7 @@ class PaymentProviderPropertiesTests {
 
         settings.setIpnUrl("https://api.goride.example/api/v1/payments/providers/momo/webhook");
         assertThat(settings.hasMomoCheckoutConfiguration()).isTrue();
+        assertThat(settings.hasMomoWebhookConfiguration()).isTrue();
     }
 
     @Test

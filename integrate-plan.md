@@ -1,6 +1,6 @@
 # GoRide Front-end Integration Plan
 
-Branch da kiem tra: `feature/momo-checkout-provider`
+Branch da kiem tra: `feature/momo-webhook-verification`
 
 Muc tieu file nay:
 - Checklist chuc nang backend da co code va co the tich hop FE.
@@ -180,6 +180,9 @@ type PaymentStatus = "PENDING" | "COMPLETED" | "FAILED" | "REFUNDED";
 - [x] VNPAY callback success chay shared payment completion workflow; callback lap lai cung transaction reference khong chay workflow lan nua.
 - [x] MoMo co create-payment provider ky HMAC-SHA256, dung stable `orderId`/`requestId` va verify chu ky + du lieu response.
 - [x] MoMo checkout tra `payUrl` qua checkout API khi provider registered, enabled va du config.
+- [x] MoMo IPN verify HMAC-SHA256 va doi chieu partner/order/request/amount/orderInfo truoc khi cap nhat payment.
+- [x] MoMo IPN success/failure cap nhat payment idempotent; success chay shared payment completion workflow.
+- [x] MoMo IPN hop le tra HTTP 204 khong co response body theo contract provider.
 - [x] Driver confirm da nhan tien mat.
 - [x] Payment `PENDING -> COMPLETED`, set `paidAt`.
 - [x] Payment completed workflow dung chung de notify va dua driver ve `AVAILABLE`.
@@ -229,7 +232,7 @@ type PaymentStatus = "PENDING" | "COMPLETED" | "FAILED" | "REFUNDED";
 ### Payment/rating/statistics
 
 - [x] Payment method metadata da expose `CASH`, `MOMO`, `VNPAY`; hien chi `CASH` enabled mac dinh.
-- [ ] MoMo checkout da co; chua co MoMo IPN/webhook va payment completion. VNPAY da co checkout/webhook foundation; ca hai van can sandbox account/E2E test that.
+- [ ] MoMo va VNPAY da co checkout/webhook foundation; ca hai van can sandbox account/E2E callback test that va freshness policy ro rang.
 
 ### Notification/mo rong
 
@@ -724,7 +727,7 @@ FE action:
 ### 4.7 Payment cash
 
 Payment record duoc tao khi driver complete trip. FE khong co endpoint create payment rieng.
-Backend da co provider abstraction noi bo. `CASH` enabled mac dinh; `VNPAY` va `MOMO` chi enabled khi provider bean da registered, config `enabled=true` va du config checkout rieng cho tung provider. MoMo nen tiep tuc disabled o runtime cho den khi IPN/webhook duoc implement.
+Backend da co provider abstraction noi bo. `CASH` enabled mac dinh; `VNPAY` va `MOMO` chi enabled khi provider bean da registered, config `enabled=true` va du config checkout rieng cho tung provider. Ca hai provider online da co signed checkout va callback foundation; production van nen disabled cho den khi sandbox/UAT thanh cong.
 
 #### Lay danh sach payment methods
 
@@ -810,8 +813,9 @@ FE action:
 - `VNPAY` da co provider tao checkout URL; FE chi hien option nay khi metadata tra `enabled=true`.
 - `VNPAY` da co callback/webhook verifier; backend tu cap nhat payment khi provider redirect/IPN ve endpoint webhook.
 - `MOMO` da co provider tao create-payment request `captureWallet`, verify response va tra `payUrl`; stable ID la `GORIDE-PAY-{paymentId}` va `GORIDE-CREATE-{paymentId}`.
-- `MOMO` can `merchant-id`, `access-key`, `secret-key`, create URL, return URL va IPN URL. Nen giu `enabled=false` cho den commit MoMo IPN/webhook.
+- `MOMO` can `merchant-id`, `access-key`, `secret-key`, create URL, return URL va IPN URL.
 - MoMo HTTP client dung connect/read timeout 30 giay; loi mang, timeout, provider reject, sai chu ky hoac response khong khop tra `PAYMENT_PROVIDER_ERROR` (HTTP 502).
+- MoMo IPN verify canonical HMAC-SHA256 truoc khi lookup payment; callback lap lai cung `transId` khong chay completion workflow lan nua.
 - Khi provider online enabled, FE can xu ly `checkoutRequired=true`.
 - `sandbox=true` dung cho moi truong test provider; production nen set `sandbox=false` va secret qua env/secret manager.
 
@@ -842,7 +846,7 @@ FE action:
 - Goi sau trip `COMPLETED`/payment `PENDING` de biet payment method co can redirect khong.
 - Voi `CASH`, `checkoutRequired=false`, FE hien man hinh thanh toan tien mat va cho driver confirm.
 - Voi `VNPAY`, neu `checkoutRequired=true`, FE mo `checkoutUrl` va theo doi payment status/webhook flow.
-- Voi `MOMO`, neu backend expose `enabled=true`, FE mo `checkoutUrl` (`payUrl`) tu response. Trong phase hien tai nen giu config disabled vi MoMo IPN/payment completion chua co.
+- Voi `MOMO`, neu backend expose `enabled=true`, FE mo `checkoutUrl` (`payUrl`) tu response; sau redirect refresh payment detail trong khi backend xu ly IPN.
 - Endpoint chi hop le cho payment `PENDING`; neu payment da completed backend tra `PAYMENT_INVALID_STATUS`, FE nen refresh payment detail.
 
 #### Provider webhook callback
@@ -877,6 +881,8 @@ POST generic provider response van dung `ApiResponse`:
 }
 ```
 
+MoMo IPN hop le tra HTTP `204 No Content`, khong co response body. Neu signature/payload khong hop le, backend khong acknowledge 204 va khong cap nhat payment.
+
 VNPAY GET/IPN response tra raw JSON theo contract provider, khong boc `ApiResponse`:
 
 ```json
@@ -899,7 +905,9 @@ FE action:
 - Voi `VNPAY`, sau khi user quay ve app/web tu `vnp_ReturnUrl`, FE nen refresh payment detail theo trip va hien trang thai moi. Backend xu ly callback khi provider goi `/providers/vnpay/webhook` bang GET query params hoac POST JSON.
 - Hien tai `CASH` khong support webhook; goi `/providers/cash/webhook` se tra `PAYMENT_PROVIDER_UNSUPPORTED`.
 - `VNPAY` verify `vnp_SecureHash` khong phan biet uppercase/lowercase, `vnp_TmnCode`, `vnp_Amount` va map `vnp_ResponseCode=00` + `vnp_TransactionStatus=00` thanh `COMPLETED`; cac status khac thanh `FAILED`.
-- MoMo checkout da verify chu ky response; MoMo IPN sau nay van phai verify signature/header/payload trong `PaymentProvider.handleWebhook(...)`.
+- MoMo checkout va IPN deu verify HMAC-SHA256; IPN doi chieu partner code, stable order/request ID, amount, order info va `extraData`.
+- MoMo map `resultCode=0` hoac `9000` thanh `COMPLETED` cho flow `captureWallet` auto-capture; cac result code khac thanh `FAILED`.
+- Duplicate MoMo success cung `transId` la idempotent; callback conflict voi transaction reference da luu bi reject.
 - Sau khi provider webhook mark payment `COMPLETED`, backend goi shared payment completion workflow de notify passenger/driver va dua driver ve `AVAILABLE`.
 
 Driver confirm cash:
