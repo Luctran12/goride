@@ -223,6 +223,89 @@ class VnPayPaymentProviderTests {
                 .hasMessage("VNPay amount is invalid");
     }
 
+    @Test
+    void rejectsStaleWebhookBeforeUpdatingPayment() {
+        Payment payment = payment();
+        PaymentRepository paymentRepository = mock(PaymentRepository.class);
+        when(paymentRepository.findByIdForUpdate(70L)).thenReturn(Optional.of(payment));
+        VnPayPaymentProvider provider = provider(
+                properties(),
+                paymentRepository,
+                mock(PaymentCompletionWorkflow.class)
+        );
+        Map<String, Object> payload = webhookPayload("00", "00", "14123456", "2000000");
+        payload.put("vnp_PayDate", "20260610205959");
+        resign(payload);
+
+        assertThatThrownBy(() -> provider.handleWebhook(webhookRequest(payload)))
+                .isInstanceOfSatisfying(BusinessException.class, exception ->
+                        assertThat(exception.errorCode()).isEqualTo(ErrorCode.VALIDATION_ERROR)
+                )
+                .hasMessage("Payment provider callback is too old");
+
+        verify(paymentRepository, never()).save(any(Payment.class));
+    }
+
+    @Test
+    void rejectsInvalidPayDate() {
+        VnPayPaymentProvider provider = provider(properties());
+        Map<String, Object> payload = webhookPayload("00", "00", "14123456", "2000000");
+        payload.put("vnp_PayDate", "20260230120000");
+        resign(payload);
+
+        assertThatThrownBy(() -> provider.handleWebhook(webhookRequest(payload)))
+                .isInstanceOfSatisfying(BusinessException.class, exception ->
+                        assertThat(exception.errorCode()).isEqualTo(ErrorCode.VALIDATION_ERROR)
+                )
+                .hasMessage("VNPay pay date is invalid");
+    }
+
+    @Test
+    void rejectsWebhookTimestampBeyondFutureClockSkew() {
+        Payment payment = payment();
+        PaymentRepository paymentRepository = mock(PaymentRepository.class);
+        when(paymentRepository.findByIdForUpdate(70L)).thenReturn(Optional.of(payment));
+        VnPayPaymentProvider provider = provider(
+                properties(),
+                paymentRepository,
+                mock(PaymentCompletionWorkflow.class)
+        );
+        Map<String, Object> payload = webhookPayload("00", "00", "14123456", "2000000");
+        payload.put("vnp_PayDate", "20260611210501");
+        resign(payload);
+
+        assertThatThrownBy(() -> provider.handleWebhook(webhookRequest(payload)))
+                .isInstanceOfSatisfying(BusinessException.class, exception ->
+                        assertThat(exception.errorCode()).isEqualTo(ErrorCode.VALIDATION_ERROR)
+                )
+                .hasMessage("Payment provider callback timestamp is in the future");
+
+        verify(paymentRepository, never()).save(any(Payment.class));
+    }
+
+    @Test
+    void acceptsStaleDuplicateWebhookWithSameTransactionReference() {
+        Payment payment = payment();
+        payment.markCompletedByProvider("vnpay", "14123456");
+        PaymentRepository paymentRepository = mock(PaymentRepository.class);
+        PaymentCompletionWorkflow paymentCompletionWorkflow = mock(PaymentCompletionWorkflow.class);
+        when(paymentRepository.findByIdForUpdate(70L)).thenReturn(Optional.of(payment));
+        when(paymentRepository.save(any(Payment.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        VnPayPaymentProvider provider = provider(
+                properties(),
+                paymentRepository,
+                paymentCompletionWorkflow
+        );
+        Map<String, Object> payload = webhookPayload("00", "00", "14123456", "2000000");
+        payload.put("vnp_PayDate", "20260601210000");
+        resign(payload);
+
+        PaymentWebhookResult result = provider.handleWebhook(webhookRequest(payload));
+
+        assertThat(result.status()).isEqualTo(PaymentStatus.COMPLETED);
+        verify(paymentCompletionWorkflow, never()).handleCompletedPayment(any(Payment.class));
+    }
+
     private PaymentProviderProperties properties() {
         PaymentProviderProperties properties = new PaymentProviderProperties();
         PaymentProviderProperties.ProviderSettings vnpay = properties.getVnpay();
@@ -253,7 +336,8 @@ class VnPayPaymentProviderTests {
                 properties,
                 Clock.fixed(FIXED_NOW, ZoneOffset.UTC),
                 paymentRepository,
-                paymentCompletionWorkflow
+                paymentCompletionWorkflow,
+                new PaymentWebhookFreshnessPolicy()
         );
     }
 
@@ -324,7 +408,7 @@ class VnPayPaymentProviderTests {
         params.put("vnp_BankCode", "NCB");
         params.put("vnp_CardType", "ATM");
         params.put("vnp_OrderInfo", "GoRide trip 99 payment 70");
-        params.put("vnp_PayDate", "20260611211030");
+        params.put("vnp_PayDate", "20260611210030");
         params.put("vnp_ResponseCode", responseCode);
         params.put("vnp_TmnCode", "GORIDETMN");
         params.put("vnp_TransactionNo", transactionNo);
@@ -334,6 +418,20 @@ class VnPayPaymentProviderTests {
         Map<String, Object> payload = new TreeMap<>();
         payload.putAll(params);
         return payload;
+    }
+
+    private PaymentWebhookRequest webhookRequest(Map<String, Object> payload) {
+        return new PaymentWebhookRequest("vnpay", Map.of(), payload, FIXED_NOW);
+    }
+
+    private void resign(Map<String, Object> payload) {
+        Map<String, String> params = new TreeMap<>();
+        payload.forEach((key, value) -> {
+            if (!"vnp_SecureHash".equals(key)) {
+                params.put(key, value.toString());
+            }
+        });
+        payload.put("vnp_SecureHash", expectedSecureHash(params, "vnp-secret"));
     }
 
     private String urlDecode(String value) {

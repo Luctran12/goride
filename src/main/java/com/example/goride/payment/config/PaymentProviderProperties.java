@@ -53,6 +53,8 @@ public class PaymentProviderProperties {
         private String ipnUrl;
         private String defaultIpAddress = "127.0.0.1";
         private String webhookSecret;
+        private long webhookMaxAgeSeconds = 86_400;
+        private long webhookFutureSkewSeconds = 300;
 
         public boolean isEnabled() {
             return enabled;
@@ -132,6 +134,28 @@ public class PaymentProviderProperties {
 
         public void setWebhookSecret(String webhookSecret) {
             this.webhookSecret = webhookSecret;
+        }
+
+        public long getWebhookMaxAgeSeconds() {
+            return webhookMaxAgeSeconds;
+        }
+
+        public void setWebhookMaxAgeSeconds(long webhookMaxAgeSeconds) {
+            if (webhookMaxAgeSeconds <= 0) {
+                throw new IllegalArgumentException("webhookMaxAgeSeconds must be positive");
+            }
+            this.webhookMaxAgeSeconds = webhookMaxAgeSeconds;
+        }
+
+        public long getWebhookFutureSkewSeconds() {
+            return webhookFutureSkewSeconds;
+        }
+
+        public void setWebhookFutureSkewSeconds(long webhookFutureSkewSeconds) {
+            if (webhookFutureSkewSeconds < 0) {
+                throw new IllegalArgumentException("webhookFutureSkewSeconds must not be negative");
+            }
+            this.webhookFutureSkewSeconds = webhookFutureSkewSeconds;
         }
 
         public String normalizedMerchantId() {

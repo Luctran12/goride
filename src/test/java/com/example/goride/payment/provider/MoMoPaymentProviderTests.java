@@ -304,6 +304,70 @@ class MoMoPaymentProviderTests {
     }
 
     @Test
+    void rejectsStaleIpnBeforeUpdatingPayment() {
+        Payment payment = payment(BigDecimal.valueOf(20000));
+        PaymentRepository paymentRepository = mock(PaymentRepository.class);
+        when(paymentRepository.findByIdForUpdate(70L)).thenReturn(Optional.of(payment));
+        MoMoPaymentProvider provider = provider(
+                properties(),
+                mock(MoMoPaymentClient.class),
+                paymentRepository,
+                mock(PaymentCompletionWorkflow.class)
+        );
+        Map<String, Object> payload = ipnPayload(0, 4088878653L);
+        payload.put("responseTime", Instant.parse("2026-06-12T05:59:59Z").toEpochMilli());
+        payload.put("signature", notificationSignature(payload));
+
+        assertValidationError(() -> provider.handleWebhook(webhookRequest(payload)));
+
+        verify(paymentRepository, never()).save(any(Payment.class));
+    }
+
+    @Test
+    void rejectsIpnTimestampBeyondFutureClockSkew() {
+        Payment payment = payment(BigDecimal.valueOf(20000));
+        PaymentRepository paymentRepository = mock(PaymentRepository.class);
+        when(paymentRepository.findByIdForUpdate(70L)).thenReturn(Optional.of(payment));
+        MoMoPaymentProvider provider = provider(
+                properties(),
+                mock(MoMoPaymentClient.class),
+                paymentRepository,
+                mock(PaymentCompletionWorkflow.class)
+        );
+        Map<String, Object> payload = ipnPayload(0, 4088878653L);
+        payload.put("responseTime", Instant.parse("2026-06-13T06:05:01Z").toEpochMilli());
+        payload.put("signature", notificationSignature(payload));
+
+        assertValidationError(() -> provider.handleWebhook(webhookRequest(payload)));
+
+        verify(paymentRepository, never()).save(any(Payment.class));
+    }
+
+    @Test
+    void acceptsStaleDuplicateIpnWithSameTransactionReference() {
+        Payment payment = payment(BigDecimal.valueOf(20000));
+        payment.markCompletedByProvider("momo", "4088878653");
+        PaymentRepository paymentRepository = mock(PaymentRepository.class);
+        PaymentCompletionWorkflow paymentCompletionWorkflow = mock(PaymentCompletionWorkflow.class);
+        when(paymentRepository.findByIdForUpdate(70L)).thenReturn(Optional.of(payment));
+        when(paymentRepository.save(any(Payment.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        MoMoPaymentProvider provider = provider(
+                properties(),
+                mock(MoMoPaymentClient.class),
+                paymentRepository,
+                paymentCompletionWorkflow
+        );
+        Map<String, Object> payload = ipnPayload(0, 4088878653L);
+        payload.put("responseTime", Instant.parse("2026-06-01T06:00:00Z").toEpochMilli());
+        payload.put("signature", notificationSignature(payload));
+
+        PaymentWebhookResult result = provider.handleWebhook(webhookRequest(payload));
+
+        assertThat(result.status()).isEqualTo(PaymentStatus.COMPLETED);
+        verify(paymentCompletionWorkflow, never()).handleCompletedPayment(any(Payment.class));
+    }
+
+    @Test
     void acceptsUppercaseIpnSignature() {
         Payment payment = payment(BigDecimal.valueOf(20000));
         PaymentRepository paymentRepository = mock(PaymentRepository.class);
@@ -389,7 +453,8 @@ class MoMoPaymentProviderTests {
                 properties,
                 paymentClient,
                 paymentRepository,
-                paymentCompletionWorkflow
+                paymentCompletionWorkflow,
+                new PaymentWebhookFreshnessPolicy()
         );
     }
 

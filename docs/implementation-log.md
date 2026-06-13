@@ -6,6 +6,70 @@
 
 ---
 
+## Commit: `feat: enforce payment webhook freshness`
+
+Branch: `feature/payment-webhook-freshness`
+
+Phase: Phase 7 - Payment provider completion, callback freshness and replay policy
+
+### Muc tieu
+
+Bo sung freshness policy dung chung cho MoMo va VNPAY de reject callback co timestamp da ky qua cu hoac nam qua xa trong tuong lai, dong thoi van chap nhan provider retry cu neu payment da o terminal state voi dung provider va transaction reference.
+
+### Noi dung da trien khai
+
+- Them `PaymentWebhookFreshnessPolicy`:
+  - Mac dinh callback dau tien hop le trong 24 gio.
+  - Cho phep clock skew toi da 5 phut trong tuong lai.
+  - Callback qua cu chi duoc chap nhan neu la idempotent replay cua terminal payment voi cung provider va transaction reference.
+  - Timestamp nam trong tuong lai qua clock skew luon bi reject, ke ca callback lap.
+- Mo rong config provider:
+  - `webhook-max-age-seconds`, mac dinh `86400`.
+  - `webhook-future-skew-seconds`, mac dinh `300`.
+  - Reject config max age khong duong hoac future skew am.
+- Tich hop MoMo:
+  - Dung `responseTime` epoch milliseconds trong canonical signed IPN.
+  - Verify chu ky va du lieu callback truoc khi ap dung freshness policy va cap nhat payment.
+- Tich hop VNPAY:
+  - Bat buoc `vnp_PayDate` theo `yyyyMMddHHmmss`, timezone `Asia/Ho_Chi_Minh`.
+  - Parse strict calendar date sau khi verify `vnp_SecureHash`.
+  - Ap dung cung freshness/idempotent replay policy voi MoMo.
+- Cap nhat frontend/config docs va `docs/pland.xlsx` de danh dau freshness policy hoan tat; sandbox merchant E2E van open.
+
+### Review truoc commit
+
+- Da xac nhan callback dung boundary 24 gio duoc chap nhan va qua boundary bi reject.
+- Da xac nhan timestamp vuot qua future skew bi reject.
+- Da xac nhan duplicate callback cu cung transaction reference van idempotent cho ca MoMo va VNPAY.
+- Da xac nhan `vnp_PayDate` calendar khong hop le bi reject.
+- Da chay targeted payment tests: pass 56 tests.
+- Da chay `./mvnw.cmd test`: pass 288 tests.
+- Da chay `git diff --check`: khong co whitespace error.
+- CodeRabbit khong chay duoc: CLI chua cai va environment security policy khong cho thuc thi official downloaded installer script; khong gan nhan CodeRabbit cho ket qua review khac.
+
+### Files chinh
+
+- `src/main/java/com/example/goride/payment/config/PaymentProviderProperties.java`
+- `src/main/java/com/example/goride/payment/provider/PaymentWebhookFreshnessPolicy.java`
+- `src/main/java/com/example/goride/payment/provider/MoMoPaymentProvider.java`
+- `src/main/java/com/example/goride/payment/provider/VnPayPaymentProvider.java`
+- `src/test/java/com/example/goride/payment/config/PaymentProviderPropertiesTests.java`
+- `src/test/java/com/example/goride/payment/provider/PaymentWebhookFreshnessPolicyTests.java`
+- `src/test/java/com/example/goride/payment/provider/MoMoPaymentProviderTests.java`
+- `src/test/java/com/example/goride/payment/provider/VnPayPaymentProviderTests.java`
+- `src/test/java/com/example/goride/payment/service/PaymentMethodServiceTests.java`
+- `integrate-plan.md`
+- `plan.md`
+- `docs/pland.xlsx`
+
+### Viec tiep theo
+
+- Chay MoMo/VNPAY sandbox E2E voi merchant account va callback URL that.
+- Dieu chinh freshness window theo retry/UAT cua tung provider neu sandbox cho thay can thay doi.
+- Tiep tuc Phase 2 real maps/distance provider sau khi payment sandbox duoc xac nhan.
+
+---
+
 ## Commit: `feat: verify momo webhook callbacks`
 
 Branch: `feature/momo-webhook-verification`

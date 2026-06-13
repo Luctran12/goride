@@ -183,6 +183,7 @@ type PaymentStatus = "PENDING" | "COMPLETED" | "FAILED" | "REFUNDED";
 - [x] MoMo IPN verify HMAC-SHA256 va doi chieu partner/order/request/amount/orderInfo truoc khi cap nhat payment.
 - [x] MoMo IPN success/failure cap nhat payment idempotent; success chay shared payment completion workflow.
 - [x] MoMo IPN hop le tra HTTP 204 khong co response body theo contract provider.
+- [x] MoMo/VNPAY callback ap dung freshness policy tren timestamp da ky; callback qua cu/tuong lai bi reject, duplicate terminal callback cung transaction reference van idempotent.
 - [x] Driver confirm da nhan tien mat.
 - [x] Payment `PENDING -> COMPLETED`, set `paidAt`.
 - [x] Payment completed workflow dung chung de notify va dua driver ve `AVAILABLE`.
@@ -232,7 +233,7 @@ type PaymentStatus = "PENDING" | "COMPLETED" | "FAILED" | "REFUNDED";
 ### Payment/rating/statistics
 
 - [x] Payment method metadata da expose `CASH`, `MOMO`, `VNPAY`; hien chi `CASH` enabled mac dinh.
-- [ ] MoMo va VNPAY da co checkout/webhook foundation; ca hai van can sandbox account/E2E callback test that va freshness policy ro rang.
+- [ ] MoMo va VNPAY da co signed checkout/webhook va freshness policy; ca hai van can sandbox account/E2E callback test that.
 
 ### Notification/mo rong
 
@@ -797,6 +798,8 @@ app:
         ipn-url: ${MOMO_IPN_URL:}
         default-ip-address: ${PAYMENT_DEFAULT_IP_ADDRESS:127.0.0.1}
         webhook-secret: ${MOMO_WEBHOOK_SECRET:}
+        webhook-max-age-seconds: ${MOMO_WEBHOOK_MAX_AGE_SECONDS:86400}
+        webhook-future-skew-seconds: ${MOMO_WEBHOOK_FUTURE_SKEW_SECONDS:300}
       vnpay:
         enabled: false
         sandbox: true
@@ -807,6 +810,8 @@ app:
         ipn-url: ${VNPAY_IPN_URL:}
         default-ip-address: ${PAYMENT_DEFAULT_IP_ADDRESS:127.0.0.1}
         webhook-secret: ${VNPAY_WEBHOOK_SECRET:}
+        webhook-max-age-seconds: ${VNPAY_WEBHOOK_MAX_AGE_SECONDS:86400}
+        webhook-future-skew-seconds: ${VNPAY_WEBHOOK_FUTURE_SKEW_SECONDS:300}
 ```
 
 FE action:
@@ -816,6 +821,7 @@ FE action:
 - `MOMO` can `merchant-id`, `access-key`, `secret-key`, create URL, return URL va IPN URL.
 - MoMo HTTP client dung connect/read timeout 30 giay; loi mang, timeout, provider reject, sai chu ky hoac response khong khop tra `PAYMENT_PROVIDER_ERROR` (HTTP 502).
 - MoMo IPN verify canonical HMAC-SHA256 truoc khi lookup payment; callback lap lai cung `transId` khong chay completion workflow lan nua.
+- `webhook-max-age-seconds` gioi han tuoi callback dau tien; `webhook-future-skew-seconds` cho phep sai lech dong ho provider nho. Mac dinh la 24 gio va 5 phut.
 - Khi provider online enabled, FE can xu ly `checkoutRequired=true`.
 - `sandbox=true` dung cho moi truong test provider; production nen set `sandbox=false` va secret qua env/secret manager.
 
@@ -908,6 +914,8 @@ FE action:
 - MoMo checkout va IPN deu verify HMAC-SHA256; IPN doi chieu partner code, stable order/request ID, amount, order info va `extraData`.
 - MoMo map `resultCode=0` hoac `9000` thanh `COMPLETED` cho flow `captureWallet` auto-capture; cac result code khac thanh `FAILED`.
 - Duplicate MoMo success cung `transId` la idempotent; callback conflict voi transaction reference da luu bi reject.
+- MoMo dung signed `responseTime`; VNPAY dung signed `vnp_PayDate` GMT+7. Callback qua cu hoac nam qua xa trong tuong lai tra validation error va khong cap nhat payment.
+- Provider retry qua freshness window van duoc acknowledge neu payment da terminal voi cung provider va transaction reference; retry conflict van bi reject.
 - Sau khi provider webhook mark payment `COMPLETED`, backend goi shared payment completion workflow de notify passenger/driver va dua driver ve `AVAILABLE`.
 
 Driver confirm cash:

@@ -15,10 +15,14 @@ class PaymentProviderPropertiesTests {
         assertThat(properties.getMomo().isSandbox()).isTrue();
         assertThat(properties.getMomo().hasMomoCheckoutConfiguration()).isFalse();
         assertThat(properties.getMomo().hasWebhookConfiguration()).isFalse();
+        assertThat(properties.getMomo().getWebhookMaxAgeSeconds()).isEqualTo(86_400);
+        assertThat(properties.getMomo().getWebhookFutureSkewSeconds()).isEqualTo(300);
         assertThat(properties.getVnpay().isEnabled()).isFalse();
         assertThat(properties.getVnpay().isSandbox()).isTrue();
         assertThat(properties.getVnpay().hasVnPayCheckoutConfiguration()).isFalse();
         assertThat(properties.getVnpay().hasWebhookConfiguration()).isFalse();
+        assertThat(properties.getVnpay().getWebhookMaxAgeSeconds()).isEqualTo(86_400);
+        assertThat(properties.getVnpay().getWebhookFutureSkewSeconds()).isEqualTo(300);
     }
 
     @Test
@@ -106,5 +110,18 @@ class PaymentProviderPropertiesTests {
         assertThatThrownBy(() -> properties.settingsFor(" "))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("providerName must not be blank");
+    }
+
+    @Test
+    void rejectsInvalidWebhookFreshnessConfiguration() {
+        PaymentProviderProperties.ProviderSettings settings =
+                new PaymentProviderProperties.ProviderSettings();
+
+        assertThatThrownBy(() -> settings.setWebhookMaxAgeSeconds(0))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("webhookMaxAgeSeconds must be positive");
+        assertThatThrownBy(() -> settings.setWebhookFutureSkewSeconds(-1))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("webhookFutureSkewSeconds must not be negative");
     }
 }

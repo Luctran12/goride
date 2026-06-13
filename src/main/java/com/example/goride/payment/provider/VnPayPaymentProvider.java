@@ -20,16 +20,26 @@ import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.Instant;
+import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.time.format.DateTimeFormatterBuilder;
 import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
+import java.time.format.ResolverStyle;
 import java.util.Locale;
 import java.util.Map;
 import java.util.TreeMap;
 
 @Component
 public class VnPayPaymentProvider implements PaymentProvider {
+    private static final ZoneId VNPAY_ZONE = ZoneId.of("Asia/Ho_Chi_Minh");
     private static final DateTimeFormatter VNPAY_TIME_FORMAT =
-            DateTimeFormatter.ofPattern("yyyyMMddHHmmss").withZone(ZoneId.of("Asia/Ho_Chi_Minh"));
+            DateTimeFormatter.ofPattern("yyyyMMddHHmmss").withZone(VNPAY_ZONE);
+    private static final DateTimeFormatter VNPAY_PAY_DATE_FORMAT =
+            new DateTimeFormatterBuilder()
+                    .appendPattern("uuuuMMddHHmmss")
+                    .toFormatter()
+                    .withResolverStyle(ResolverStyle.STRICT);
     private static final int CHECKOUT_EXPIRY_MINUTES = 15;
     private static final String TRANSACTION_REFERENCE_PREFIX = "GORIDE-PAY-";
 
@@ -37,17 +47,20 @@ public class VnPayPaymentProvider implements PaymentProvider {
     private final Clock clock;
     private final PaymentRepository paymentRepository;
     private final PaymentCompletionWorkflow paymentCompletionWorkflow;
+    private final PaymentWebhookFreshnessPolicy webhookFreshnessPolicy;
 
     public VnPayPaymentProvider(
             PaymentProviderProperties paymentProviderProperties,
             Clock clock,
             PaymentRepository paymentRepository,
-            PaymentCompletionWorkflow paymentCompletionWorkflow
+            PaymentCompletionWorkflow paymentCompletionWorkflow,
+            PaymentWebhookFreshnessPolicy webhookFreshnessPolicy
     ) {
         this.paymentProviderProperties = paymentProviderProperties;
         this.clock = clock;
         this.paymentRepository = paymentRepository;
         this.paymentCompletionWorkflow = paymentCompletionWorkflow;
+        this.webhookFreshnessPolicy = webhookFreshnessPolicy;
     }
 
     @Override
@@ -97,6 +110,7 @@ public class VnPayPaymentProvider implements PaymentProvider {
 
         Map<String, String> params = vnpayPayload(request.payload());
         verifySecureHash(params, settings.normalizedWebhookSecret());
+        Instant providerTimestamp = payDate(params);
 
         Long paymentId = paymentId(params.get("vnp_TxnRef"));
         Payment payment = paymentRepository.findByIdForUpdate(paymentId)
@@ -105,6 +119,12 @@ public class VnPayPaymentProvider implements PaymentProvider {
         assertMerchantAndAmount(params, settings, payment);
 
         String transactionRef = transactionReferenceFromWebhook(params);
+        webhookFreshnessPolicy.validate(
+                providerTimestamp,
+                request,
+                settings,
+                isIdempotentReplay(payment, transactionRef)
+        );
         boolean success = "00".equals(params.get("vnp_ResponseCode"))
                 && "00".equals(params.get("vnp_TransactionStatus"));
         PaymentStatus previousStatus = payment.getStatus();
@@ -269,6 +289,26 @@ public class VnPayPaymentProvider implements PaymentProvider {
             return transactionNo;
         }
         return params.get("vnp_TxnRef");
+    }
+
+    private Instant payDate(Map<String, String> params) {
+        String payDate = params.get("vnp_PayDate");
+        if (payDate == null || payDate.isBlank()) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "VNPay pay date is required");
+        }
+        try {
+            return LocalDateTime.parse(payDate, VNPAY_PAY_DATE_FORMAT)
+                    .atZone(VNPAY_ZONE)
+                    .toInstant();
+        } catch (DateTimeParseException exception) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "VNPay pay date is invalid");
+        }
+    }
+
+    private boolean isIdempotentReplay(Payment payment, String transactionRef) {
+        return payment.getStatus() != PaymentStatus.PENDING
+                && providerName().equals(payment.getProvider())
+                && transactionRef.equals(payment.getTransactionRef());
     }
 
     private void appendParam(StringBuilder builder, String key, String value) {
