@@ -6,13 +6,17 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.redis.core.HashOperations;
+import org.springframework.data.redis.core.GeoOperations;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.ValueOperations;
 
 import java.math.BigDecimal;
 import java.time.Duration;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -26,11 +30,61 @@ class RedisDriverAvailabilityStoreTests {
     @Mock
     private HashOperations<String, Object, Object> hashOperations;
 
+    @Mock
+    private ValueOperations<String, String> valueOperations;
+
+    @Mock
+    private GeoOperations<String, String> geoOperations;
+
     private RedisDriverAvailabilityStore store;
+    private DriverAvailabilityProperties properties;
 
     @BeforeEach
     void setUp() {
-        store = new RedisDriverAvailabilityStore(redisTemplate);
+        properties = new DriverAvailabilityProperties();
+        store = new RedisDriverAvailabilityStore(redisTemplate, properties);
+    }
+
+    @Test
+    void markAvailableWritesLocationMetadataAndAvailableStatusWithHeartbeatTtl() {
+        when(redisTemplate.opsForGeo()).thenReturn(geoOperations);
+        when(redisTemplate.opsForHash()).thenReturn(hashOperations);
+        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
+
+        store.markAvailable(availability());
+
+        verify(geoOperations).add(eq("drivers:online"), any(), eq("20"));
+        verify(hashOperations).putAll(eq("driver:20:meta"), any());
+        verify(redisTemplate).expire("driver:20:meta", Duration.ofSeconds(60));
+        verify(valueOperations).set("driver:20:status", "AVAILABLE", Duration.ofSeconds(60));
+    }
+
+    @Test
+    void refreshHeartbeatPreservesBusyStatusAndRefreshesTtl() {
+        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
+        when(valueOperations.get("driver:20:status")).thenReturn("BUSY");
+        when(redisTemplate.opsForGeo()).thenReturn(geoOperations);
+        when(redisTemplate.opsForHash()).thenReturn(hashOperations);
+        when(redisTemplate.expire(anyString(), eq(Duration.ofSeconds(60)))).thenReturn(true);
+
+        boolean refreshed = store.refreshHeartbeat(availability());
+
+        assertThat(refreshed).isTrue();
+        verify(valueOperations, never()).set(anyString(), anyString(), any(Duration.class));
+        verify(redisTemplate).expire("driver:20:meta", Duration.ofSeconds(60));
+        verify(redisTemplate).expire("driver:20:status", Duration.ofSeconds(60));
+    }
+
+    @Test
+    void refreshHeartbeatRejectsExpiredStatusWithoutRecreatingAvailability() {
+        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
+        when(valueOperations.get("driver:20:status")).thenReturn(null);
+
+        boolean refreshed = store.refreshHeartbeat(availability());
+
+        assertThat(refreshed).isFalse();
+        verify(redisTemplate, never()).opsForGeo();
+        verify(redisTemplate, never()).opsForHash();
     }
 
     @Test
@@ -66,5 +120,17 @@ class RedisDriverAvailabilityStoreTests {
         verify(redisTemplate, never()).opsForHash();
         verify(redisTemplate, never()).expire(anyString(), any(Duration.class));
         verifyNoInteractions(hashOperations);
+    }
+
+    private DriverAvailabilityStore.DriverAvailability availability() {
+        return new DriverAvailabilityStore.DriverAvailability(
+                20L,
+                BigDecimal.valueOf(10.7769),
+                BigDecimal.valueOf(106.7009),
+                com.example.goride.driver.domain.VehicleType.CAR_4_SEAT,
+                BigDecimal.valueOf(4.8),
+                "Driver",
+                null
+        );
     }
 }

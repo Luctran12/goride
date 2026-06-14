@@ -1,16 +1,16 @@
 # GoRide Project Completion Plan
 
-Generated: 2026-06-13, Asia/Bangkok
+Generated: 2026-06-14, Asia/Bangkok
 
 ## Project Snapshot
 
 | Item | Status |
 | --- | --- |
-| Working branch | `feature/real-distance-provider` |
-| Latest merged feature on develop | `feature/payment-webhook-freshness` |
-| Develop merge commit | `88d5fb0` (`merge: payment webhook freshness`) |
-| Test status | `./mvnw.cmd test`: pass 297 tests on 2026-06-13 |
-| Diff hygiene | `git diff --check`: pass on 2026-06-13 |
+| Working branch | `feature/driver-heartbeat-timeout` |
+| Latest merged feature on develop | `feature/real-distance-provider` |
+| Develop merge commit | `241f153` (`merge: real distance routing provider`) |
+| Test status | `./mvnw.cmd test`: pass 309 tests on 2026-06-14 |
+| Diff hygiene | `git diff --check`: pass on 2026-06-14 |
 | CodeRabbit CLI | Blocked: CLI missing and official installer execution is disallowed by the environment security policy |
 | Publish status | Feature branch in review flow; merge to `develop` after user review |
 | Local config | `src/main/resources/application.yml` is environment-specific and must stay uncommitted |
@@ -21,7 +21,7 @@ Generated: 2026-06-13, Asia/Bangkok
 | --- | --- | --- | --- |
 | Auth and JWT | Register, login, refresh token, logout, JWT generation/validation, role-aware security context | `POST /api/v1/auth/register`, `POST /api/v1/auth/login`, `POST /api/v1/auth/refresh`, `POST /api/v1/auth/logout` | Backend foundation is ready for passenger, driver, and admin sign-in flows. |
 | User profile | Current user profile, update profile, admin user list/detail/create/update/status controls | `GET/PUT /api/users/me`, admin user endpoints under `/api/users` | Covers user account management and admin CRUD workflows. |
-| Driver profile | Driver profile creation/update, document/profile data, admin approval flow, driver online/offline status | `/api/v1/drivers/me/profile`, `/api/v1/drivers/me/status`, `/api/v1/admin/drivers/pending`, approval endpoints | Driver availability is stored in Redis and tied into matching. |
+| Driver profile and availability | Driver profile creation/update, document/profile data, admin approval flow, online/offline status, heartbeat refresh and automatic stale-driver timeout | `/api/v1/drivers/me/profile`, `/api/v1/drivers/me/status`, `POST /api/v1/drivers/me/heartbeat`, admin approval endpoints | Redis TTL removes stale drivers from matching immediately; a scheduled batch synchronizes expired online state back to the database. |
 | Pricing and routing | Fare estimate, OSRM-compatible route distance/duration, configurable Haversine fallback, pricing configuration and admin pricing management | `/api/v1/bookings/estimate`, `/api/v1/pricing`, `/api/v1/admin/pricing` | Estimate/create booking can use real routed distance/time; completed-trip fare still uses actual tracking history. |
 | Booking | Create booking, booking detail, passenger history/listing, cancellation rules/status updates | `/api/v1/bookings` and related detail/cancel/list endpoints | Booking lifecycle is connected to matching and trip creation. |
 | Trip lifecycle | Driver response, arrived/start/complete transitions, passenger/driver trip history, payment confirmation hooks | `/api/v1/drivers/trips/{tripId}/respond`, `/status`, `/payment-confirm` | Trip completion can compute final fare from tracking history. |
@@ -41,7 +41,6 @@ Generated: 2026-06-13, Asia/Bangkok
 | --- | --- | --- | --- | --- |
 | P0 | Payment providers | Finish MoMo/VNPAY sandbox E2E validation against real merchant flows | Sandbox merchant accounts, callback URLs, provider test apps | Both online providers return usable checkout URLs and real sandbox success/failure callbacks reconcile internal payment/trip state. |
 | P0 | Webhook sandbox handling | Run real sandbox callback tests for MoMo and VNPAY; unit mapping for both providers is implemented | Sandbox callback payloads and merchant test accounts | Sandbox success/failure statuses map to internal payment states and provider acknowledgements meet real gateway expectations. |
-| P1 | Driver heartbeat | Add periodic driver heartbeat and automatic offline timeout | Redis TTL policy, scheduler/job config | Drivers who stop heartbeating become unavailable for matching without manual offline action. |
 | P1 | Firebase production setup | Finalize Firebase Admin service account and secret loading for production | Secure secret storage, env-specific config | FCM works in staging/prod without committing credentials; missing secrets fail clearly. |
 | P1 | E2E/integration tests | Add integration tests for auth, booking, matching, tracking, payment, notification, and admin flows | Testcontainers or stable local test profile | Critical passenger/driver/admin flows pass in CI against database/Redis-compatible services. |
 | P1 | Production hardening | Add rate limits, observability, CORS policy, error audit, health/readiness checks | Deployment platform requirements | API has safe production defaults and operational visibility. |
@@ -60,6 +59,7 @@ Generated: 2026-06-13, Asia/Bangkok
 | Auth | `/api/v1/auth/register`, `/login`, `/refresh`, `/logout` | Store access token safely, refresh before expiry, clear local session on logout/401. |
 | Passenger profile | `/api/users/me` | Load and update current passenger profile. |
 | Driver onboarding | `/api/v1/drivers/me/profile` | Submit driver profile/document metadata and display approval status. |
+| Driver availability | `PATCH /api/v1/drivers/me/status`, `POST /api/v1/drivers/me/heartbeat` | Start heartbeat after going online, send current coordinates before the returned expiry, and return to the online action when heartbeat reports `DRIVER_NOT_AVAILABLE`. |
 | Admin user management | `/api/users` admin endpoints | Build list, filter/search, create/update, status controls. |
 | Admin driver approval | `/api/v1/admin/drivers/pending`, approval endpoint | Review pending drivers and approve/reject with reason. |
 | Fare estimate | `/api/v1/bookings/estimate` | Show fare/distance/time estimate before booking creation. |
@@ -78,7 +78,7 @@ Generated: 2026-06-13, Asia/Bangkok
 | --- | --- | --- |
 | Phase 1 | Payment provider completion | MoMo/VNPAY sandbox E2E validation, provider-specific freshness-window tuning and real merchant callback tests. |
 | Phase 2 | Real-world routing | OSRM-compatible routing provider implemented; production endpoint UAT, fallback monitoring and timeout tuning remain. |
-| Phase 3 | Driver availability reliability | Heartbeat API/job, automatic offline timeout, matching tests around stale drivers. |
+| Phase 3 | Driver availability reliability | Heartbeat API, Redis TTL refresh and automatic database offline timeout implemented; production interval tuning and Redis/database soak testing remain. |
 | Phase 4 | Production readiness | Firebase secrets, environment profiles, CORS/rate limits, observability, release SQL strategy. |
 | Phase 5 | Integration confidence | Testcontainers/integration tests, end-to-end passenger/driver/admin happy paths, CI validation. |
 | Phase 6 | Product expansion | Uploads, messaging, scheduled rides, surge pricing, multi-city, analytics. |
@@ -90,6 +90,6 @@ Generated: 2026-06-13, Asia/Bangkok
 | Online payment providers are still not production-complete | Frontend should not expose MoMo/VNPAY in production without real sandbox/UAT validation | Keep CASH as MVP; enable online methods first in sandbox and only after full callback/UAT validation. |
 | Webhook freshness defaults need sandbox validation | The 24-hour age and 5-minute future-skew defaults are configurable but not yet calibrated against real merchant retries | Validate both gateways in sandbox and tune provider-specific windows without weakening signature or transaction-reference checks. |
 | Routing endpoint is not production-calibrated | Real route estimates are implemented, but public/self-hosted endpoint capacity and fallback rate are not validated | Use a controlled OSRM-compatible endpoint, monitor fallback warnings, and tune timeout/profile during UAT. |
-| Drivers can stay online without heartbeat | Matching may dispatch to unavailable drivers | Add heartbeat/offline timeout before broad driver testing. |
+| Heartbeat timing is not production-calibrated | Aggressive intervals may create reconnect churn; loose intervals delay database cleanup | Start with a 20-second client heartbeat and 60-second timeout, then tune from staging disconnect and scheduler metrics. |
 | Production secrets are not finalized | Deployments may fail or leak credentials if handled manually | Use environment-specific secret storage and never commit provider/Firebase credentials. |
 | Integration coverage is still limited | Regressions may slip across auth/booking/matching/payment flows | Add focused integration tests and CI before release candidate. |
