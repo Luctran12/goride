@@ -1,6 +1,6 @@
 # GoRide Front-end Integration Plan
 
-Branch da kiem tra: `feature/auth-integration-tests`
+Branch da kiem tra: `feature/driver-trip-routing`
 
 Muc tieu file nay:
 - Checklist chuc nang backend da co code va co the tich hop FE.
@@ -170,6 +170,7 @@ type PaymentStatus = "PENDING" | "COMPLETED" | "FAILED" | "REFUNDED";
 - [x] Passenger lay latest driver location qua REST.
 - [x] Fare estimate va booking creation co the dung OSRM-compatible route distance/duration khi `app.routing.enabled=true`.
 - [x] Routing timeout/HTTP error/NoRoute co Haversine fallback cau hinh duoc.
+- [x] Assigned driver co API route tu GPS hien tai den pickup/dropoff, tra GeoJSON `LineString` va maneuver steps.
 
 ### Payment cash
 
@@ -247,6 +248,7 @@ type PaymentStatus = "PENDING" | "COMPLETED" | "FAILED" | "REFUNDED";
 ### Routing/maps
 
 - [x] Da thay mock distance bean bang OSRM-compatible routing provider cho estimate/create booking.
+- [x] Da co driver trip routing API tu current GPS den pickup/dropoff theo trip status.
 - [ ] Can UAT routing endpoint production/self-hosted va theo doi tan suat fallback truoc khi launch.
 
 ### Notification/mo rong
@@ -709,6 +711,76 @@ Passenger can subscribe:
 ```
 
 Khi driver accept, passenger nhan `TRIP_ACCEPTED` notification va topic status `ACCEPTED`.
+
+#### Routing cho tai xe den pickup/dropoff
+
+```http
+POST /api/v1/drivers/trips/{tripId}/route
+Authorization: Bearer <driverToken>
+Content-Type: application/json
+```
+
+Request la GPS hien tai cua tai xe:
+
+```json
+{
+  "latitude": 10.7600,
+  "longitude": 106.6900
+}
+```
+
+Backend tu chon destination:
+
+| Trip status | `destinationType` | Dich |
+|---|---|---|
+| `ACCEPTED` | `PICKUP` | Vi tri don khach |
+| `ARRIVED`, `IN_PROGRESS` | `DROPOFF` | Vi tri tra khach |
+| Status khac | Error | `TRIP_ROUTE_NOT_AVAILABLE` |
+
+Response `data`:
+
+```json
+{
+  "tripId": 99,
+  "tripStatus": "ACCEPTED",
+  "destinationType": "PICKUP",
+  "destination": {
+    "lat": 10.7769,
+    "lng": 106.7009,
+    "address": "Ben Thanh Market"
+  },
+  "distanceMeters": 2346,
+  "durationSeconds": 457,
+  "geometry": {
+    "type": "LineString",
+    "coordinates": [
+      [106.6900, 10.7600],
+      [106.6950, 10.7680],
+      [106.7009, 10.7769]
+    ]
+  },
+  "steps": [
+    {
+      "distanceMeters": 125,
+      "durationSeconds": 32,
+      "roadName": "Le Loi",
+      "maneuverType": "turn",
+      "maneuverModifier": "right",
+      "longitude": 106.6950,
+      "latitude": 10.7680
+    }
+  ]
+}
+```
+
+FE action:
+- GeoJSON coordinates luon theo thu tu `[longitude, latitude]`; khong dao thanh `[lat, lng]` khi ve polyline.
+- Goi lan dau ngay sau khi accept trip, sau do re-route khi tai xe di lech/di chuyen du nguong hoac theo interval co debounce; khong goi theo tung GPS frame.
+- Khi status doi sang `ARRIVED`, goi lai endpoint de destination tu dong chuyen sang `DROPOFF`.
+- `maneuverType`/`maneuverModifier` la du lieu OSRM; FE tu map sang icon va text tieng Viet.
+- Chi assigned driver goi duoc. `FORBIDDEN` thi dong navigation va refresh trip detail.
+- `ROUTING_PROVIDER_ERROR` HTTP 502 thi giu destination marker, cho retry hoac mo external map app bang destination coordinates.
+- Driver navigation yeu cau `ROUTING_ENABLED=true`; khong dung Haversine fallback vi duong thang khong an toan de dieu huong.
 
 ---
 
@@ -1742,6 +1814,7 @@ Subscribe vao `/topic/trip/{tripId}/status` va `/topic/trip/{tripId}/location` c
 - [ ] Approval waiting screen: doc `approvalStatus` tu `GET /api/v1/drivers/me/profile`; chi cho online khi status la `APPROVED`.
 - [ ] Online toggle with current GPS.
 - [ ] Offer modal from `/user/queue/trip-requests`.
+- [ ] Driver navigation: goi `POST /api/v1/drivers/trips/{tripId}/route`, ve GeoJSON route den pickup/dropoff va debounce re-route.
 - [ ] Trip workflow buttons: arrived/start/complete.
 - [ ] Location sender while `IN_PROGRESS`.
 - [ ] Cash confirmation screen.
@@ -1782,6 +1855,7 @@ Subscribe vao `/topic/trip/{tripId}/status` va `/topic/trip/{tripId}/location` c
 | `PAYMENT_PROVIDER_UNSUPPORTED` | Provider payment chua duoc backend enable; refresh/cau hinh lai payment method. |
 | `PAYMENT_PROVIDER_ERROR` | Hien loi tam thoi cua cong thanh toan, cho retry checkout; khong danh dau payment da thanh cong. |
 | `ROUTING_PROVIDER_ERROR` | Hien khong the tinh lo trinh, giu du lieu pickup/dropoff va cho retry. |
+| `TRIP_ROUTE_NOT_AVAILABLE` | Dung navigation va refresh trip; status hien tai khong cho route pickup/dropoff. |
 | `TRIP_ALREADY_RATED` | An rating form, coi trip da danh gia. |
 | `DRIVER_LOCATION_NOT_FOUND` | Hien "Dang cho vi tri tai xe". |
 | `NOTIFICATION_NOT_FOUND` | Refresh inbox; notification khong ton tai hoac khong thuoc user. |

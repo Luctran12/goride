@@ -3,8 +3,11 @@ package com.example.goride.driver.controller;
 import com.example.goride.common.api.ApiResponse;
 import com.example.goride.common.security.CurrentUser;
 import com.example.goride.driver.dto.DriverTripRespondRequest;
+import com.example.goride.driver.dto.DriverTripRouteRequest;
+import com.example.goride.driver.dto.DriverTripRouteResponse;
 import com.example.goride.driver.dto.DriverTripResponse;
 import com.example.goride.driver.dto.DriverTripStatusUpdateRequest;
+import com.example.goride.driver.service.DriverTripRoutingService;
 import com.example.goride.driver.service.DriverTripStatusService;
 import com.example.goride.matching.service.DriverOfferResponseService;
 import com.example.goride.payment.dto.PaymentConfirmationResponse;
@@ -14,6 +17,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -23,19 +27,36 @@ import org.springframework.web.bind.annotation.RestController;
 public class DriverTripController {
     private final DriverOfferResponseService driverOfferResponseService;
     private final DriverTripStatusService driverTripStatusService;
+    private final DriverTripRoutingService driverTripRoutingService;
     private final CashPaymentConfirmationService cashPaymentConfirmationService;
     private final CurrentUser currentUser;
 
     public DriverTripController(
             DriverOfferResponseService driverOfferResponseService,
             DriverTripStatusService driverTripStatusService,
+            DriverTripRoutingService driverTripRoutingService,
             CashPaymentConfirmationService cashPaymentConfirmationService,
             CurrentUser currentUser
     ) {
         this.driverOfferResponseService = driverOfferResponseService;
         this.driverTripStatusService = driverTripStatusService;
+        this.driverTripRoutingService = driverTripRoutingService;
         this.cashPaymentConfirmationService = cashPaymentConfirmationService;
         this.currentUser = currentUser;
+    }
+
+    @PostMapping("/{tripId}/route")
+    @PreAuthorize("hasRole('DRIVER')")
+    public ApiResponse<DriverTripRouteResponse> routeToTripDestination(
+            Authentication authentication,
+            @PathVariable Long tripId,
+            @Valid @RequestBody DriverTripRouteRequest request
+    ) {
+        return ApiResponse.ok(driverTripRoutingService.route(
+                currentUser.requireUserId(authentication),
+                tripId,
+                request
+        ));
     }
 
     @PatchMapping("/{tripId}/respond")
