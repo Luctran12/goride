@@ -164,6 +164,8 @@ type PaymentStatus = "PENDING" | "COMPLETED" | "FAILED" | "REFUNDED";
 - [x] Backend luu latest location vao Redis.
 - [x] Backend broadcast driver location qua `/topic/trip/{tripId}/location`.
 - [x] Passenger lay latest driver location qua REST.
+- [x] Fare estimate va booking creation co the dung OSRM-compatible route distance/duration khi `app.routing.enabled=true`.
+- [x] Routing timeout/HTTP error/NoRoute co Haversine fallback cau hinh duoc.
 
 ### Payment cash
 
@@ -235,6 +237,11 @@ type PaymentStatus = "PENDING" | "COMPLETED" | "FAILED" | "REFUNDED";
 - [x] Payment method metadata da expose `CASH`, `MOMO`, `VNPAY`; hien chi `CASH` enabled mac dinh.
 - [ ] MoMo va VNPAY da co signed checkout/webhook va freshness policy; ca hai van can sandbox account/E2E callback test that.
 
+### Routing/maps
+
+- [x] Da thay mock distance bean bang OSRM-compatible routing provider cho estimate/create booking.
+- [ ] Can UAT routing endpoint production/self-hosted va theo doi tan suat fallback truoc khi launch.
+
 ### Notification/mo rong
 
 - [ ] Chua co deploy secret/env production cho Firebase service account path.
@@ -252,6 +259,26 @@ type PaymentStatus = "PENDING" | "COMPLETED" | "FAILED" | "REFUNDED";
 ---
 
 ## 4. Huong dan FE tich hop tung chuc nang
+
+### 4.0 Routing config va fare estimate
+
+Backend giu nguyen API contract fare estimate; FE khong goi OSRM truc tiep va khong can provider API key.
+
+```yaml
+app:
+  routing:
+    enabled: ${ROUTING_ENABLED:false}
+    base-url: ${ROUTING_BASE_URL:https://router.project-osrm.org}
+    profile: ${ROUTING_PROFILE:driving}
+    timeout-seconds: ${ROUTING_TIMEOUT_SECONDS:5}
+    fallback-enabled: ${ROUTING_FALLBACK_ENABLED:true}
+```
+
+- Khi enabled, backend gui pickup/dropoff theo OSRM order `longitude,latitude`.
+- Provider distance meter duoc tra ve FE thanh km; duration giay duoc lam tron len thanh phut.
+- Neu fallback enabled, timeout/HTTP error/`NoRoute` tu provider se dung Haversine estimate de booking flow khong bi dung.
+- Neu fallback disabled, estimate/create booking tra `ROUTING_PROVIDER_ERROR` HTTP 502; FE hien thong bao khong the tinh lo trinh va cho retry.
+- Distance/duration nay chi la estimate truoc chuyen. Khi trip completed, final fare dung tracking history va actual duration.
 
 ### 4.1 Auth
 
@@ -1678,6 +1705,7 @@ Subscribe vao `/topic/trip/{tripId}/status` va `/topic/trip/{tripId}/location` c
 | `PAYMENT_INVALID_STATUS`, `PAYMENT_NOT_FOUND` | Refresh payment/trip, tranh double confirm. |
 | `PAYMENT_PROVIDER_UNSUPPORTED` | Provider payment chua duoc backend enable; refresh/cau hinh lai payment method. |
 | `PAYMENT_PROVIDER_ERROR` | Hien loi tam thoi cua cong thanh toan, cho retry checkout; khong danh dau payment da thanh cong. |
+| `ROUTING_PROVIDER_ERROR` | Hien khong the tinh lo trinh, giu du lieu pickup/dropoff va cho retry. |
 | `TRIP_ALREADY_RATED` | An rating form, coi trip da danh gia. |
 | `DRIVER_LOCATION_NOT_FOUND` | Hien "Dang cho vi tri tai xe". |
 | `NOTIFICATION_NOT_FOUND` | Refresh inbox; notification khong ton tai hoac khong thuoc user. |

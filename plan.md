@@ -6,10 +6,10 @@ Generated: 2026-06-13, Asia/Bangkok
 
 | Item | Status |
 | --- | --- |
-| Working branch | `feature/payment-webhook-freshness` |
-| Latest merged feature on develop | `feature/momo-webhook-verification` |
-| Develop merge commit | `a1537a8` (`merge: momo webhook verification`) |
-| Test status | `./mvnw.cmd test`: pass 288 tests on 2026-06-13 |
+| Working branch | `feature/real-distance-provider` |
+| Latest merged feature on develop | `feature/payment-webhook-freshness` |
+| Develop merge commit | `88d5fb0` (`merge: payment webhook freshness`) |
+| Test status | `./mvnw.cmd test`: pass 297 tests on 2026-06-13 |
 | Diff hygiene | `git diff --check`: pass on 2026-06-13 |
 | CodeRabbit CLI | Blocked: CLI missing and official installer execution is disallowed by the environment security policy |
 | Publish status | Feature branch in review flow; merge to `develop` after user review |
@@ -22,7 +22,7 @@ Generated: 2026-06-13, Asia/Bangkok
 | Auth and JWT | Register, login, refresh token, logout, JWT generation/validation, role-aware security context | `POST /api/v1/auth/register`, `POST /api/v1/auth/login`, `POST /api/v1/auth/refresh`, `POST /api/v1/auth/logout` | Backend foundation is ready for passenger, driver, and admin sign-in flows. |
 | User profile | Current user profile, update profile, admin user list/detail/create/update/status controls | `GET/PUT /api/users/me`, admin user endpoints under `/api/users` | Covers user account management and admin CRUD workflows. |
 | Driver profile | Driver profile creation/update, document/profile data, admin approval flow, driver online/offline status | `/api/v1/drivers/me/profile`, `/api/v1/drivers/me/status`, `/api/v1/admin/drivers/pending`, approval endpoints | Driver availability is stored in Redis and tied into matching. |
-| Pricing | Fare estimate foundation, pricing configuration, admin pricing management | `/api/v1/bookings/estimate`, `/api/v1/pricing`, `/api/v1/admin/pricing` | Supports base fare, distance/time inputs, and admin-maintained pricing config. |
+| Pricing and routing | Fare estimate, OSRM-compatible route distance/duration, configurable Haversine fallback, pricing configuration and admin pricing management | `/api/v1/bookings/estimate`, `/api/v1/pricing`, `/api/v1/admin/pricing` | Estimate/create booking can use real routed distance/time; completed-trip fare still uses actual tracking history. |
 | Booking | Create booking, booking detail, passenger history/listing, cancellation rules/status updates | `/api/v1/bookings` and related detail/cancel/list endpoints | Booking lifecycle is connected to matching and trip creation. |
 | Trip lifecycle | Driver response, arrived/start/complete transitions, passenger/driver trip history, payment confirmation hooks | `/api/v1/drivers/trips/{tripId}/respond`, `/status`, `/payment-confirm` | Trip completion can compute final fare from tracking history. |
 | Matching | Nearby driver lookup, offer dispatch, accept/reject handling, timeout handling, retry/no-driver flow | Internal matching services and driver offer APIs | Uses Redis GEO/availability data to dispatch ride offers. |
@@ -41,7 +41,6 @@ Generated: 2026-06-13, Asia/Bangkok
 | --- | --- | --- | --- | --- |
 | P0 | Payment providers | Finish MoMo/VNPAY sandbox E2E validation against real merchant flows | Sandbox merchant accounts, callback URLs, provider test apps | Both online providers return usable checkout URLs and real sandbox success/failure callbacks reconcile internal payment/trip state. |
 | P0 | Webhook sandbox handling | Run real sandbox callback tests for MoMo and VNPAY; unit mapping for both providers is implemented | Sandbox callback payloads and merchant test accounts | Sandbox success/failure statuses map to internal payment states and provider acknowledgements meet real gateway expectations. |
-| P0 | Maps and distance | Replace `MockDistanceService` with a real maps/distance provider | Google Maps, Mapbox, HERE, or local routing service key | Estimates and completed-trip fare use real route distance/time; provider failures fall back predictably. |
 | P1 | Driver heartbeat | Add periodic driver heartbeat and automatic offline timeout | Redis TTL policy, scheduler/job config | Drivers who stop heartbeating become unavailable for matching without manual offline action. |
 | P1 | Firebase production setup | Finalize Firebase Admin service account and secret loading for production | Secure secret storage, env-specific config | FCM works in staging/prod without committing credentials; missing secrets fail clearly. |
 | P1 | E2E/integration tests | Add integration tests for auth, booking, matching, tracking, payment, notification, and admin flows | Testcontainers or stable local test profile | Critical passenger/driver/admin flows pass in CI against database/Redis-compatible services. |
@@ -78,7 +77,7 @@ Generated: 2026-06-13, Asia/Bangkok
 | Phase | Goal | Main Deliverables |
 | --- | --- | --- |
 | Phase 1 | Payment provider completion | MoMo/VNPAY sandbox E2E validation, provider-specific freshness-window tuning and real merchant callback tests. |
-| Phase 2 | Real-world routing | Real distance/maps provider, route estimate tests, fallback and provider error handling. |
+| Phase 2 | Real-world routing | OSRM-compatible routing provider implemented; production endpoint UAT, fallback monitoring and timeout tuning remain. |
 | Phase 3 | Driver availability reliability | Heartbeat API/job, automatic offline timeout, matching tests around stale drivers. |
 | Phase 4 | Production readiness | Firebase secrets, environment profiles, CORS/rate limits, observability, release SQL strategy. |
 | Phase 5 | Integration confidence | Testcontainers/integration tests, end-to-end passenger/driver/admin happy paths, CI validation. |
@@ -90,7 +89,7 @@ Generated: 2026-06-13, Asia/Bangkok
 | --- | --- | --- |
 | Online payment providers are still not production-complete | Frontend should not expose MoMo/VNPAY in production without real sandbox/UAT validation | Keep CASH as MVP; enable online methods first in sandbox and only after full callback/UAT validation. |
 | Webhook freshness defaults need sandbox validation | The 24-hour age and 5-minute future-skew defaults are configurable but not yet calibrated against real merchant retries | Validate both gateways in sandbox and tune provider-specific windows without weakening signature or transaction-reference checks. |
-| Mock distance provider remains in use | Fare estimates may be inaccurate | Integrate real maps provider before real-money launch. |
+| Routing endpoint is not production-calibrated | Real route estimates are implemented, but public/self-hosted endpoint capacity and fallback rate are not validated | Use a controlled OSRM-compatible endpoint, monitor fallback warnings, and tune timeout/profile during UAT. |
 | Drivers can stay online without heartbeat | Matching may dispatch to unavailable drivers | Add heartbeat/offline timeout before broad driver testing. |
 | Production secrets are not finalized | Deployments may fail or leak credentials if handled manually | Use environment-specific secret storage and never commit provider/Firebase credentials. |
 | Integration coverage is still limited | Regressions may slip across auth/booking/matching/payment flows | Add focused integration tests and CI before release candidate. |
