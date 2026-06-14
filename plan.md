@@ -6,10 +6,10 @@ Generated: 2026-06-14, Asia/Bangkok
 
 | Item | Status |
 | --- | --- |
-| Working branch | `feature/firebase-production-config` |
-| Latest merged feature on develop | `feature/driver-heartbeat-timeout` |
-| Develop merge commit | `e57955c` (`merge: driver heartbeat timeout`) |
-| Test status | `./mvnw.cmd test`: pass 311 tests on 2026-06-14 |
+| Working branch | `feature/auth-integration-tests` |
+| Latest merged feature on develop | `feature/firebase-production-config` |
+| Develop merge commit | `c0ad35f` (`merge: firebase production config`) |
+| Test status | `./mvnw.cmd test`: pass 312 tests on 2026-06-14; auth integration test uses Testcontainers PostGIS and Redis |
 | Diff hygiene | `git diff --check`: pass on 2026-06-14 |
 | CodeRabbit CLI | Blocked: CLI missing and official installer execution is disallowed by the environment security policy |
 | Publish status | Feature branch in review flow; merge to `develop` after user review |
@@ -33,6 +33,7 @@ Generated: 2026-06-14, Asia/Bangkok
 | Rating | Passenger trip rating, duplicate prevention/status, driver public ratings, Redis rating sync | `/api/v1/ratings`, `/api/v1/ratings/trips/{tripId}/me`, `/api/v1/drivers/{driverId}/ratings` | Rating data is available for frontend review displays. |
 | Notifications | Notification inbox, mark-read flow, in-app/WebSocket delivery, FCM token CRUD, Firebase Admin sender, ADC/service-account credential loading and startup validation | `/api/v1/notifications`, FCM token endpoints | FCM stays disabled by default; enabled deployments fail startup clearly when credentials are unavailable and never require committed credential JSON. |
 | Admin trip operations | Admin trip list/filter/detail-like views and dashboard metrics | `/api/v1/admin/trips`, `/api/v1/admin/dashboard` | Supports basic operations dashboard and trip monitoring. |
+| Integration test foundation | Docker-backed PostGIS/Redis base and full auth HTTP flow | `AuthFlowIntegrationTests` | Covers registration, JWT-protected access, refresh rotation, logout revocation and duplicate-phone rejection through the real Spring stack. |
 | Documentation | Implementation log and frontend integration plan | `docs/implementation-log.md`, `integrate-plan.md` | Living docs describe commit history and integration contracts. |
 
 ## Unfinished Work
@@ -41,7 +42,7 @@ Generated: 2026-06-14, Asia/Bangkok
 | --- | --- | --- | --- | --- |
 | P0 | Payment providers | Finish MoMo/VNPAY sandbox E2E validation against real merchant flows | Sandbox merchant accounts, callback URLs, provider test apps | Both online providers return usable checkout URLs and real sandbox success/failure callbacks reconcile internal payment/trip state. |
 | P0 | Webhook sandbox handling | Run real sandbox callback tests for MoMo and VNPAY; unit mapping for both providers is implemented | Sandbox callback payloads and merchant test accounts | Sandbox success/failure statuses map to internal payment states and provider acknowledgements meet real gateway expectations. |
-| P1 | E2E/integration tests | Add integration tests for auth, booking, matching, tracking, payment, notification, and admin flows | Testcontainers or stable local test profile | Critical passenger/driver/admin flows pass in CI against database/Redis-compatible services. |
+| P1 | E2E/integration tests | Auth is covered with Testcontainers PostGIS/Redis; add booking, matching, trip lifecycle, tracking, payment, notification, and admin flows | Existing Testcontainers base, Docker-enabled CI | Remaining critical passenger/driver/admin flows pass in CI against database/Redis-compatible services. |
 | P1 | Production hardening | Add rate limits, observability, CORS policy, error audit, health/readiness checks | Deployment platform requirements | API has safe production defaults and operational visibility. |
 | P1 | Database release strategy | Define production database migration/release SQL workflow without Flyway unless project policy changes | DBA/deployment convention | Schema changes are reproducible across environments and documented per release. |
 | P2 | Upload storage | Add driver document/avatar upload storage | S3-compatible storage, local dev storage, file validation | Driver can upload required files; admin can view verified document URLs. |
@@ -79,7 +80,7 @@ Generated: 2026-06-14, Asia/Bangkok
 | Phase 2 | Real-world routing | OSRM-compatible routing provider implemented; production endpoint UAT, fallback monitoring and timeout tuning remain. |
 | Phase 3 | Driver availability reliability | Heartbeat API, Redis TTL refresh and automatic database offline timeout implemented; production interval tuning and Redis/database soak testing remain. |
 | Phase 4 | Production readiness | Firebase ADC/secret loading and fail-fast validation implemented; environment profiles, CORS/rate limits, observability and release SQL strategy remain. |
-| Phase 5 | Integration confidence | Testcontainers/integration tests, end-to-end passenger/driver/admin happy paths, CI validation. |
+| Phase 5 | Integration confidence | Testcontainers PostGIS/Redis foundation and auth flow implemented; booking/matching/tracking/payment/admin flows and CI validation remain. |
 | Phase 6 | Product expansion | Uploads, messaging, scheduled rides, surge pricing, multi-city, analytics. |
 
 ## Risks
@@ -91,4 +92,4 @@ Generated: 2026-06-14, Asia/Bangkok
 | Routing endpoint is not production-calibrated | Real route estimates are implemented, but public/self-hosted endpoint capacity and fallback rate are not validated | Use a controlled OSRM-compatible endpoint, monitor fallback warnings, and tune timeout/profile during UAT. |
 | Heartbeat timing is not production-calibrated | Aggressive intervals may create reconnect churn; loose intervals delay database cleanup | Start with a 20-second client heartbeat and 60-second timeout, then tune from staging disconnect and scheduler metrics. |
 | Firebase credential path still needs staging UAT | Credential loading is production-ready, but the real deployment identity/secret mount has not been exercised in this repository | Prefer attached workload identity/ADC; otherwise mount the JSON outside the image, set `GOOGLE_APPLICATION_CREDENTIALS`, and verify startup plus one test push in staging. |
-| Integration coverage is still limited | Regressions may slip across auth/booking/matching/payment flows | Add focused integration tests and CI before release candidate. |
+| Integration coverage is partial | Auth now runs through HTTP/JWT/JPA/Redis, but cross-module booking, matching, tracking and payment regressions may still slip through | Reuse the Testcontainers base for remaining critical flows and run the suite in CI before release candidate. |
