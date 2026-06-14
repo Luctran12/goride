@@ -14,6 +14,7 @@ class FcmPushPropertiesTests {
         assertThat(properties.getMaxAttempts()).isEqualTo(2);
         assertThat(properties.getAppName()).isEqualTo("goride");
         assertThat(properties.hasServiceAccountPath()).isFalse();
+        assertThat(properties.credentialSource()).isEqualTo("Google Application Default Credentials");
     }
 
     @Test
@@ -26,6 +27,9 @@ class FcmPushPropertiesTests {
 
         assertThat(properties.hasServiceAccountPath()).isTrue();
         assertThat(properties.normalizedServiceAccountPath()).isEqualTo("C:/secrets/firebase.json");
+        assertThat(properties.credentialSource()).isEqualTo(
+                "service account file C:/secrets/firebase.json"
+        );
         assertThat(properties.normalizedProjectId()).isEqualTo("goride-prod");
         assertThat(properties.getAppName()).isEqualTo("goride-fcm");
     }

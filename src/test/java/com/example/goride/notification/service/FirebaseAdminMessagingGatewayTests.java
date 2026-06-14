@@ -20,8 +20,9 @@ import static org.mockito.Mockito.mock;
 
 class FirebaseAdminMessagingGatewayTests {
     @Test
-    void rejectsSendWhenServiceAccountPathIsMissing() {
+    void reportsConfiguredCredentialFileWhenItCannotBeRead() {
         FcmPushProperties properties = new FcmPushProperties();
+        properties.setServiceAccountPath("missing/firebase-service-account.json");
         FirebaseAdminMessagingGateway gateway = new FirebaseAdminMessagingGateway(properties);
         Message message = Message.builder()
                 .setToken("token-123")
@@ -29,7 +30,10 @@ class FirebaseAdminMessagingGatewayTests {
 
         assertThatThrownBy(() -> gateway.send(message))
                 .isInstanceOf(FcmPushSendException.class)
-                .hasMessage("app.notifications.fcm.service-account-path is required to send FCM push");
+                .hasMessage(
+                        "Failed to load Firebase credentials from service account file "
+                                + "missing/firebase-service-account.json"
+                );
     }
 
     @Test

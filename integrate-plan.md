@@ -222,6 +222,9 @@ type PaymentStatus = "PENDING" | "COMPLETED" | "FAILED" | "REFUNDED";
 - [x] Notification ca nhan duoc route qua `UserNotificationChannel` pipeline.
 - [x] FCM push channel foundation doc token Redis va build payload push.
 - [x] Firebase Admin SDK sender gui mobile push khi backend duoc cau hinh service account.
+- [x] Firebase production config ho tro Google Application Default Credentials va explicit service-account path.
+- [x] Khi FCM enabled, backend validate Firebase luc startup va fail ro rang neu credential thieu/sai.
+- [x] File `.env`, `secrets/` va `firebase-service-account*.json` duoc ignore khoi Git.
 - [x] Backend tu xoa FCM token Redis khi Firebase bao token `UNREGISTERED`.
 - [x] Notification ca nhan duoc luu DB de lam inbox trong app.
 - [x] User xem danh sach notification inbox va mark read.
@@ -248,7 +251,8 @@ type PaymentStatus = "PENDING" | "COMPLETED" | "FAILED" | "REFUNDED";
 
 ### Notification/mo rong
 
-- [ ] Chua co deploy secret/env production cho Firebase service account path.
+- [x] Backend da co ADC/env production config va startup validation cho Firebase.
+- [ ] Can mount/gan workload identity that va gui test push tren staging truoc launch.
 
 ### Admin module
 
@@ -1533,7 +1537,7 @@ FE action:
 - Goi sau login, sau refresh FCM token, hoac khi Firebase cap token moi.
 - Backend trim token va luu vao Redis key `fcm_token:{userId}`.
 - Token toi da 4096 ky tu; neu token rong backend tra `VALIDATION_ERROR`.
-- Backend da co FCM channel va Firebase Admin SDK sender. Khi backend bat `app.notifications.fcm.enabled=true` va cau hinh service account path, notification ca nhan se duoc gui them qua FCM bang token da luu.
+- Backend da co FCM channel va Firebase Admin SDK sender. Khi `FCM_ENABLED=true`, notification ca nhan duoc gui them qua FCM bang token da luu.
 - Local/dev van mac dinh khong gui push that neu `app.notifications.fcm.enabled=false`.
 
 #### Xoa FCM token
@@ -1566,14 +1570,25 @@ Runtime backend:
 - `app.notifications.fcm.enabled=false` theo mac dinh trong code.
 - Khi `enabled=false`, channel FCM bo qua push va khong doc Redis token.
 - Khi `enabled=true`, backend lay token tu `fcm_token:{userId}`, build payload `{ title, body, data }`, retry theo `app.notifications.fcm.max-attempts` mac dinh `2`.
+- Khi `enabled=true`, Firebase Admin SDK duoc khoi tao ngay luc startup. Credential thieu/sai lam application startup fail de deployment phat hien som.
 - Neu Firebase tra `UNREGISTERED`, backend xoa token trong Redis va khong retry token do.
 - Cac loi transient khac duoc retry/suppress; backend khong xoa token voi cac loi nay.
-- Firebase Admin SDK lazy-init khi gui push lan dau. Neu thieu/sai service account path, loi push duoc log/suppress trong FCM channel; WebSocket va inbox van chay binh thuong.
-- Cau hinh backend can co de gui push that:
-  - `app.notifications.fcm.enabled=true`
-  - `app.notifications.fcm.service-account-path=/path/to/firebase-service-account.json`
-  - `app.notifications.fcm.project-id=<firebase-project-id>` neu service account khong tu suy ra project.
-  - `app.notifications.fcm.app-name=goride` neu can doi app name mac dinh.
+- Uu tien production tren Google Cloud: gan service account cho workload de ADC tu tim credential, khong can JSON key.
+- Production ngoai Google Cloud: mount credential/config federation ngoai container va dat `GOOGLE_APPLICATION_CREDENTIALS=/run/secrets/firebase-credentials.json`.
+- Fallback tuong thich: dat `FIREBASE_SERVICE_ACCOUNT_PATH=/run/secrets/firebase-service-account.json`; backend uu tien path nay truoc ADC.
+- Khong bake credential vao image, khong commit JSON vao repo. `.gitignore` da chan `.env`, `secrets/` va `firebase-service-account*.json`.
+
+Environment variables:
+
+```text
+FCM_ENABLED=true
+FCM_MAX_ATTEMPTS=2
+FIREBASE_PROJECT_ID=goride-production
+FIREBASE_APP_NAME=goride
+GOOGLE_APPLICATION_CREDENTIALS=/run/secrets/firebase-credentials.json
+```
+
+`GOOGLE_APPLICATION_CREDENTIALS` co the tro den service account key hoac workload identity federation credential config. Neu da dung attached service account tren Google Cloud thi khong can dat bien nay.
 
 ---
 

@@ -45,6 +45,12 @@ public class FcmPushProperties {
         return serviceAccountPath == null ? null : serviceAccountPath.strip();
     }
 
+    public String credentialSource() {
+        return hasServiceAccountPath()
+                ? "service account file " + normalizedServiceAccountPath()
+                : "Google Application Default Credentials";
+    }
+
     public String getProjectId() {
         return projectId;
     }
