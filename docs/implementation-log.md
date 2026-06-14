@@ -6,6 +6,65 @@
 
 ---
 
+## Commit: `feat: add firebase production config`
+
+Branch: `feature/firebase-production-config`
+
+Phase: Phase 4 - Production readiness, Firebase credential loading
+
+### Muc tieu
+
+Hoan thien cach Firebase Admin SDK nhan credential trong staging/production ma khong commit service account JSON, dong thoi fail-fast khi FCM duoc bat nhung deployment cau hinh sai.
+
+### Noi dung da trien khai
+
+- Chuyen credential loading sang hai che do:
+  - Neu co `FIREBASE_SERVICE_ACCOUNT_PATH`, doc credential file duoc mount ngoai application/image.
+  - Neu khong co path rieng, dung `GoogleCredentials.getApplicationDefault()` de ho tro `GOOGLE_APPLICATION_CREDENTIALS`, workload identity federation va attached service account tren Google Cloud.
+- Them `FirebaseAdminStartupValidator`:
+  - Chi tao bean khi `app.notifications.fcm.enabled=true`.
+  - Khoi tao Firebase Messaging ngay luc startup.
+  - Credential thieu, file khong doc duoc hoac JSON sai lam startup fail voi message neu ro credential source.
+- Them environment mapping trong `application.properties`:
+  - `FCM_ENABLED`, `FCM_MAX_ATTEMPTS`.
+  - `FIREBASE_SERVICE_ACCOUNT_PATH`, `FIREBASE_PROJECT_ID`, `FIREBASE_APP_NAME`.
+  - Local/dev mac dinh van `FCM_ENABLED=false`.
+- Them Git ignore cho `.env`, `.env.*`, `secrets/` va `firebase-service-account*.json`; van cho phep commit `.env.example`.
+- Khong thay doi REST/FCM token contract cua frontend.
+
+### Review truoc commit
+
+- Da xac nhan default credential source la Google Application Default Credentials.
+- Da xac nhan explicit service-account path duoc uu tien va error message neu dung path khong doc duoc.
+- Da xac nhan startup validator goi Firebase initialization.
+- Da xac nhan Spring context local van load khi FCM disabled.
+- Targeted tests: pass 16 tests.
+- `./mvnw.cmd test`: pass 311 tests.
+- `git diff --check`: khong co whitespace error.
+- CodeRabbit khong chay duoc: CLI chua cai va environment security policy khong cho thuc thi official downloaded installer script; khong gan nhan CodeRabbit cho ket qua review khac.
+
+### Files chinh
+
+- `.gitignore`
+- `src/main/resources/application.properties`
+- `src/main/java/com/example/goride/notification/config/FcmPushProperties.java`
+- `src/main/java/com/example/goride/notification/service/FirebaseMessagingGateway.java`
+- `src/main/java/com/example/goride/notification/service/FirebaseAdminMessagingGateway.java`
+- `src/main/java/com/example/goride/notification/service/FirebaseAdminStartupValidator.java`
+- `src/test/java/com/example/goride/notification/config/FcmPushPropertiesTests.java`
+- `src/test/java/com/example/goride/notification/service/FirebaseAdminMessagingGatewayTests.java`
+- `src/test/java/com/example/goride/notification/service/FirebaseAdminStartupValidatorTests.java`
+- `integrate-plan.md`
+- `plan.md`
+- `docs/pland.xlsx`
+
+### Viec tiep theo
+
+- Cau hinh workload identity hoac secret mount that tren staging va gui mot test push.
+- Tiep tuc E2E/integration tests hoac production hardening theo plan.
+
+---
+
 ## Commit: `feat: add driver heartbeat timeout`
 
 Branch: `feature/driver-heartbeat-timeout`

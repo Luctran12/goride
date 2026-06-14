@@ -6,10 +6,10 @@ Generated: 2026-06-14, Asia/Bangkok
 
 | Item | Status |
 | --- | --- |
-| Working branch | `feature/driver-heartbeat-timeout` |
-| Latest merged feature on develop | `feature/real-distance-provider` |
-| Develop merge commit | `241f153` (`merge: real distance routing provider`) |
-| Test status | `./mvnw.cmd test`: pass 309 tests on 2026-06-14 |
+| Working branch | `feature/firebase-production-config` |
+| Latest merged feature on develop | `feature/driver-heartbeat-timeout` |
+| Develop merge commit | `e57955c` (`merge: driver heartbeat timeout`) |
+| Test status | `./mvnw.cmd test`: pass 311 tests on 2026-06-14 |
 | Diff hygiene | `git diff --check`: pass on 2026-06-14 |
 | CodeRabbit CLI | Blocked: CLI missing and official installer execution is disallowed by the environment security policy |
 | Publish status | Feature branch in review flow; merge to `develop` after user review |
@@ -31,7 +31,7 @@ Generated: 2026-06-14, Asia/Bangkok
 | Cash payment | Cash payment record, payment detail, cash confirmation, payment completion workflow | `/api/v1/payments/trips/{tripId}`, driver payment confirmation endpoint | CASH path is implemented end to end enough for MVP trip completion. |
 | Payment checkout and webhook foundation | Payment provider registry/config properties, checkout entry point, webhook entry point, payment method metadata, signed VNPAY and MoMo checkout/callback flows, configurable callback freshness/replay policy | `/api/v1/payments/methods`, `/api/v1/payments/trips/{tripId}/checkout`, `/api/v1/payments/providers/{providerName}/webhook` | CASH works end to end; VNPAY and MoMo support signed checkout/callbacks, stale/future callback rejection and idempotent terminal retries. |
 | Rating | Passenger trip rating, duplicate prevention/status, driver public ratings, Redis rating sync | `/api/v1/ratings`, `/api/v1/ratings/trips/{tripId}/me`, `/api/v1/drivers/{driverId}/ratings` | Rating data is available for frontend review displays. |
-| Notifications | Notification inbox, mark-read flow, in-app/WebSocket notification delivery, FCM token CRUD | `/api/v1/notifications`, FCM token endpoints | Includes FCM sender channel and invalid-token cleanup path. |
+| Notifications | Notification inbox, mark-read flow, in-app/WebSocket delivery, FCM token CRUD, Firebase Admin sender, ADC/service-account credential loading and startup validation | `/api/v1/notifications`, FCM token endpoints | FCM stays disabled by default; enabled deployments fail startup clearly when credentials are unavailable and never require committed credential JSON. |
 | Admin trip operations | Admin trip list/filter/detail-like views and dashboard metrics | `/api/v1/admin/trips`, `/api/v1/admin/dashboard` | Supports basic operations dashboard and trip monitoring. |
 | Documentation | Implementation log and frontend integration plan | `docs/implementation-log.md`, `integrate-plan.md` | Living docs describe commit history and integration contracts. |
 
@@ -41,7 +41,6 @@ Generated: 2026-06-14, Asia/Bangkok
 | --- | --- | --- | --- | --- |
 | P0 | Payment providers | Finish MoMo/VNPAY sandbox E2E validation against real merchant flows | Sandbox merchant accounts, callback URLs, provider test apps | Both online providers return usable checkout URLs and real sandbox success/failure callbacks reconcile internal payment/trip state. |
 | P0 | Webhook sandbox handling | Run real sandbox callback tests for MoMo and VNPAY; unit mapping for both providers is implemented | Sandbox callback payloads and merchant test accounts | Sandbox success/failure statuses map to internal payment states and provider acknowledgements meet real gateway expectations. |
-| P1 | Firebase production setup | Finalize Firebase Admin service account and secret loading for production | Secure secret storage, env-specific config | FCM works in staging/prod without committing credentials; missing secrets fail clearly. |
 | P1 | E2E/integration tests | Add integration tests for auth, booking, matching, tracking, payment, notification, and admin flows | Testcontainers or stable local test profile | Critical passenger/driver/admin flows pass in CI against database/Redis-compatible services. |
 | P1 | Production hardening | Add rate limits, observability, CORS policy, error audit, health/readiness checks | Deployment platform requirements | API has safe production defaults and operational visibility. |
 | P1 | Database release strategy | Define production database migration/release SQL workflow without Flyway unless project policy changes | DBA/deployment convention | Schema changes are reproducible across environments and documented per release. |
@@ -79,7 +78,7 @@ Generated: 2026-06-14, Asia/Bangkok
 | Phase 1 | Payment provider completion | MoMo/VNPAY sandbox E2E validation, provider-specific freshness-window tuning and real merchant callback tests. |
 | Phase 2 | Real-world routing | OSRM-compatible routing provider implemented; production endpoint UAT, fallback monitoring and timeout tuning remain. |
 | Phase 3 | Driver availability reliability | Heartbeat API, Redis TTL refresh and automatic database offline timeout implemented; production interval tuning and Redis/database soak testing remain. |
-| Phase 4 | Production readiness | Firebase secrets, environment profiles, CORS/rate limits, observability, release SQL strategy. |
+| Phase 4 | Production readiness | Firebase ADC/secret loading and fail-fast validation implemented; environment profiles, CORS/rate limits, observability and release SQL strategy remain. |
 | Phase 5 | Integration confidence | Testcontainers/integration tests, end-to-end passenger/driver/admin happy paths, CI validation. |
 | Phase 6 | Product expansion | Uploads, messaging, scheduled rides, surge pricing, multi-city, analytics. |
 
@@ -91,5 +90,5 @@ Generated: 2026-06-14, Asia/Bangkok
 | Webhook freshness defaults need sandbox validation | The 24-hour age and 5-minute future-skew defaults are configurable but not yet calibrated against real merchant retries | Validate both gateways in sandbox and tune provider-specific windows without weakening signature or transaction-reference checks. |
 | Routing endpoint is not production-calibrated | Real route estimates are implemented, but public/self-hosted endpoint capacity and fallback rate are not validated | Use a controlled OSRM-compatible endpoint, monitor fallback warnings, and tune timeout/profile during UAT. |
 | Heartbeat timing is not production-calibrated | Aggressive intervals may create reconnect churn; loose intervals delay database cleanup | Start with a 20-second client heartbeat and 60-second timeout, then tune from staging disconnect and scheduler metrics. |
-| Production secrets are not finalized | Deployments may fail or leak credentials if handled manually | Use environment-specific secret storage and never commit provider/Firebase credentials. |
+| Firebase credential path still needs staging UAT | Credential loading is production-ready, but the real deployment identity/secret mount has not been exercised in this repository | Prefer attached workload identity/ADC; otherwise mount the JSON outside the image, set `GOOGLE_APPLICATION_CREDENTIALS`, and verify startup plus one test push in staging. |
 | Integration coverage is still limited | Regressions may slip across auth/booking/matching/payment flows | Add focused integration tests and CI before release candidate. |

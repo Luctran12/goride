@@ -25,6 +25,11 @@ public class FirebaseAdminMessagingGateway implements FirebaseMessagingGateway {
     }
 
     @Override
+    public void initialize() {
+        firebaseMessaging();
+    }
+
+    @Override
     public String send(Message message) {
         try {
             return firebaseMessaging().send(message);
@@ -59,22 +64,31 @@ public class FirebaseAdminMessagingGateway implements FirebaseMessagingGateway {
     }
 
     private FirebaseOptions firebaseOptions() {
-        if (!properties.hasServiceAccountPath()) {
-            throw new FcmPushSendException(
-                    "app.notifications.fcm.service-account-path is required to send FCM push"
-            );
-        }
-
-        try (InputStream credentialsStream = Files.newInputStream(Path.of(properties.normalizedServiceAccountPath()))) {
+        try {
             FirebaseOptions.Builder builder = FirebaseOptions.builder()
-                    .setCredentials(GoogleCredentials.fromStream(credentialsStream));
+                    .setCredentials(loadCredentials());
             String projectId = properties.normalizedProjectId();
             if (projectId != null) {
                 builder.setProjectId(projectId);
             }
             return builder.build();
         } catch (IOException exception) {
-            throw new FcmPushSendException("Failed to initialize Firebase Admin SDK", exception);
+            throw new FcmPushSendException(
+                    "Failed to load Firebase credentials from " + properties.credentialSource(),
+                    exception
+            );
+        }
+    }
+
+    private GoogleCredentials loadCredentials() throws IOException {
+        if (!properties.hasServiceAccountPath()) {
+            return GoogleCredentials.getApplicationDefault();
+        }
+
+        try (InputStream credentialsStream = Files.newInputStream(
+                Path.of(properties.normalizedServiceAccountPath())
+        )) {
+            return GoogleCredentials.fromStream(credentialsStream);
         }
     }
 }
