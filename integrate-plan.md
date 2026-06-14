@@ -1,6 +1,6 @@
 # GoRide Front-end Integration Plan
 
-Branch da kiem tra: `feature/momo-webhook-verification`
+Branch da kiem tra: `feature/driver-heartbeat-timeout`
 
 Muc tieu file nay:
 - Checklist chuc nang backend da co code va co the tich hop FE.
@@ -117,6 +117,10 @@ type PaymentStatus = "PENDING" | "COMPLETED" | "FAILED" | "REFUNDED";
 - [x] Khi online, backend ghi vi tri + metadata driver vao Redis.
 - [x] Khi offline, backend xoa status/meta khoi Redis.
 - [x] Driver chi online duoc neu profile da `APPROVED`.
+- [x] Driver gui heartbeat REST de cap nhat vi tri va gia han Redis TTL.
+- [x] Heartbeat giu nguyen status `BUSY`, khong dua driver dang chay trip ve `AVAILABLE`.
+- [x] Redis status het TTL thi driver khong con duoc matching chon.
+- [x] Scheduler theo batch chuyen profile DB stale sang offline va don Redis GEO/meta.
 
 ### User profile va admin user management
 
@@ -443,8 +447,57 @@ Request offline:
 
 FE action:
 - Chi cho online khi da co quyen location.
-- Goi lai API hoac gui heartbeat tu app de Redis TTL khong het. Backend hien co endpoint online/offline, chua co heartbeat REST rieng.
+- Sau khi online thanh cong, bat dau heartbeat moi 20 giay.
 - Neu loi `DRIVER_NOT_APPROVED`, hien thong bao "Ho so chua duoc duyet".
+
+#### Driver heartbeat
+
+```http
+POST /api/v1/drivers/me/heartbeat
+Authorization: Bearer <driverToken>
+Content-Type: application/json
+```
+
+Request:
+
+```json
+{
+  "lat": 10.7769,
+  "lng": 106.7009
+}
+```
+
+Response `data`:
+
+```json
+{
+  "online": true,
+  "heartbeatAt": "2026-06-14T06:30:00Z",
+  "expiresAt": "2026-06-14T06:31:00Z"
+}
+```
+
+FE action:
+- Gui heartbeat khi app driver dang online, de xuat moi 20 giay va truoc `expiresAt`.
+- Moi heartbeat gui location moi nhat; backend cap nhat Redis GEO va `driver_profiles.last_location_at`.
+- Tam dung heartbeat khi driver bam offline hoặc logout.
+- Neu mat mang ngan, retry voi exponential backoff nhung khong de qua `expiresAt`.
+- Neu nhan `DRIVER_NOT_AVAILABLE`, dung heartbeat va hien nut "Bat dau nhan chuyen" de goi lai `PATCH /api/v1/drivers/me/status` voi `online=true`.
+- Heartbeat khong lam driver dang `BUSY` thanh `AVAILABLE`; FE tiep tuc gui heartbeat trong suot active trip.
+
+Backend config:
+
+```yaml
+app:
+  driver:
+    availability:
+      heartbeat-timeout-seconds: 60
+      cleanup-batch-size: 100
+      scheduler:
+        enabled: true
+        fixed-delay-ms: 15000
+        initial-delay-ms: 30000
+```
 
 ---
 

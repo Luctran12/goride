@@ -7,6 +7,8 @@ import java.math.BigDecimal;
 public interface DriverAvailabilityStore {
     void markAvailable(DriverAvailability availability);
 
+    boolean refreshHeartbeat(DriverAvailability availability);
+
     void markOffline(Long driverId);
 
     void updateRating(Long driverId, BigDecimal rating);

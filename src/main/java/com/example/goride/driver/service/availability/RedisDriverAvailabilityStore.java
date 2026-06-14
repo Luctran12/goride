@@ -12,30 +12,50 @@ import java.util.Map;
 @Component
 public class RedisDriverAvailabilityStore implements DriverAvailabilityStore {
     private static final String ONLINE_DRIVERS_KEY = "drivers:online";
-    private static final Duration DRIVER_STATUS_TTL = Duration.ofSeconds(60);
 
     private final StringRedisTemplate redisTemplate;
+    private final DriverAvailabilityProperties properties;
 
-    public RedisDriverAvailabilityStore(StringRedisTemplate redisTemplate) {
+    public RedisDriverAvailabilityStore(
+            StringRedisTemplate redisTemplate,
+            DriverAvailabilityProperties properties
+    ) {
         this.redisTemplate = redisTemplate;
+        this.properties = properties;
     }
 
     @Override
     public void markAvailable(DriverAvailability availability) {
         String driverId = String.valueOf(availability.driverId());
+        writeLocationAndMetadata(availability, driverId);
+        redisTemplate.opsForValue().set(statusKey(driverId), "AVAILABLE", properties.heartbeatTimeout());
+    }
+
+    @Override
+    public boolean refreshHeartbeat(DriverAvailability availability) {
+        String driverId = String.valueOf(availability.driverId());
+        String statusKey = statusKey(driverId);
+        if (redisTemplate.opsForValue().get(statusKey) == null) {
+            return false;
+        }
+
+        writeLocationAndMetadata(availability, driverId);
+        return Boolean.TRUE.equals(redisTemplate.expire(statusKey, properties.heartbeatTimeout()));
+    }
+
+    private void writeLocationAndMetadata(DriverAvailability availability, String driverId) {
         redisTemplate.opsForGeo().add(
                 ONLINE_DRIVERS_KEY,
                 new Point(availability.longitude().doubleValue(), availability.latitude().doubleValue()),
                 driverId
         );
-        redisTemplate.opsForValue().set(statusKey(driverId), "AVAILABLE", DRIVER_STATUS_TTL);
         redisTemplate.opsForHash().putAll(metaKey(driverId), Map.of(
                 "vehicleType", availability.vehicleType().name(),
                 "rating", availability.rating().toPlainString(),
                 "name", nullToBlank(availability.driverName()),
                 "avatarUrl", nullToBlank(availability.avatarUrl())
         ));
-        redisTemplate.expire(metaKey(driverId), DRIVER_STATUS_TTL);
+        redisTemplate.expire(metaKey(driverId), properties.heartbeatTimeout());
     }
 
     @Override
@@ -60,7 +80,7 @@ public class RedisDriverAvailabilityStore implements DriverAvailabilityStore {
         }
 
         redisTemplate.opsForHash().put(metaKey, "rating", rating.toPlainString());
-        redisTemplate.expire(metaKey, DRIVER_STATUS_TTL);
+        redisTemplate.expire(metaKey, properties.heartbeatTimeout());
     }
 
     private String statusKey(String driverId) {

@@ -6,6 +6,69 @@
 
 ---
 
+## Commit: `feat: add driver heartbeat timeout`
+
+Branch: `feature/driver-heartbeat-timeout`
+
+Phase: Phase 3 - Driver availability reliability
+
+### Muc tieu
+
+Bo sung heartbeat rieng cho driver dang online va dong bo offline tu dong khi driver mat ket noi. Redis TTL tiep tuc la lop chan nhanh cho matching, con scheduler cap nhat lai `driver_profiles.is_online` de database khong giu trang thai stale.
+
+### Noi dung da trien khai
+
+- Them `POST /api/v1/drivers/me/heartbeat`:
+  - Yeu cau role `DRIVER`, profile ton tai va dang online.
+  - Nhan `lat`/`lng` bat buoc, cap nhat Redis GEO va `last_known_location`/`last_location_at`.
+  - Tra `heartbeatAt` va `expiresAt` de FE lap lich heartbeat tiep theo.
+  - Neu Redis status da het TTL, tra `DRIVER_NOT_AVAILABLE` va khong tu dong hoi sinh availability.
+- Tap trung config vao `app.driver.availability`:
+  - `heartbeat-timeout-seconds`, mac dinh 60 va toi thieu 10.
+  - `cleanup-batch-size`, mac dinh 100.
+  - Scheduler mac dinh chay moi 15 giay, initial delay 30 giay va co the disable bang config.
+- Mo rong `DriverAvailabilityStore.refreshHeartbeat`:
+  - Gia han status/meta TTL va cap nhat GEO/metadata.
+  - Khong ghi lai gia tri status, vi vay `BUSY` duoc giu nguyen.
+  - Status da het han se khong duoc tao lai; matching tiep tuc bo qua driver.
+- Them `DriverHeartbeatTimeoutService`:
+  - Dung pessimistic lock lay profile online co `lastLocationAt` cu hon timeout.
+  - Xu ly theo batch, chuyen database sang offline.
+  - Sau transaction commit, xoa driver khoi Redis GEO/status/meta.
+- Them `Clock` bean de heartbeat va timeout co thoi gian nhat quan, test duoc.
+
+### Review truoc commit
+
+- Da xac nhan heartbeat cap nhat location va expiry dung 60 giay.
+- Da xac nhan driver offline va Redis status da expire bi reject.
+- Da xac nhan heartbeat khong ghi de status `BUSY`.
+- Da xac nhan scheduler dung cutoff va batch size config, chuyen stale profile offline va don Redis.
+- Targeted tests: pass 24 tests.
+- `./mvnw.cmd test`: pass 309 tests.
+- `git diff --check`: khong co whitespace error.
+- CodeRabbit khong chay duoc: CLI chua cai va environment security policy khong cho thuc thi official downloaded installer script; khong gan nhan CodeRabbit cho ket qua review khac.
+
+### Files chinh
+
+- `src/main/java/com/example/goride/driver/controller/DriverStatusController.java`
+- `src/main/java/com/example/goride/driver/service/DriverHeartbeatService.java`
+- `src/main/java/com/example/goride/driver/service/DriverHeartbeatTimeoutService.java`
+- `src/main/java/com/example/goride/driver/service/DriverHeartbeatTimeoutScheduler.java`
+- `src/main/java/com/example/goride/driver/service/availability/RedisDriverAvailabilityStore.java`
+- `src/main/java/com/example/goride/driver/service/availability/DriverAvailabilityProperties.java`
+- `src/main/java/com/example/goride/driver/repository/DriverProfileRepository.java`
+- `integrate-plan.md`
+- `plan.md`
+- `docs/pland.xlsx`
+
+### Viec tiep theo
+
+- UAT heartbeat interval/timeout voi app mobile o background va mang khong on dinh.
+- Them metrics cho heartbeat reject, Redis expiry va so driver bi scheduler cleanup.
+- Tiep tuc Firebase production secret setup hoac integration test phase theo plan.
+
+---
+
 ## Commit: `feat: add real distance routing provider`
 
 Branch: `feature/real-distance-provider`

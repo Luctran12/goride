@@ -166,6 +166,11 @@ public class DriverProfile {
         this.lastLocationAt = location == null ? null : Instant.now();
     }
 
+    public void recordHeartbeat(Point location, Instant heartbeatAt) {
+        this.lastKnownLocation = requireNonNull(location, "location");
+        this.lastLocationAt = requireNonNull(heartbeatAt, "heartbeatAt");
+    }
+
     public void recordCompletedTrip() {
         this.totalTrips++;
     }

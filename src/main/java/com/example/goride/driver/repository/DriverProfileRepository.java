@@ -10,6 +10,8 @@ import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 
 public interface DriverProfileRepository extends JpaRepository<DriverProfile, Long> {
@@ -24,6 +26,21 @@ public interface DriverProfileRepository extends JpaRepository<DriverProfile, Lo
               and user.deletedAt is null
             """)
     Optional<DriverProfile> findByUserIdForUpdate(@Param("userId") Long userId);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+            select profile
+            from DriverProfile profile
+            join fetch profile.user user
+            where profile.online = true
+              and profile.lastLocationAt < :cutoff
+              and user.deletedAt is null
+            order by profile.lastLocationAt
+            """)
+    List<DriverProfile> findStaleOnlineProfilesForUpdate(
+            @Param("cutoff") Instant cutoff,
+            Pageable pageable
+    );
 
     Page<DriverProfile> findByApprovalStatusAndUserDeletedAtIsNull(
             ApprovalStatus approvalStatus,
