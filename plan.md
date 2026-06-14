@@ -6,10 +6,10 @@ Generated: 2026-06-14, Asia/Bangkok
 
 | Item | Status |
 | --- | --- |
-| Working branch | `feature/auth-integration-tests` |
-| Latest merged feature on develop | `feature/firebase-production-config` |
-| Develop merge commit | `c0ad35f` (`merge: firebase production config`) |
-| Test status | `./mvnw.cmd test`: pass 312 tests on 2026-06-14; auth integration test uses Testcontainers PostGIS and Redis |
+| Working branch | `feature/driver-trip-routing` |
+| Latest merged feature on develop | `feature/auth-integration-tests` |
+| Develop merge commit | `08ec166` (`merge: auth integration tests`) |
+| Test status | `./mvnw.cmd test`: pass 321 tests on 2026-06-14 |
 | Diff hygiene | `git diff --check`: pass on 2026-06-14 |
 | CodeRabbit CLI | Blocked: CLI missing and official installer execution is disallowed by the environment security policy |
 | Publish status | Feature branch in review flow; merge to `develop` after user review |
@@ -22,7 +22,7 @@ Generated: 2026-06-14, Asia/Bangkok
 | Auth and JWT | Register, login, refresh token, logout, JWT generation/validation, role-aware security context | `POST /api/v1/auth/register`, `POST /api/v1/auth/login`, `POST /api/v1/auth/refresh`, `POST /api/v1/auth/logout` | Backend foundation is ready for passenger, driver, and admin sign-in flows. |
 | User profile | Current user profile, update profile, admin user list/detail/create/update/status controls | `GET/PUT /api/users/me`, admin user endpoints under `/api/users` | Covers user account management and admin CRUD workflows. |
 | Driver profile and availability | Driver profile creation/update, document/profile data, admin approval flow, online/offline status, heartbeat refresh and automatic stale-driver timeout | `/api/v1/drivers/me/profile`, `/api/v1/drivers/me/status`, `POST /api/v1/drivers/me/heartbeat`, admin approval endpoints | Redis TTL removes stale drivers from matching immediately; a scheduled batch synchronizes expired online state back to the database. |
-| Pricing and routing | Fare estimate, OSRM-compatible route distance/duration, configurable Haversine fallback, pricing configuration and admin pricing management | `/api/v1/bookings/estimate`, `/api/v1/pricing`, `/api/v1/admin/pricing` | Estimate/create booking can use real routed distance/time; completed-trip fare still uses actual tracking history. |
+| Pricing and routing | Fare estimate, OSRM-compatible route distance/duration, driver navigation GeoJSON/steps, configurable estimate fallback, pricing configuration and admin pricing management | `/api/v1/bookings/estimate`, `POST /api/v1/drivers/trips/{tripId}/route`, `/api/v1/pricing`, `/api/v1/admin/pricing` | Estimate/create booking can use routed distance/time; assigned drivers can request pickup/dropoff routes; completed-trip fare still uses actual tracking history. |
 | Booking | Create booking, booking detail, passenger history/listing, cancellation rules/status updates | `/api/v1/bookings` and related detail/cancel/list endpoints | Booking lifecycle is connected to matching and trip creation. |
 | Trip lifecycle | Driver response, arrived/start/complete transitions, passenger/driver trip history, payment confirmation hooks | `/api/v1/drivers/trips/{tripId}/respond`, `/status`, `/payment-confirm` | Trip completion can compute final fare from tracking history. |
 | Matching | Nearby driver lookup, offer dispatch, accept/reject handling, timeout handling, retry/no-driver flow | Internal matching services and driver offer APIs | Uses Redis GEO/availability data to dispatch ride offers. |
@@ -65,6 +65,7 @@ Generated: 2026-06-14, Asia/Bangkok
 | Fare estimate | `/api/v1/bookings/estimate` | Show fare/distance/time estimate before booking creation. |
 | Passenger booking | `/api/v1/bookings` | Create booking, show matching progress, allow cancel when allowed. |
 | Driver offers | Driver trip offer APIs and user-specific WebSocket notifications | Display incoming offer countdown, accept/reject, handle timeout. |
+| Driver navigation | `POST /api/v1/drivers/trips/{tripId}/route` | Send current GPS, draw returned GeoJSON `LineString`, route to pickup while accepted and dropoff after arrival, then re-route only when movement/time threshold is reached. |
 | Trip status | Driver trip status endpoints and trip WebSocket topic | Render status timeline: accepted, arrived, in progress, completed/cancelled. |
 | Realtime tracking | WebSocket location topic, REST fallback tracking endpoints | Subscribe for live driver location and poll REST fallback on reconnect. |
 | Payment | `/api/v1/payments/methods`, `/api/v1/payments/trips/{tripId}`, `/checkout`, webhook-driven state | Support CASH fully; show VNPAY/MoMo only when provider metadata says enabled; open returned checkout URL and refresh payment detail after redirect while signed callbacks update state. |
@@ -77,7 +78,7 @@ Generated: 2026-06-14, Asia/Bangkok
 | Phase | Goal | Main Deliverables |
 | --- | --- | --- |
 | Phase 1 | Payment provider completion | MoMo/VNPAY sandbox E2E validation, provider-specific freshness-window tuning and real merchant callback tests. |
-| Phase 2 | Real-world routing | OSRM-compatible routing provider implemented; production endpoint UAT, fallback monitoring and timeout tuning remain. |
+| Phase 2 | Real-world routing | Fare estimation and assigned-driver pickup/dropoff GeoJSON routing implemented; production endpoint UAT, route request rate control, monitoring and timeout tuning remain. |
 | Phase 3 | Driver availability reliability | Heartbeat API, Redis TTL refresh and automatic database offline timeout implemented; production interval tuning and Redis/database soak testing remain. |
 | Phase 4 | Production readiness | Firebase ADC/secret loading and fail-fast validation implemented; environment profiles, CORS/rate limits, observability and release SQL strategy remain. |
 | Phase 5 | Integration confidence | Testcontainers PostGIS/Redis foundation and auth flow implemented; booking/matching/tracking/payment/admin flows and CI validation remain. |
@@ -89,7 +90,7 @@ Generated: 2026-06-14, Asia/Bangkok
 | --- | --- | --- |
 | Online payment providers are still not production-complete | Frontend should not expose MoMo/VNPAY in production without real sandbox/UAT validation | Keep CASH as MVP; enable online methods first in sandbox and only after full callback/UAT validation. |
 | Webhook freshness defaults need sandbox validation | The 24-hour age and 5-minute future-skew defaults are configurable but not yet calibrated against real merchant retries | Validate both gateways in sandbox and tune provider-specific windows without weakening signature or transaction-reference checks. |
-| Routing endpoint is not production-calibrated | Real route estimates are implemented, but public/self-hosted endpoint capacity and fallback rate are not validated | Use a controlled OSRM-compatible endpoint, monitor fallback warnings, and tune timeout/profile during UAT. |
+| Routing endpoint is not production-calibrated | Fare estimates and driver navigation geometry are implemented, but endpoint capacity, route request rate and Vietnamese road quality are not validated | Use a controlled OSRM-compatible endpoint, debounce/re-route on FE, add rate/latency metrics, and tune timeout/profile during UAT. |
 | Heartbeat timing is not production-calibrated | Aggressive intervals may create reconnect churn; loose intervals delay database cleanup | Start with a 20-second client heartbeat and 60-second timeout, then tune from staging disconnect and scheduler metrics. |
 | Firebase credential path still needs staging UAT | Credential loading is production-ready, but the real deployment identity/secret mount has not been exercised in this repository | Prefer attached workload identity/ADC; otherwise mount the JSON outside the image, set `GOOGLE_APPLICATION_CREDENTIALS`, and verify startup plus one test push in staging. |
 | Integration coverage is partial | Auth now runs through HTTP/JWT/JPA/Redis, but cross-module booking, matching, tracking and payment regressions may still slip through | Reuse the Testcontainers base for remaining critical flows and run the suite in CI before release candidate. |

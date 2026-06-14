@@ -6,6 +6,62 @@
 
 ---
 
+## Commit: `feat: add driver trip routing`
+
+Branch: `feature/driver-trip-routing`
+
+Phase: Phase 2 - Real-world routing, driver navigation
+
+### Muc tieu
+
+Bo sung API routing cho app tai xe tu vi tri GPS hien tai den diem don hoac diem tra, tra ve GeoJSON route geometry va maneuver steps de FE ve polyline va hien huong dan dieu huong.
+
+### Noi dung da trien khai
+
+- Them `POST /api/v1/drivers/trips/{tripId}/route`:
+  - Chi role `DRIVER` va assigned driver cua trip duoc goi.
+  - Request nhan `latitude`/`longitude` GPS hien tai va validate WGS84 range.
+  - Trip `ACCEPTED` tu dong route den `PICKUP`.
+  - Trip `ARRIVED` hoac `IN_PROGRESS` tu dong route den `DROPOFF`.
+  - Status khac tra `TRIP_ROUTE_NOT_AVAILABLE`.
+- Them OSRM route geometry provider:
+  - Goi route service theo thu tu `longitude,latitude`.
+  - Dung `overview=full`, `geometries=geojson`, `steps=true`.
+  - Verify distance, duration, GeoJSON `LineString`, coordinates va maneuver locations.
+  - Provider disabled, timeout, HTTP error, `NoRoute` hoac payload sai tra `ROUTING_PROVIDER_ERROR` HTTP 502; navigation geometry khong dung duong thang Haversine gia lap.
+- Response cho FE gom destination type/address/location, distance meter, duration second, GeoJSON geometry va maneuver steps.
+- Them environment mappings `ROUTING_ENABLED`, `ROUTING_BASE_URL`, `ROUTING_PROFILE`, `ROUTING_TIMEOUT_SECONDS`, `ROUTING_FALLBACK_ENABLED` vao `application.properties`.
+
+### Review truoc commit
+
+- Targeted routing/controller/service/context tests: pass 10 tests.
+- Targeted routing suite cung estimate provider: pass 15 tests.
+- `./mvnw.cmd test`: pass 321 tests, 0 failure, 0 error.
+- `git diff --check`: khong co whitespace error.
+- CodeRabbit khong chay duoc: CLI chua cai va environment security policy khong cho thuc thi official downloaded installer script; khong gan nhan CodeRabbit cho ket qua review khac.
+
+### Files chinh
+
+- `src/main/java/com/example/goride/booking/service/distance/OsrmRouteGeometryProvider.java`
+- `src/main/java/com/example/goride/booking/service/distance/RouteGeometryProvider.java`
+- `src/main/java/com/example/goride/driver/service/DriverTripRoutingService.java`
+- `src/main/java/com/example/goride/driver/controller/DriverTripController.java`
+- `src/main/java/com/example/goride/driver/dto/DriverTripRouteResponse.java`
+- `src/test/java/com/example/goride/booking/service/distance/OsrmRouteGeometryProviderTests.java`
+- `src/test/java/com/example/goride/driver/service/DriverTripRoutingServiceTests.java`
+- `src/test/java/com/example/goride/driver/controller/DriverTripControllerTests.java`
+- `integrate-plan.md`
+- `plan.md`
+- `docs/pland.xlsx`
+
+### Viec tiep theo
+
+- UAT voi OSRM-compatible endpoint production/self-hosted va route that tai Viet Nam.
+- FE debounce/re-route theo GPS movement va localize maneuver type/modifier.
+- Them caching/rate limiting/observability cho route requests truoc production.
+
+---
+
 ## Commit: `test: add auth integration flow`
 
 Branch: `feature/auth-integration-tests`
