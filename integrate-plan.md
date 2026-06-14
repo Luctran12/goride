@@ -1,6 +1,6 @@
 # GoRide Front-end Integration Plan
 
-Branch da kiem tra: `feature/driver-heartbeat-timeout`
+Branch da kiem tra: `feature/auth-integration-tests`
 
 Muc tieu file nay:
 - Checklist chuc nang backend da co code va co the tich hop FE.
@@ -263,6 +263,14 @@ type PaymentStatus = "PENDING" | "COMPLETED" | "FAILED" | "REFUNDED";
 - [x] Admin approve/reject driver.
 - [x] Admin list trips/filter.
 - [x] Admin stats/dashboard.
+
+### Integration test backend
+
+- [x] Co Testcontainers base dung PostGIS va Redis that cho integration test.
+- [x] Auth flow da duoc test qua HTTP/JWT/JPA/Redis: register, protected request, refresh rotation, logout revocation va duplicate phone.
+- [ ] Booking/matching/trip lifecycle chua co integration flow hoan chinh.
+- [ ] Tracking/payment/notification/admin chua co integration flow hoan chinh.
+- [ ] Docker-backed integration suite chua duoc cau hinh chay tren CI.
 
 ---
 

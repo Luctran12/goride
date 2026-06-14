@@ -6,6 +6,54 @@
 
 ---
 
+## Commit: `test: add auth integration flow`
+
+Branch: `feature/auth-integration-tests`
+
+Phase: Phase 5 - Integration confidence
+
+### Muc tieu
+
+Tao nen integration test dung dich vu PostGIS va Redis that, sau do bao phu auth flow qua HTTP de xac nhan REST controller, Spring Security/JWT, JPA va refresh-token state hoat dong cung nhau.
+
+### Noi dung da trien khai
+
+- Them `PostgresRedisIntegrationTest` lam base dung chung cho integration tests:
+  - Khoi dong `postgis/postgis:15-3.3` va `redis:7-alpine` bang Testcontainers.
+  - Gan datasource/Redis runtime ports qua `@DynamicPropertySource`.
+  - Dung `hibernate.ddl-auto=create-drop` cho schema test rieng.
+  - Tat matching timeout, driver availability scheduler va FCM de test on dinh, khong goi provider ngoai.
+- Them `AuthFlowIntegrationTests` voi `MockMvc` va full Spring context:
+  - Dang ky passenger va nhan access/refresh token.
+  - Dung access token goi notification inbox duoc bao ve boi JWT.
+  - Refresh token duoc rotate; token cu bi reject.
+  - Logout revoke token moi; token da logout bi reject.
+  - Dang ky trung phone tra `PHONE_ALREADY_EXISTS`.
+- Khong thay doi REST API contract hoac production configuration.
+
+### Review truoc commit
+
+- Targeted `AuthFlowIntegrationTests`: pass 1 test.
+- `./mvnw.cmd test`: pass 312 tests, 0 failure, 0 error.
+- `git diff --check`: khong co whitespace error.
+- CodeRabbit khong chay duoc: CLI chua cai va environment security policy khong cho thuc thi official downloaded installer script; khong gan nhan CodeRabbit cho ket qua review khac.
+
+### Files chinh
+
+- `src/test/java/com/example/goride/integration/PostgresRedisIntegrationTest.java`
+- `src/test/java/com/example/goride/integration/AuthFlowIntegrationTests.java`
+- `integrate-plan.md`
+- `plan.md`
+- `docs/pland.xlsx`
+
+### Viec tiep theo
+
+- Mo rong integration coverage cho booking/matching va trip lifecycle.
+- Them tracking/payment/notification/admin integration flows.
+- Dua Docker-backed integration suite vao CI.
+
+---
+
 ## Commit: `feat: add firebase production config`
 
 Branch: `feature/firebase-production-config`
