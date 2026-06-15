@@ -1,6 +1,6 @@
 # GoRide Front-end Integration Plan
 
-Branch da kiem tra: `feature/driver-trip-routing`
+Branch da kiem tra: `feature/booking-matching-routing-integration`
 
 Muc tieu file nay:
 - Checklist chuc nang backend da co code va co the tich hop FE.
@@ -270,7 +270,8 @@ type PaymentStatus = "PENDING" | "COMPLETED" | "FAILED" | "REFUNDED";
 
 - [x] Co Testcontainers base dung PostGIS va Redis that cho integration test.
 - [x] Auth flow da duoc test qua HTTP/JWT/JPA/Redis: register, protected request, refresh rotation, logout revocation va duplicate phone.
-- [ ] Booking/matching/trip lifecycle chua co integration flow hoan chinh.
+- [x] Booking -> Redis matching -> driver accept -> route pickup -> arrived -> route dropoff da duoc test qua full Spring HTTP flow va OSRM boundary local.
+- [ ] Trip start/completion va final fare chua co integration flow hoan chinh.
 - [ ] Tracking/payment/notification/admin chua co integration flow hoan chinh.
 - [ ] Docker-backed integration suite chua duoc cau hinh chay tren CI.
 

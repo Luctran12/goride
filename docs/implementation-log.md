@@ -6,6 +6,52 @@
 
 ---
 
+## Commit: `test: cover booking matching routing flow`
+
+Branch: `feature/booking-matching-routing-integration`
+
+Phase: Phase 5 - Integration confidence
+
+### Muc tieu
+
+Bao phu bang integration test luong backend quan trong tu passenger dat xe, Redis matching tai xe, tai xe nhan chuyen, routing den diem don va chuyen routing sang diem tra sau khi den noi don.
+
+### Noi dung da trien khai
+
+- Them `BookingMatchingRoutingIntegrationTests` dung full Spring context, MockMvc, PostGIS va Redis Testcontainers.
+- Thuc thi flow qua REST/JWT that:
+  - Dang ky passenger va driver.
+  - Seed admin bootstrap, dang nhap qua auth API, tao va approve driver profile.
+  - Dua driver online gan pickup de Redis matching tao offer.
+  - Passenger tao booking, driver accept offer va trip chuyen sang `ACCEPTED`.
+  - Tai xe lay route `PICKUP`, cap nhat `ARRIVED`, sau do lay route `DROPOFF`.
+- Khoi dong HTTP server cuc bo mo phong bien OSRM:
+  - Tra distance/duration cho booking estimate.
+  - Tra GeoJSON `LineString` va maneuver step cho driver navigation.
+  - Khong phu thuoc network/provider ngoai trong test suite.
+- Khong thay doi REST API contract, database schema hoac production configuration.
+
+### Review truoc commit
+
+- Targeted `BookingMatchingRoutingIntegrationTests`: pass 1 test.
+- `./mvnw.cmd test`: pass 322 tests, 0 failure, 0 error.
+- CodeRabbit khong chay duoc: CLI chua cai va official installer execution da bi environment security policy chan o luong cai dat truoc; khong gan nhan CodeRabbit cho ket qua review khac.
+
+### Files chinh
+
+- `src/test/java/com/example/goride/integration/BookingMatchingRoutingIntegrationTests.java`
+- `integrate-plan.md`
+- `plan.md`
+- `docs/pland.xlsx`
+
+### Viec tiep theo
+
+- Mo rong flow qua `IN_PROGRESS`, tracking history, final fare va payment completion.
+- Them notification/admin integration flows.
+- Cau hinh Docker-backed integration suite tren CI.
+
+---
+
 ## Commit: `feat: add driver trip routing`
 
 Branch: `feature/driver-trip-routing`
