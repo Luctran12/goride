@@ -7,6 +7,7 @@ import com.example.goride.driver.domain.DriverProfile;
 import com.example.goride.driver.dto.DriverProfileResponse;
 import com.example.goride.driver.dto.DriverStatusUpdateRequest;
 import com.example.goride.driver.dto.DriverProfileUpsertRequest;
+import com.example.goride.driver.event.DriverAvailableEvent;
 import com.example.goride.driver.repository.DriverProfileRepository;
 import com.example.goride.driver.service.availability.DriverAvailabilityStore;
 import com.example.goride.user.domain.User;
@@ -16,6 +17,7 @@ import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.GeometryFactory;
 import org.locationtech.jts.geom.Point;
 import org.locationtech.jts.geom.PrecisionModel;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
@@ -30,15 +32,18 @@ public class DriverProfileService {
     private final DriverProfileRepository driverProfileRepository;
     private final UserRepository userRepository;
     private final DriverAvailabilityStore driverAvailabilityStore;
+    private final ApplicationEventPublisher eventPublisher;
 
     public DriverProfileService(
             DriverProfileRepository driverProfileRepository,
             UserRepository userRepository,
-            DriverAvailabilityStore driverAvailabilityStore
+            DriverAvailabilityStore driverAvailabilityStore,
+            ApplicationEventPublisher eventPublisher
     ) {
         this.driverProfileRepository = driverProfileRepository;
         this.userRepository = userRepository;
         this.driverAvailabilityStore = driverAvailabilityStore;
+        this.eventPublisher = eventPublisher;
     }
 
     @Transactional(readOnly = true)
@@ -111,7 +116,11 @@ public class DriverProfileService {
         profile.updateLastKnownLocation(location);
         DriverProfile savedProfile = driverProfileRepository.save(profile);
         DriverAvailabilityStore.DriverAvailability availability = availabilityFrom(savedProfile, request.lat(), request.lng());
-        runAfterCommit(() -> driverAvailabilityStore.markAvailable(availability));
+        Long driverId = savedProfile.getUser().getId();
+        runAfterCommit(() -> {
+            driverAvailabilityStore.markAvailable(availability);
+            eventPublisher.publishEvent(new DriverAvailableEvent(driverId));
+        });
         return DriverProfileResponse.from(savedProfile);
     }
 
