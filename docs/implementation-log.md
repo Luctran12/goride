@@ -6,6 +6,147 @@
 
 ---
 
+## Commit: `fix: complete initial matching and SockJS handshake`
+
+Branch: `feature/request-tracing-logging`
+
+Phase: Booking -> matching -> realtime integration stabilization
+
+### Muc tieu
+
+Sua hai loi phat hien tu backend log khi passenger dat xe: SockJS goi `/ws/info` bi 500 vi backend chi dang ky native WebSocket, va trip bi giu o `SEARCHING` khi initial matching khong tim thay driver.
+
+### Noi dung da trien khai
+
+- Doi `/ws` thanh SockJS/STOMP endpoint:
+  - `GET /ws/info` duoc SockJS phuc vu.
+  - Them `/ws-native` cho client dung native WebSocket voi `brokerURL`.
+  - Mo Spring Security handshake routes cho ca hai endpoint; JWT van duoc kiem tra tai STOMP `CONNECT`.
+- Hoan thien initial matching no-driver:
+  - Neu initial matching chua co candidate, giu trip o `SEARCHING` thay vi terminal `NO_DRIVER`.
+  - Them `DriverAvailableEvent` khi driver online hoac heartbeat thanh cong.
+  - Them `SearchingTripMatchingService` de thu match lai cac trip `SEARCHING` chua co offer active khi co driver available.
+  - Bo qua trip da co active matching state de tranh gui trung offer.
+  - Them domain log cho offer dau tien, initial no-candidate va rematch tu driver availability.
+- Cap nhat `integrate-plan.md`:
+  - Phan biet URL SockJS va native WebSocket.
+  - FE chi poll driver location sau khi trip da co driver.
+  - Khi trip con `SEARCHING`, FE hien dang tim tai xe va cho WebSocket status/offer thay vi coi `DRIVER_LOCATION_NOT_FOUND` la loi.
+
+### Review truoc commit
+
+- Auth/logging/STOMP/WebSocket/driver/matching targeted suite: pass 46 tests.
+- Docker-backed `AuthFlowIntegrationTests` da them assertion `/ws/info` nhung chua rerun duoc vi Docker Desktop dang dong.
+- Chua commit; cho user review patch.
+
+### Files chinh
+
+- `src/main/java/com/example/goride/common/config/WebSocketConfig.java`
+- `src/main/java/com/example/goride/auth/config/SecurityConfig.java`
+- `src/main/java/com/example/goride/matching/service/BookingCreatedMatchingListener.java`
+- `src/test/java/com/example/goride/common/config/WebSocketConfigTests.java`
+- `src/test/java/com/example/goride/matching/service/BookingCreatedMatchingListenerTests.java`
+- `src/test/java/com/example/goride/integration/AuthFlowIntegrationTests.java`
+- `integrate-plan.md`
+- `plan.md`
+- `docs/pland.xlsx`
+
+---
+
+## Commit: `fix: broadcast driver approach location`
+
+Branch: `feature/request-tracing-logging`
+
+Phase: Booking -> matching -> driver approach tracking stabilization
+
+### Muc tieu
+
+Sua loi passenger chi thay vi tri tai xe sau khi driver bam bat dau chuyen. Log cho thay driver da gui `/app/driver.location` sau khi accept, nhung backend chi chap nhan trip `IN_PROGRESS`, nen toa do khi tai xe dang den diem don bi tu choi voi "Driver has no in-progress trip".
+
+### Noi dung da trien khai
+
+- Cho phep driver update location khi trip o cac status:
+  - `ACCEPTED`
+  - `ARRIVED`
+  - `IN_PROGRESS`
+- Them repository query lay current tracking trip cua driver theo status active assigned moi nhat.
+- Tach behavior tracking:
+  - `ACCEPTED`/`ARRIVED`: chi cache latest location va broadcast realtime cho passenger xem tai xe dang den diem don.
+  - `IN_PROGRESS`: cache/broadcast dong thoi luu `TripLocationHistory` de tinh actual distance/final fare.
+- Cap nhat FE guide:
+  - Passenger co the subscribe/poll driver location sau khi trip co driver va status la `ACCEPTED`, `ARRIVED` hoac `IN_PROGRESS`.
+  - Khong poll khi `SEARCHING` hoac `NO_DRIVER`.
+
+### Review truoc commit
+
+- Auth/logging/STOMP/WebSocket/driver/matching/tracking targeted suite: pass 57 tests.
+- Docker-backed `BookingMatchingRoutingIntegrationTests` chua rerun duoc vi Docker Desktop/dockerdang dong (`docker_engine` access denied).
+- Chua commit; cho user review patch.
+
+### Files chinh
+
+- `src/main/java/com/example/goride/booking/repository/TripRepository.java`
+- `src/main/java/com/example/goride/tracking/service/TripLocationTrackingService.java`
+- `src/test/java/com/example/goride/tracking/service/TripLocationTrackingServiceTests.java`
+- `integrate-plan.md`
+- `plan.md`
+- `docs/pland.xlsx`
+
+---
+
+## Commit: `feat: add request tracing logs`
+
+Branch: `feature/request-tracing-logging`
+
+Phase: Phase 4 - Production readiness, observability foundation
+
+### Muc tieu
+
+Them correlation ID va logging tap trung de truy vet loi REST tu FE den backend ma khong ghi request body, password, token hoac query string nhay cam.
+
+### Noi dung da trien khai
+
+- Them `RequestCorrelationFilter` chay truoc Spring Security:
+  - Nhan `X-Request-Id` an toan tu client hoac tu sinh UUID.
+  - Gan request ID vao SLF4J MDC va tra lai trong response header.
+  - Log method, path, HTTP status va duration cho moi request.
+  - Loai request ID khoi MDC sau request de tranh ro ri giua servlet threads.
+- Them `requestId` vao error response de FE/support doi chieu truc tiep voi backend log.
+- Them centralized exception logging:
+  - Business/validation/auth/access-denied log WARN voi method, path va error code/field names.
+  - Unexpected exception log ERROR kem full stack trace.
+- Them security entry-point/access-denied logging cho loi xay ra truoc controller.
+- Them console log pattern co request ID; khong log request body, Authorization header, token, password hoac query string.
+- Cap nhat FE integration guide de client tao, nhan va luu `X-Request-Id` khi bao loi.
+
+### Review truoc commit
+
+- Targeted request tracing va auth integration tests: pass 4 tests.
+- `./mvnw.cmd test`: pass 325 tests, 0 failure, 0 error.
+- `git diff --check`: khong co whitespace error.
+- CodeRabbit khong chay duoc: CLI chua cai va official installer execution da bi environment security policy chan o luong cai dat truoc; khong gan nhan CodeRabbit cho ket qua review khac.
+
+### Files chinh
+
+- `src/main/java/com/example/goride/common/logging/RequestCorrelationFilter.java`
+- `src/main/java/com/example/goride/common/api/ErrorResponse.java`
+- `src/main/java/com/example/goride/common/error/GlobalExceptionHandler.java`
+- `src/main/java/com/example/goride/auth/security/RestAuthenticationEntryPoint.java`
+- `src/main/java/com/example/goride/auth/security/RestAccessDeniedHandler.java`
+- `src/test/java/com/example/goride/common/logging/RequestCorrelationFilterTests.java`
+- `src/test/java/com/example/goride/common/api/ErrorResponseTests.java`
+- `integrate-plan.md`
+- `plan.md`
+- `docs/pland.xlsx`
+
+### Viec tiep theo
+
+- Ship stdout log vao centralized logging platform va dat retention/search/alert rules.
+- Them metrics, health/readiness va distributed tracing neu tach service.
+- Them rate limit va production CORS policy.
+
+---
+
 ## Commit: `test: cover booking matching routing flow`
 
 Branch: `feature/booking-matching-routing-integration`

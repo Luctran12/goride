@@ -5,6 +5,7 @@ import com.example.goride.common.error.ErrorCode;
 import com.example.goride.driver.domain.DriverProfile;
 import com.example.goride.driver.domain.VehicleType;
 import com.example.goride.driver.dto.DriverHeartbeatRequest;
+import com.example.goride.driver.event.DriverAvailableEvent;
 import com.example.goride.driver.repository.DriverProfileRepository;
 import com.example.goride.driver.service.availability.DriverAvailabilityProperties;
 import com.example.goride.driver.service.availability.DriverAvailabilityStore;
@@ -16,6 +17,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
@@ -43,6 +45,9 @@ class DriverHeartbeatServiceTests {
     @Mock
     private DriverAvailabilityStore driverAvailabilityStore;
 
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
+
     private DriverHeartbeatService service;
 
     @BeforeEach
@@ -51,7 +56,8 @@ class DriverHeartbeatServiceTests {
                 driverProfileRepository,
                 driverAvailabilityStore,
                 new DriverAvailabilityProperties(),
-                Clock.fixed(NOW, ZoneOffset.UTC)
+                Clock.fixed(NOW, ZoneOffset.UTC),
+                eventPublisher
         );
     }
 
@@ -68,6 +74,7 @@ class DriverHeartbeatServiceTests {
                 ArgumentCaptor.forClass(DriverAvailabilityStore.DriverAvailability.class);
         verify(driverAvailabilityStore).refreshHeartbeat(captor.capture());
         verify(driverProfileRepository).save(profile);
+        verify(eventPublisher).publishEvent(new DriverAvailableEvent(10L));
         assertThat(captor.getValue().driverId()).isEqualTo(10L);
         assertThat(captor.getValue().latitude()).isEqualByComparingTo("10.7769");
         assertThat(response.online()).isTrue();

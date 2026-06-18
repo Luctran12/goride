@@ -49,6 +49,8 @@ public class SecurityConfig {
                                 "/api/v1/pricing/**",
                                 "/ws",
                                 "/ws/**",
+                                "/ws-native",
+                                "/ws-native/**",
                                 "/v3/api-docs/**",
                                 "/swagger-ui/**",
                                 "/swagger-ui.html"

@@ -5,6 +5,7 @@ import com.example.goride.common.error.ErrorCode;
 import com.example.goride.driver.domain.DriverProfile;
 import com.example.goride.driver.dto.DriverHeartbeatRequest;
 import com.example.goride.driver.dto.DriverHeartbeatResponse;
+import com.example.goride.driver.event.DriverAvailableEvent;
 import com.example.goride.driver.repository.DriverProfileRepository;
 import com.example.goride.driver.service.availability.DriverAvailabilityProperties;
 import com.example.goride.driver.service.availability.DriverAvailabilityStore;
@@ -13,8 +14,11 @@ import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.GeometryFactory;
 import org.locationtech.jts.geom.Point;
 import org.locationtech.jts.geom.PrecisionModel;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.Clock;
 import java.time.Instant;
@@ -27,17 +31,20 @@ public class DriverHeartbeatService {
     private final DriverAvailabilityStore driverAvailabilityStore;
     private final DriverAvailabilityProperties properties;
     private final Clock clock;
+    private final ApplicationEventPublisher eventPublisher;
 
     public DriverHeartbeatService(
             DriverProfileRepository driverProfileRepository,
             DriverAvailabilityStore driverAvailabilityStore,
             DriverAvailabilityProperties properties,
-            Clock clock
+            Clock clock,
+            ApplicationEventPublisher eventPublisher
     ) {
         this.driverProfileRepository = driverProfileRepository;
         this.driverAvailabilityStore = driverAvailabilityStore;
         this.properties = properties;
         this.clock = clock;
+        this.eventPublisher = eventPublisher;
     }
 
     @Transactional
@@ -63,6 +70,7 @@ public class DriverHeartbeatService {
 
         profile.recordHeartbeat(location, heartbeatAt);
         driverProfileRepository.save(profile);
+        runAfterCommit(() -> eventPublisher.publishEvent(new DriverAvailableEvent(userId)));
         return new DriverHeartbeatResponse(
                 true,
                 heartbeatAt,
@@ -84,5 +92,19 @@ public class DriverHeartbeatService {
                 user.getFullName(),
                 user.getAvatarUrl()
         );
+    }
+
+    private void runAfterCommit(Runnable action) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            action.run();
+            return;
+        }
+
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                action.run();
+            }
+        });
     }
 }

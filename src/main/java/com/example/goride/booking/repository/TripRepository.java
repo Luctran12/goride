@@ -26,9 +26,16 @@ public interface TripRepository extends JpaRepository<Trip, Long> {
 
     List<Trip> findByDriverIdAndDeletedAtIsNullOrderByRequestedAtDesc(Long driverId);
 
+    List<Trip> findByStatusAndDeletedAtIsNullOrderByRequestedAtAsc(TripStatus status);
+
     Optional<Trip> findFirstByDriverIdAndStatusAndDeletedAtIsNullOrderByStartedAtDesc(
             Long driverId,
             TripStatus status
+    );
+
+    Optional<Trip> findFirstByDriverIdAndStatusInAndDeletedAtIsNullOrderByAcceptedAtDesc(
+            Long driverId,
+            Collection<TripStatus> statuses
     );
 
     boolean existsByPassengerIdAndStatusInAndDeletedAtIsNull(Long passengerId, Collection<TripStatus> statuses);

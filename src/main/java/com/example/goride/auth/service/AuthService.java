@@ -11,6 +11,8 @@ import com.example.goride.user.domain.User;
 import com.example.goride.user.domain.UserRole;
 import com.example.goride.user.domain.UserStatus;
 import com.example.goride.user.repository.UserRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,6 +21,8 @@ import java.util.Set;
 
 @Service
 public class AuthService {
+    private static final Logger log = LoggerFactory.getLogger(AuthService.class);
+
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenService jwtTokenService;
@@ -65,13 +69,23 @@ public class AuthService {
 
     @Transactional
     public AuthResponse login(LoginRequest request) {
-        User user = userRepository.findByPhoneAndDeletedAtIsNull(request.phone().trim())
-                .orElseThrow(() -> new BusinessException(ErrorCode.INVALID_CREDENTIALS));
+        String phone = request.phone().trim();
+        User user = userRepository.findByPhoneAndDeletedAtIsNull(phone)
+                .orElseThrow(() -> {
+                    log.warn("Login failed reason=user_not_found phoneSuffix={}", phoneSuffix(phone));
+                    return new BusinessException(ErrorCode.INVALID_CREDENTIALS);
+                });
 
         if (!passwordEncoder.matches(request.password(), user.getPasswordHash())) {
+            log.warn(
+                    "Login failed reason=password_mismatch userId={} phoneSuffix={}",
+                    user.getId(),
+                    phoneSuffix(phone)
+            );
             throw new BusinessException(ErrorCode.INVALID_CREDENTIALS);
         }
         if (user.getStatus() != UserStatus.ACTIVE) {
+            log.warn("Login failed reason=user_inactive userId={} status={}", user.getId(), user.getStatus());
             throw new BusinessException(ErrorCode.FORBIDDEN, "User account is not active");
         }
 
@@ -109,5 +123,12 @@ public class AuthService {
             return null;
         }
         return value.trim();
+    }
+
+    private String phoneSuffix(String phone) {
+        if (phone.length() <= 4) {
+            return phone;
+        }
+        return phone.substring(phone.length() - 4);
     }
 }

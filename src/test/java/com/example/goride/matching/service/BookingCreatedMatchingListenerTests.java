@@ -57,7 +57,7 @@ class BookingCreatedMatchingListenerTests {
     }
 
     @Test
-    void bookingCreatedDoesNotNotifyWhenNoDriverCanBeLocked() {
+    void bookingCreatedKeepsSearchingWhenNoDriverCanBeLocked() {
         BookingCreatedEvent event = event();
         when(matchingService.findAndLockDriver(any(MatchingRequest.class))).thenReturn(Optional.empty());
         BookingCreatedMatchingListener listener = new BookingCreatedMatchingListener(
