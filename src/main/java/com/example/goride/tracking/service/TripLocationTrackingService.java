@@ -19,11 +19,18 @@ import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.math.BigDecimal;
+import java.time.Instant;
+import java.util.Set;
 import java.util.Objects;
 
 @Service
 public class TripLocationTrackingService {
     private static final GeometryFactory GEOMETRY_FACTORY = new GeometryFactory(new PrecisionModel(), 4326);
+    private static final Set<TripStatus> DRIVER_TRACKING_STATUSES = Set.of(
+            TripStatus.ACCEPTED,
+            TripStatus.ARRIVED,
+            TripStatus.IN_PROGRESS
+    );
 
     private final TripRepository tripRepository;
     private final TripLocationHistoryRepository tripLocationHistoryRepository;
@@ -48,30 +55,43 @@ public class TripLocationTrackingService {
             throw new BusinessException(ErrorCode.VALIDATION_ERROR, "Driver location is required");
         }
 
-        Trip trip = tripRepository.findFirstByDriverIdAndStatusAndDeletedAtIsNullOrderByStartedAtDesc(
+        Trip trip = tripRepository.findFirstByDriverIdAndStatusInAndDeletedAtIsNullOrderByAcceptedAtDesc(
                         driverId,
-                        TripStatus.IN_PROGRESS
+                        DRIVER_TRACKING_STATUSES
                 )
                 .orElseThrow(() -> new BusinessException(
                         ErrorCode.TRIP_NOT_FOUND,
-                        "Driver has no in-progress trip"
+                        "Driver has no active assigned trip"
                 ));
 
         Point location = toPoint(request.lat(), request.lng());
         Long tripId = trip.getId();
-        TripLocationHistory history = tripLocationHistoryRepository.save(TripLocationHistory.record(
-                trip,
-                location,
-                request.bearing(),
-                request.speed()
-        ));
-        DriverLocationResponse response = responseFrom(trip, driverId, history);
+        DriverLocationResponse response = recordHistoryWhenTripStarted(trip, driverId, request, location);
         LatestDriverLocationStore.LatestDriverLocation latestLocation = latestFrom(response);
         runAfterCommit(() -> {
             latestDriverLocationStore.save(latestLocation);
             tripLocationNotifier.broadcastDriverLocation(tripId, response);
         });
         return response;
+    }
+
+    private DriverLocationResponse recordHistoryWhenTripStarted(
+            Trip trip,
+            Long driverId,
+            DriverLocationUpdateRequest request,
+            Point location
+    ) {
+        if (trip.getStatus() != TripStatus.IN_PROGRESS) {
+            return responseFrom(trip, driverId, location, request, Instant.now());
+        }
+
+        TripLocationHistory history = tripLocationHistoryRepository.save(TripLocationHistory.record(
+                trip,
+                location,
+                request.bearing(),
+                request.speed()
+        ));
+        return responseFrom(trip, driverId, history);
     }
 
     @Transactional(readOnly = true)
@@ -102,14 +122,35 @@ public class TripLocationTrackingService {
 
     private DriverLocationResponse responseFrom(Trip trip, Long driverId, TripLocationHistory history) {
         Point location = history.getLocation();
+        return responseFrom(
+                trip,
+                driverId,
+                location,
+                new DriverLocationUpdateRequest(
+                        BigDecimal.valueOf(location.getY()),
+                        BigDecimal.valueOf(location.getX()),
+                        history.getBearing(),
+                        history.getSpeed()
+                ),
+                history.getRecordedAt()
+        );
+    }
+
+    private DriverLocationResponse responseFrom(
+            Trip trip,
+            Long driverId,
+            Point location,
+            DriverLocationUpdateRequest request,
+            Instant updatedAt
+    ) {
         return new DriverLocationResponse(
                 trip.getId(),
                 driverId,
                 BigDecimal.valueOf(location.getY()),
                 BigDecimal.valueOf(location.getX()),
-                history.getBearing(),
-                history.getSpeed(),
-                history.getRecordedAt()
+                request.bearing(),
+                request.speed(),
+                updatedAt
         );
     }
 

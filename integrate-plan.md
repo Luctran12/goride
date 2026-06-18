@@ -1,6 +1,6 @@
 # GoRide Front-end Integration Plan
 
-Branch da kiem tra: `feature/booking-matching-routing-integration`
+Branch da kiem tra: `feature/request-tracing-logging`
 
 Muc tieu file nay:
 - Checklist chuc nang backend da co code va co the tich hop FE.
@@ -52,11 +52,19 @@ Voi create:
     "message": "Request is invalid",
     "details": {}
   },
+  "requestId": "fe-booking-550e8400",
   "timestamp": "2026-05-27T10:00:00Z"
 }
 ```
 
 FE nen map `error.code` thay vi chi doc text message.
+
+### Request tracing
+
+- FE co the gui header `X-Request-Id` tren moi REST request. Gia tri nen la UUID hoac ID duy nhat gom toi da 64 ky tu chu, so, `.`, `_`, `:`, `-`.
+- Backend luon tra `X-Request-Id` trong response header; neu FE khong gui hoac gui gia tri khong an toan, backend tu sinh UUID.
+- Error response cung co field `requestId`. Khi hien man loi/support, FE nen luu `requestId`, endpoint, thoi gian va `error.code` de backend tim dung log.
+- Khong dua access token, refresh token, password hoac thong tin nhay cam vao `X-Request-Id`.
 
 ### Auth header
 
@@ -334,6 +342,7 @@ FE action:
 - Luu `accessToken` trong memory/secure storage.
 - Luu `refreshToken` trong secure storage.
 - Dieu huong theo role: passenger app, driver onboarding, admin neu co.
+- Gan mot `X-Request-Id` moi cho moi request; neu request fail, ghi lai `response.requestId` de trace voi backend.
 
 #### Dang nhap
 
@@ -636,6 +645,7 @@ FE action:
 ### 4.4 Matching va driver offer
 
 Matching chay tu dong sau khi passenger tao booking. FE khong co endpoint "start matching" rieng.
+Neu chua co driver online/phu hop ngay lan matching dau, backend giu trip o `SEARCHING`. Khi driver online hoac gui heartbeat thanh cong, backend tu thu match lai cac trip dang `SEARCHING` chua co offer active.
 
 Driver can:
 1. Tao profile.
@@ -849,12 +859,13 @@ Payload:
 }
 ```
 
-Backend se tim trip `IN_PROGRESS` moi nhat cua driver. Khong can gui `tripId` trong payload.
+Backend se tim trip active moi nhat cua driver voi status `ACCEPTED`, `ARRIVED` hoac `IN_PROGRESS`. Khong can gui `tripId` trong payload.
 
 FE action:
-- Chi gui location khi trip status `IN_PROGRESS`.
+- Bat dau gui location ngay sau khi driver accept trip (`ACCEPTED`) de passenger thay tai xe dang den diem don.
+- Tiep tuc gui location trong `ARRIVED` va `IN_PROGRESS`.
 - Tan suat goi y: 3-5 giay/lan voi mobile MVP.
-- Neu backend tra/emit loi `TRIP_NOT_FOUND`, dung tracking vi driver chua co trip in-progress.
+- Neu backend tra/emit loi `TRIP_NOT_FOUND`, dung tracking vi driver chua co active assigned trip.
 
 #### Passenger subscribe vi tri driver
 
@@ -887,6 +898,9 @@ FE action:
 - Goi REST khi mo lai app/deep link vao trip screen.
 - Sau do dung WebSocket topic de realtime.
 - Neu `DRIVER_LOCATION_NOT_FOUND`, hien "Dang cho vi tri tai xe".
+- Chi bat dau subscribe/polling vi tri khi trip da co driver va status la `ACCEPTED`, `ARRIVED` hoac `IN_PROGRESS`; khong polling khi status con `SEARCHING` hoac da la `NO_DRIVER`.
+- Backend nhan vi tri driver tu luc `ACCEPTED` de passenger thay tai xe dang den diem don. Vi tri truoc `IN_PROGRESS` chi duoc cache/broadcast realtime, khong luu vao trip location history dung de tinh quang duong/final fare.
+- Khi status con `SEARCHING`, hien man hinh dang tim tai xe va cho offer/status qua WebSocket; khong coi `DRIVER_LOCATION_NOT_FOUND` la loi.
 
 ---
 
@@ -1743,7 +1757,26 @@ FE action:
 Endpoint:
 
 ```text
-ws://localhost:8080/ws
+SockJS: http://localhost:8080/ws
+Native WebSocket: ws://localhost:8080/ws-native
+```
+
+FE dung `SockJS`:
+
+```ts
+const socket = new SockJS("http://localhost:8080/ws");
+const client = Stomp.over(socket);
+```
+
+FE dung native WebSocket voi `@stomp/stompjs`:
+
+```ts
+const client = new Client({
+  brokerURL: "ws://localhost:8080/ws-native",
+  connectHeaders: {
+    Authorization: `Bearer ${accessToken}`,
+  },
+});
 ```
 
 Application destination prefix:
@@ -1768,7 +1801,7 @@ connectHeaders: {
 }
 ```
 
-Luu y: HTTP handshake toi `/ws` duoc mo de client ket noi WebSocket. Backend authenticate o STOMP `CONNECT`; neu thieu hoac sai `Authorization: Bearer <accessToken>`, connection frame bi tu choi. Sau khi connect thanh cong, backend gan `Principal`/roles tu JWT cho message mapping nhu `/app/driver.location`.
+Luu y: `/ws` la SockJS endpoint nen request `GET /ws/info` phai tra `200`. `/ws-native` la endpoint cho native WebSocket. Backend authenticate o STOMP `CONNECT`; neu thieu hoac sai `Authorization: Bearer <accessToken>`, connection frame bi tu choi. Sau khi connect thanh cong, backend gan `Principal`/roles tu JWT cho message mapping nhu `/app/driver.location`.
 
 Subscribe vao `/topic/trip/{tripId}/status` va `/topic/trip/{tripId}/location` chi thanh cong neu JWT user la passenger cua trip, driver cua trip, hoac admin. Neu FE subscribe nham trip, backend reject frame voi `FORBIDDEN`/access denied o WebSocket layer.
 

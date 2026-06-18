@@ -32,6 +32,7 @@ import java.util.Set;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -68,9 +69,9 @@ class TripLocationTrackingServiceTests {
     void recordsCachesAndBroadcastsDriverLocationForInProgressTrip() {
         Trip trip = inProgressTrip(driver(20L));
         DriverLocationUpdateRequest request = locationRequest();
-        when(tripRepository.findFirstByDriverIdAndStatusAndDeletedAtIsNullOrderByStartedAtDesc(
-                20L,
-                TripStatus.IN_PROGRESS
+        when(tripRepository.findFirstByDriverIdAndStatusInAndDeletedAtIsNullOrderByAcceptedAtDesc(
+                eq(20L),
+                any()
         )).thenReturn(Optional.of(trip));
         when(tripLocationHistoryRepository.save(any(TripLocationHistory.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
@@ -98,10 +99,34 @@ class TripLocationTrackingServiceTests {
     }
 
     @Test
-    void rejectsLocationUpdateWhenDriverHasNoInProgressTrip() {
-        when(tripRepository.findFirstByDriverIdAndStatusAndDeletedAtIsNullOrderByStartedAtDesc(
-                20L,
-                TripStatus.IN_PROGRESS
+    void cachesAndBroadcastsDriverLocationForAcceptedTripWithoutRecordingHistory() {
+        Trip trip = acceptedTrip(driver(20L));
+        DriverLocationUpdateRequest request = locationRequest();
+        when(tripRepository.findFirstByDriverIdAndStatusInAndDeletedAtIsNullOrderByAcceptedAtDesc(
+                eq(20L),
+                any()
+        )).thenReturn(Optional.of(trip));
+
+        var response = service.updateDriverLocation(20L, request);
+
+        ArgumentCaptor<LatestDriverLocationStore.LatestDriverLocation> latestCaptor =
+                ArgumentCaptor.forClass(LatestDriverLocationStore.LatestDriverLocation.class);
+        verifyNoInteractions(tripLocationHistoryRepository);
+        verify(latestDriverLocationStore).save(latestCaptor.capture());
+        verify(tripLocationNotifier).broadcastDriverLocation(99L, response);
+        assertThat(response.tripId()).isEqualTo(99L);
+        assertThat(response.driverId()).isEqualTo(20L);
+        assertThat(response.lat()).isEqualByComparingTo("10.7800");
+        assertThat(response.lng()).isEqualByComparingTo("106.6900");
+        assertThat(response.updatedAt()).isNotNull();
+        assertThat(latestCaptor.getValue().tripId()).isEqualTo(99L);
+    }
+
+    @Test
+    void rejectsLocationUpdateWhenDriverHasNoActiveAssignedTrip() {
+        when(tripRepository.findFirstByDriverIdAndStatusInAndDeletedAtIsNullOrderByAcceptedAtDesc(
+                eq(20L),
+                any()
         )).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.updateDriverLocation(20L, locationRequest()))
@@ -183,10 +208,15 @@ class TripLocationTrackingServiceTests {
     }
 
     private Trip inProgressTrip(User driver) {
-        Trip trip = sampleTrip();
-        trip.accept(driver);
+        Trip trip = acceptedTrip(driver);
         trip.markArrived();
         trip.startTrip();
+        return trip;
+    }
+
+    private Trip acceptedTrip(User driver) {
+        Trip trip = sampleTrip();
+        trip.accept(driver);
         return trip;
     }
 
