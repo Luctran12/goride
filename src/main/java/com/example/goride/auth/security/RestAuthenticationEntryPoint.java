@@ -5,6 +5,8 @@ import com.example.goride.common.error.ErrorCode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.MediaType;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.web.AuthenticationEntryPoint;
@@ -15,6 +17,8 @@ import java.util.Map;
 
 @Component
 public class RestAuthenticationEntryPoint implements AuthenticationEntryPoint {
+    private static final Logger log = LoggerFactory.getLogger(RestAuthenticationEntryPoint.class);
+
     private final ObjectMapper objectMapper;
 
     public RestAuthenticationEntryPoint(ObjectMapper objectMapper) {
@@ -27,6 +31,11 @@ public class RestAuthenticationEntryPoint implements AuthenticationEntryPoint {
             HttpServletResponse response,
             AuthenticationException authException
     ) throws IOException {
+        log.warn(
+                "Security authentication rejected method={} path={}",
+                request.getMethod(),
+                request.getRequestURI()
+        );
         response.setStatus(ErrorCode.TOKEN_INVALID.httpStatus().value());
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
         objectMapper.writeValue(

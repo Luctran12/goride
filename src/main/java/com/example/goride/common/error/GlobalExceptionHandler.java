@@ -2,6 +2,9 @@ package com.example.goride.common.error;
 
 import com.example.goride.common.api.ErrorResponse;
 import jakarta.validation.ConstraintViolationException;
+import jakarta.servlet.http.HttpServletRequest;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -17,53 +20,115 @@ import java.util.Map;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+    private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
+
     @ExceptionHandler(BusinessException.class)
-    public ResponseEntity<ErrorResponse> handleBusinessException(BusinessException exception) {
+    public ResponseEntity<ErrorResponse> handleBusinessException(
+            BusinessException exception,
+            HttpServletRequest request
+    ) {
         ErrorCode errorCode = exception.errorCode();
+        log.warn(
+                "Business request rejected method={} path={} errorCode={}",
+                request.getMethod(),
+                request.getRequestURI(),
+                errorCode.name()
+        );
         return ResponseEntity
                 .status(errorCode.httpStatus())
                 .body(ErrorResponse.of(errorCode, exception.getMessage(), exception.details()));
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity<ErrorResponse> handleMethodArgumentNotValid(MethodArgumentNotValidException exception) {
+    public ResponseEntity<ErrorResponse> handleMethodArgumentNotValid(
+            MethodArgumentNotValidException exception,
+            HttpServletRequest request
+    ) {
         Map<String, Object> details = new LinkedHashMap<>();
         for (FieldError fieldError : exception.getBindingResult().getFieldErrors()) {
             details.put(fieldError.getField(), fieldError.getDefaultMessage());
         }
+        log.warn(
+                "Request validation failed method={} path={} fields={}",
+                request.getMethod(),
+                request.getRequestURI(),
+                details.keySet()
+        );
         return validationError(details);
     }
 
     @ExceptionHandler(ConstraintViolationException.class)
-    public ResponseEntity<ErrorResponse> handleConstraintViolation(ConstraintViolationException exception) {
+    public ResponseEntity<ErrorResponse> handleConstraintViolation(
+            ConstraintViolationException exception,
+            HttpServletRequest request
+    ) {
         Map<String, Object> details = new LinkedHashMap<>();
         exception.getConstraintViolations().forEach(violation ->
                 details.put(violation.getPropertyPath().toString(), violation.getMessage())
+        );
+        log.warn(
+                "Request constraint validation failed method={} path={} fields={}",
+                request.getMethod(),
+                request.getRequestURI(),
+                details.keySet()
         );
         return validationError(details);
     }
 
     @ExceptionHandler(HttpMessageNotReadableException.class)
-    public ResponseEntity<ErrorResponse> handleHttpMessageNotReadable(HttpMessageNotReadableException exception) {
+    public ResponseEntity<ErrorResponse> handleHttpMessageNotReadable(
+            HttpMessageNotReadableException exception,
+            HttpServletRequest request
+    ) {
+        log.warn(
+                "Request body is unreadable method={} path={}",
+                request.getMethod(),
+                request.getRequestURI()
+        );
         return validationError(Map.of("requestBody", "Request body is malformed or unreadable"));
     }
 
     @ExceptionHandler(AuthenticationException.class)
-    public ResponseEntity<ErrorResponse> handleAuthentication(AuthenticationException exception) {
+    public ResponseEntity<ErrorResponse> handleAuthentication(
+            AuthenticationException exception,
+            HttpServletRequest request
+    ) {
+        log.warn(
+                "Request authentication failed method={} path={}",
+                request.getMethod(),
+                request.getRequestURI()
+        );
         return ResponseEntity
                 .status(HttpStatus.UNAUTHORIZED)
                 .body(ErrorResponse.of(ErrorCode.TOKEN_INVALID, ErrorCode.TOKEN_INVALID.defaultMessage(), Map.of()));
     }
 
     @ExceptionHandler(AccessDeniedException.class)
-    public ResponseEntity<ErrorResponse> handleAccessDenied(AccessDeniedException exception) {
+    public ResponseEntity<ErrorResponse> handleAccessDenied(
+            AccessDeniedException exception,
+            HttpServletRequest request
+    ) {
+        log.warn(
+                "Request access denied method={} path={}",
+                request.getMethod(),
+                request.getRequestURI()
+        );
         return ResponseEntity
                 .status(HttpStatus.FORBIDDEN)
                 .body(ErrorResponse.of(ErrorCode.FORBIDDEN, ErrorCode.FORBIDDEN.defaultMessage(), Map.of()));
     }
 
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<ErrorResponse> handleUnexpected(Exception exception) {
+    public ResponseEntity<ErrorResponse> handleUnexpected(
+            Exception exception,
+            HttpServletRequest request
+    ) {
+        log.error(
+                "Unexpected request failure method={} path={}",
+                request.getMethod(),
+                request.getRequestURI(),
+                exception
+        );
         return ResponseEntity
                 .status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(ErrorResponse.of(
