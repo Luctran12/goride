@@ -6,6 +6,44 @@
 
 ---
 
+## Commit: `fix: keep searching trips after driver rejection`
+
+Branch: `develop`
+
+Phase: Booking -> matching retry stabilization
+
+### Muc tieu
+
+Sua loi tren thiet bi that: passenger dat chuyen, offer gui den driver, driver bam tu choi thi trip cua passenger bi chuyen sang ket thuc/tim khong thay tai xe thay vi tiep tuc tim driver khac.
+
+### Noi dung da trien khai
+
+- Doi behavior khi driver reject offer:
+  - Release lock driver hien tai va clear matching state active.
+  - Them driver vua reject vao excluded list khi thu candidate tiep theo.
+  - Neu co driver tiep theo: gui offer moi nhu cu.
+  - Neu chua co driver tiep theo ngay luc do: giu trip o `SEARCHING`, khong save `NO_DRIVER`, khong gui `NO_DRIVER_FOUND` cho passenger.
+- Doi behavior offer timeout tuong tu reject:
+  - Driver timeout duoc exclude o attempt tiep theo.
+  - Neu chua co candidate moi, trip van `SEARCHING` de co the rematch khi driver khac online/heartbeat.
+- Loai bo gioi han terminal theo `MAX_MATCHING_ATTEMPTS`; attempt van tang de trace retry, nhung khong dung de huy trip som.
+- Cap nhat `integrate-plan.md` va `plan.md` de FE giu passenger o man hinh searching sau reject/timeout.
+
+### Review truoc commit
+
+- Chua commit; cho user review patch.
+
+### Files chinh
+
+- `src/main/java/com/example/goride/matching/service/DriverOfferResponseService.java`
+- `src/main/java/com/example/goride/matching/service/MatchingOfferTimeoutService.java`
+- `src/test/java/com/example/goride/matching/service/DriverOfferResponseServiceTests.java`
+- `src/test/java/com/example/goride/matching/service/MatchingOfferTimeoutServiceTests.java`
+- `integrate-plan.md`
+- `plan.md`
+
+---
+
 ## Commit: `fix: complete initial matching and SockJS handshake`
 
 Branch: `feature/request-tracing-logging`

@@ -156,8 +156,8 @@ type PaymentStatus = "PENDING" | "COMPLETED" | "FAILED" | "REFUNDED";
 - [x] Gui offer toi driver qua WebSocket user queue.
 - [x] Driver accept/reject offer.
 - [x] Driver accept thi trip chuyen `SEARCHING -> ACCEPTED`, driver status Redis thanh `BUSY`.
-- [x] Driver reject/timeout thi backend thu driver tiep theo toi da 3 lan.
-- [x] Het driver thi trip chuyen `NO_DRIVER` va notify passenger.
+- [x] Driver reject/timeout thi backend release offer hien tai, exclude driver do va thu driver tiep theo neu co candidate kha dung.
+- [x] Neu chua co driver tiep theo ngay luc do, trip van giu `SEARCHING` de rematch khi driver khac online/heartbeat; khong chuyen `NO_DRIVER` chi vi mot driver reject/timeout.
 
 ### Trip status
 
@@ -711,8 +711,8 @@ Response `data`:
 FE action:
 - Hien countdown den `expiresAt`.
 - Neu accept thanh cong, mo man trip driver.
-- Neu reject thanh cong, dong modal offer.
-- Neu `MATCHING_OFFER_EXPIRED`, dong offer va doi offer moi.
+- Neu reject thanh cong, dong modal offer; passenger trip van `SEARCHING` neu backend chua tim duoc driver tiep theo.
+- Neu `MATCHING_OFFER_EXPIRED`, dong offer va doi offer moi. Passenger van o man hinh dang tim tai xe cho toi khi co driver accept, co offer moi cho driver khac, hoac passenger tu huy.
 
 Passenger can subscribe:
 
@@ -721,7 +721,7 @@ Passenger can subscribe:
 /user/queue/notifications
 ```
 
-Khi driver accept, passenger nhan `TRIP_ACCEPTED` notification va topic status `ACCEPTED`.
+Khi driver accept, passenger nhan `TRIP_ACCEPTED` notification va topic status `ACCEPTED`. Khi driver reject/offer timeout, passenger khong nhan `NO_DRIVER_FOUND` neu trip van co the tiep tuc search/rematch.
 
 #### Routing cho tai xe den pickup/dropoff
 

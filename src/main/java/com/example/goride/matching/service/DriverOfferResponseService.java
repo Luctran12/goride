@@ -33,8 +33,6 @@ import java.util.Set;
 
 @Service
 public class DriverOfferResponseService {
-    private static final int MAX_MATCHING_ATTEMPTS = 3;
-
     private final TripRepository tripRepository;
     private final TripStatusHistoryRepository tripStatusHistoryRepository;
     private final UserRepository userRepository;
@@ -115,10 +113,6 @@ public class DriverOfferResponseService {
 
         Set<Long> rejectedDriverIds = new LinkedHashSet<>(matchingState.rejectedDriverIds());
         rejectedDriverIds.add(driverId);
-        if (matchingState.attempt() >= MAX_MATCHING_ATTEMPTS) {
-            return markNoDriver(trip, "Matching exhausted after driver rejection");
-        }
-
         Optional<DriverOffer> nextOffer = matchingService.findAndLockDriver(
                 MatchingRequest.from(trip),
                 matchingState.attempt() + 1,
@@ -130,40 +124,13 @@ public class DriverOfferResponseService {
         ));
         return nextOffer
                 .map(offer -> response(trip))
-                .orElseGet(() -> markNoDriver(trip, "No more drivers available after rejection"));
-    }
-
-    private DriverTripResponse markNoDriver(Trip trip, String note) {
-        TripStatus previousStatus = trip.getStatus();
-        trip.markNoDriver();
-        Trip savedTrip = tripRepository.save(trip);
-        tripStatusHistoryRepository.save(TripStatusHistory.record(
-                savedTrip,
-                previousStatus,
-                TripStatus.NO_DRIVER,
-                null,
-                note
-        ));
-        candidateStore.clearTripMatching(savedTrip.getId());
-        notifyPassengerNoDriver(savedTrip);
-        return response(savedTrip);
+                .orElseGet(() -> response(trip));
     }
 
     private void notifyPassengerTripAccepted(Trip trip) {
         Long tripId = trip.getId();
         Long passengerId = trip.getPassenger().getId();
         UserNotification notification = UserNotification.tripAccepted(trip);
-        TripStatusNotification statusNotification = TripStatusNotification.from(trip);
-        runAfterCommit(() -> {
-            tripRealtimeNotifier.notifyPassenger(passengerId, notification);
-            tripRealtimeNotifier.broadcastTripStatus(tripId, statusNotification);
-        });
-    }
-
-    private void notifyPassengerNoDriver(Trip trip) {
-        Long tripId = trip.getId();
-        Long passengerId = trip.getPassenger().getId();
-        UserNotification notification = UserNotification.noDriverFound(trip);
         TripStatusNotification statusNotification = TripStatusNotification.from(trip);
         runAfterCommit(() -> {
             tripRealtimeNotifier.notifyPassenger(passengerId, notification);

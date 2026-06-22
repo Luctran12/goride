@@ -17,7 +17,6 @@ import com.example.goride.matching.domain.MatchingRequest;
 import com.example.goride.matching.domain.TripMatchingState;
 import com.example.goride.matching.notification.DriverOfferNotification;
 import com.example.goride.matching.notification.DriverOfferNotifier;
-import com.example.goride.notification.domain.NotificationType;
 import com.example.goride.notification.dto.TripStatusNotification;
 import com.example.goride.notification.dto.UserNotification;
 import com.example.goride.notification.service.TripRealtimeNotifier;
@@ -43,7 +42,6 @@ import java.util.Set;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -106,7 +104,7 @@ class DriverOfferResponseServiceTests {
         verify(candidateStore).markCandidateBusy(20L);
         verify(candidateStore).releaseCandidateLock(20L);
         verify(candidateStore).clearTripMatching(99L);
-        verifyPassengerNotification(NotificationType.TRIP_ACCEPTED, TripStatus.ACCEPTED);
+        verifyPassengerNotification(TripStatus.ACCEPTED);
         assertThat(response.tripId()).isEqualTo(99L);
         assertThat(response.status()).isEqualTo(TripStatus.ACCEPTED);
         assertThat(trip.getDriver()).isSameAs(driver);
@@ -148,37 +146,44 @@ class DriverOfferResponseServiceTests {
     }
 
     @Test
-    void rejectOfferMarksTripNoDriverAfterThirdAttempt() {
+    void rejectOfferKeepsSearchingAfterThirdAttemptWhenNoNextDriverCanBeLocked() {
         Trip trip = sampleTrip();
         when(candidateStore.findTripMatching(99L)).thenReturn(Optional.of(state(20L, 3, Set.of(18L, 19L))));
         when(tripRepository.findActiveByIdForUpdate(99L)).thenReturn(Optional.of(trip));
-        when(tripRepository.save(any(Trip.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(matchingService.findAndLockDriver(any(MatchingRequest.class), eq(4), any()))
+                .thenReturn(Optional.empty());
 
         var response = service.respondToOffer(20L, 99L, DriverOfferDecision.REJECT);
 
-        ArgumentCaptor<TripStatusHistory> historyCaptor = ArgumentCaptor.forClass(TripStatusHistory.class);
-        verify(matchingService, never()).findAndLockDriver(any(), anyInt(), any());
-        verify(tripStatusHistoryRepository).save(historyCaptor.capture());
-        verifyPassengerNotification(NotificationType.NO_DRIVER_FOUND, TripStatus.NO_DRIVER);
-        assertThat(response.status()).isEqualTo(TripStatus.NO_DRIVER);
-        assertThat(historyCaptor.getValue().getFromStatus()).isEqualTo(TripStatus.SEARCHING);
-        assertThat(historyCaptor.getValue().getToStatus()).isEqualTo(TripStatus.NO_DRIVER);
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Set<Long>> rejectedCaptor = ArgumentCaptor.forClass(Set.class);
+        verify(matchingService).findAndLockDriver(any(MatchingRequest.class), eq(4), rejectedCaptor.capture());
+        verify(tripRepository, never()).save(any());
+        verify(tripStatusHistoryRepository, never()).save(any());
+        verify(tripRealtimeNotifier, never()).notifyPassenger(any(), any());
+        verify(tripRealtimeNotifier, never()).broadcastTripStatus(any(), any());
+        assertThat(response.status()).isEqualTo(TripStatus.SEARCHING);
+        assertThat(trip.getStatus()).isEqualTo(TripStatus.SEARCHING);
+        assertThat(rejectedCaptor.getValue()).containsExactlyInAnyOrder(18L, 19L, 20L);
     }
 
     @Test
-    void rejectOfferMarksTripNoDriverWhenNoNextDriverCanBeLocked() {
+    void rejectOfferKeepsTripSearchingWhenNoNextDriverCanBeLocked() {
         Trip trip = sampleTrip();
         when(candidateStore.findTripMatching(99L)).thenReturn(Optional.of(state(20L, 1, Set.of())));
         when(tripRepository.findActiveByIdForUpdate(99L)).thenReturn(Optional.of(trip));
         when(matchingService.findAndLockDriver(any(MatchingRequest.class), eq(2), any()))
                 .thenReturn(Optional.empty());
-        when(tripRepository.save(any(Trip.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         var response = service.respondToOffer(20L, 99L, DriverOfferDecision.REJECT);
 
         verify(driverOfferNotifier, never()).notifyDriver(any(), any());
-        verifyPassengerNotification(NotificationType.NO_DRIVER_FOUND, TripStatus.NO_DRIVER);
-        assertThat(response.status()).isEqualTo(TripStatus.NO_DRIVER);
+        verify(tripRepository, never()).save(any());
+        verify(tripStatusHistoryRepository, never()).save(any());
+        verify(tripRealtimeNotifier, never()).notifyPassenger(any(), any());
+        verify(tripRealtimeNotifier, never()).broadcastTripStatus(any(), any());
+        assertThat(response.status()).isEqualTo(TripStatus.SEARCHING);
+        assertThat(trip.getStatus()).isEqualTo(TripStatus.SEARCHING);
     }
 
     @Test
@@ -211,12 +216,11 @@ class DriverOfferResponseServiceTests {
         verifyNoInteractions(tripRepository);
     }
 
-    private void verifyPassengerNotification(NotificationType type, TripStatus status) {
+    private void verifyPassengerNotification(TripStatus status) {
         ArgumentCaptor<UserNotification> notificationCaptor = ArgumentCaptor.forClass(UserNotification.class);
         ArgumentCaptor<TripStatusNotification> statusCaptor = ArgumentCaptor.forClass(TripStatusNotification.class);
         verify(tripRealtimeNotifier).notifyPassenger(eq(10L), notificationCaptor.capture());
         verify(tripRealtimeNotifier).broadcastTripStatus(eq(99L), statusCaptor.capture());
-        assertThat(notificationCaptor.getValue().type()).isEqualTo(type);
         assertThat(notificationCaptor.getValue().data())
                 .containsEntry("tripId", 99L)
                 .containsEntry("status", status.name());

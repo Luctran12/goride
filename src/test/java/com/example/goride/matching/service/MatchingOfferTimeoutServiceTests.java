@@ -4,7 +4,6 @@ import com.example.goride.booking.domain.PaymentMethod;
 import com.example.goride.booking.domain.PricingConfig;
 import com.example.goride.booking.domain.Trip;
 import com.example.goride.booking.domain.TripStatus;
-import com.example.goride.booking.domain.TripStatusHistory;
 import com.example.goride.booking.repository.TripRepository;
 import com.example.goride.booking.repository.TripStatusHistoryRepository;
 import com.example.goride.driver.domain.VehicleType;
@@ -14,9 +13,6 @@ import com.example.goride.matching.domain.MatchingRequest;
 import com.example.goride.matching.domain.TripMatchingState;
 import com.example.goride.matching.notification.DriverOfferNotification;
 import com.example.goride.matching.notification.DriverOfferNotifier;
-import com.example.goride.notification.domain.NotificationType;
-import com.example.goride.notification.dto.TripStatusNotification;
-import com.example.goride.notification.dto.UserNotification;
 import com.example.goride.notification.service.TripRealtimeNotifier;
 import com.example.goride.user.domain.User;
 import com.example.goride.user.domain.UserRole;
@@ -38,7 +34,6 @@ import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -73,11 +68,9 @@ class MatchingOfferTimeoutServiceTests {
     void setUp() {
         timeoutService = new MatchingOfferTimeoutService(
                 tripRepository,
-                tripStatusHistoryRepository,
                 candidateStore,
                 matchingService,
-                driverOfferNotifier,
-                tripRealtimeNotifier
+                driverOfferNotifier
         );
     }
 
@@ -134,40 +127,45 @@ class MatchingOfferTimeoutServiceTests {
     }
 
     @Test
-    void expiredOfferMarksTripNoDriverAfterThirdAttempt() {
+    void expiredOfferKeepsSearchingAfterThirdAttemptWhenNoNextDriverCanBeLocked() {
         Trip trip = sampleTrip();
         when(candidateStore.findTripMatching(99L))
                 .thenReturn(Optional.of(state(20L, 3, Instant.now().minusSeconds(1), Set.of(18L, 19L))));
         when(tripRepository.findActiveByIdForUpdate(99L)).thenReturn(Optional.of(trip));
-        when(tripRepository.save(any(Trip.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(matchingService.findAndLockDriver(any(MatchingRequest.class), eq(4), any()))
+                .thenReturn(Optional.empty());
 
         boolean processed = timeoutService.processExpiredOffer(99L);
 
-        ArgumentCaptor<TripStatusHistory> historyCaptor = ArgumentCaptor.forClass(TripStatusHistory.class);
-        verify(matchingService, never()).findAndLockDriver(any(), anyInt(), any());
-        verify(tripStatusHistoryRepository).save(historyCaptor.capture());
-        verifyPassengerNoDriverNotification();
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Set<Long>> rejectedCaptor = ArgumentCaptor.forClass(Set.class);
+        verify(matchingService).findAndLockDriver(any(MatchingRequest.class), eq(4), rejectedCaptor.capture());
+        verify(tripRepository, never()).save(any());
+        verify(tripStatusHistoryRepository, never()).save(any());
+        verify(tripRealtimeNotifier, never()).notifyPassenger(any(), any());
+        verify(tripRealtimeNotifier, never()).broadcastTripStatus(any(), any());
         assertThat(processed).isTrue();
-        assertThat(trip.getStatus()).isEqualTo(TripStatus.NO_DRIVER);
-        assertThat(historyCaptor.getValue().getToStatus()).isEqualTo(TripStatus.NO_DRIVER);
-        assertThat(historyCaptor.getValue().getNote()).isEqualTo("Matching exhausted after offer timeout");
+        assertThat(trip.getStatus()).isEqualTo(TripStatus.SEARCHING);
+        assertThat(rejectedCaptor.getValue()).containsExactlyInAnyOrder(18L, 19L, 20L);
     }
 
     @Test
-    void expiredOfferMarksTripNoDriverWhenNoNextDriverCanBeLocked() {
+    void expiredOfferKeepsTripSearchingWhenNoNextDriverCanBeLocked() {
         Trip trip = sampleTrip();
         when(candidateStore.findTripMatching(99L)).thenReturn(Optional.of(state(20L, 1, Instant.now().minusSeconds(1), Set.of())));
         when(tripRepository.findActiveByIdForUpdate(99L)).thenReturn(Optional.of(trip));
         when(matchingService.findAndLockDriver(any(MatchingRequest.class), eq(2), any()))
                 .thenReturn(Optional.empty());
-        when(tripRepository.save(any(Trip.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         boolean processed = timeoutService.processExpiredOffer(99L);
 
         verify(driverOfferNotifier, never()).notifyDriver(any(), any());
-        verifyPassengerNoDriverNotification();
+        verify(tripRepository, never()).save(any());
+        verify(tripStatusHistoryRepository, never()).save(any());
+        verify(tripRealtimeNotifier, never()).notifyPassenger(any(), any());
+        verify(tripRealtimeNotifier, never()).broadcastTripStatus(any(), any());
         assertThat(processed).isTrue();
-        assertThat(trip.getStatus()).isEqualTo(TripStatus.NO_DRIVER);
+        assertThat(trip.getStatus()).isEqualTo(TripStatus.SEARCHING);
     }
 
     @Test
@@ -183,18 +181,6 @@ class MatchingOfferTimeoutServiceTests {
         verify(candidateStore).clearTripMatching(99L);
         verifyNoInteractions(matchingService, driverOfferNotifier);
         assertThat(processed).isTrue();
-    }
-
-    private void verifyPassengerNoDriverNotification() {
-        ArgumentCaptor<UserNotification> notificationCaptor = ArgumentCaptor.forClass(UserNotification.class);
-        ArgumentCaptor<TripStatusNotification> statusCaptor = ArgumentCaptor.forClass(TripStatusNotification.class);
-        verify(tripRealtimeNotifier).notifyPassenger(eq(10L), notificationCaptor.capture());
-        verify(tripRealtimeNotifier).broadcastTripStatus(eq(99L), statusCaptor.capture());
-        assertThat(notificationCaptor.getValue().type()).isEqualTo(NotificationType.NO_DRIVER_FOUND);
-        assertThat(notificationCaptor.getValue().data())
-                .containsEntry("tripId", 99L)
-                .containsEntry("status", TripStatus.NO_DRIVER.name());
-        assertThat(statusCaptor.getValue().status()).isEqualTo(TripStatus.NO_DRIVER);
     }
 
     private TripMatchingState state(Long driverId, int attempt, Instant expiresAt, Set<Long> rejectedDriverIds) {
