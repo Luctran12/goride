@@ -187,6 +187,7 @@ type PaymentStatus = "PENDING" | "COMPLETED" | "FAILED" | "REFUNDED";
 - [x] Co `CashPaymentProvider` cho payment method `CASH`.
 - [x] Co runtime config foundation cho MoMo/VNPay provider, mac dinh disabled.
 - [x] FE co the lay danh sach payment method/provider metadata tu backend.
+- [x] Admin/devops co the kiem tra readiness MoMo/VNPAY sandbox truoc khi enable checkout that.
 - [x] Backend reject booking neu `paymentMethod` chua duoc enable.
 - [x] Co checkout foundation endpoint cho payment `PENDING`.
 - [x] Co webhook foundation endpoint cho payment provider external callback.
@@ -958,6 +959,57 @@ FE action:
 - Neu backend tra `enabled=false`, disable/hide option hoac hien "Coming soon".
 - Backend cung reject booking neu client gui method chua enabled bang `PAYMENT_PROVIDER_UNSUPPORTED`.
 
+#### Admin kiem tra provider sandbox readiness
+
+```http
+GET /api/v1/payments/providers/readiness
+Authorization: Bearer <adminToken>
+```
+
+Response `data`:
+
+```json
+[
+  {
+    "method": "MOMO",
+    "provider": "momo",
+    "displayName": "MoMo",
+    "enabled": true,
+    "sandbox": true,
+    "providerRegistered": true,
+    "checkoutConfigured": true,
+    "webhookConfigured": true,
+    "checkoutReady": true,
+    "webhookReady": true,
+    "sandboxReady": true,
+    "missingRequirements": [],
+    "webhookMaxAgeSeconds": 86400,
+    "webhookFutureSkewSeconds": 300
+  },
+  {
+    "method": "VNPAY",
+    "provider": "vnpay",
+    "displayName": "VNPay",
+    "enabled": true,
+    "sandbox": true,
+    "providerRegistered": true,
+    "checkoutConfigured": true,
+    "webhookConfigured": false,
+    "checkoutReady": true,
+    "webhookReady": false,
+    "sandboxReady": false,
+    "missingRequirements": ["webhook-secret"],
+    "webhookMaxAgeSeconds": 86400,
+    "webhookFutureSkewSeconds": 300
+  }
+]
+```
+
+Admin/devops action:
+- Goi endpoint nay sau khi set env sandbox de xac nhan `sandboxReady=true` truoc khi expose MoMo/VNPAY tren app.
+- Khong log/commit secret; response chi tra ten requirement bi thieu, khong tra gia tri config.
+- Neu `checkoutReady=false`, checkout URL chua nen duoc test tren FE.
+- Neu `webhookReady=false`, chua nen chay callback sandbox vi backend se reject callback hoac khong reconcile duoc payment.
 #### Runtime config cho provider online
 
 Backend da co config foundation cho MoMo/VNPay, mac dinh disabled.

@@ -6,6 +6,43 @@
 
 ---
 
+## Commit: `feat: add payment provider readiness diagnostics`
+
+Branch: `feature/payment-provider-sandbox-e2e`
+
+Phase: Phase 1 - Payment provider completion
+
+### Muc tieu
+
+Them buoc readiness gate cho MoMo/VNPAY truoc khi chay sandbox E2E that. Backend can bao ro provider da registered/enabled chua, checkout/webhook config da du chua, va con thieu requirement nao ma khong lo secret.
+
+### Noi dung da trien khai
+
+- Them `PaymentProviderReadinessService` de danh gia tung online provider (`MOMO`, `VNPAY`).
+- Them DTO `PaymentProviderReadinessResponse` gom:
+  - `providerRegistered`, `enabled`, `checkoutConfigured`, `webhookConfigured`.
+  - `checkoutReady`, `webhookReady`, `sandboxReady`.
+  - `missingRequirements` nhu `provider-enabled`, `merchant-id`, `webhook-secret`.
+  - `webhookMaxAgeSeconds`, `webhookFutureSkewSeconds` de kiem tra freshness policy dang ap dung.
+- Them admin endpoint `GET /api/v1/payments/providers/readiness`.
+- Cap nhat `integrate-plan.md` va `plan.md` de FE/admin/devops dung readiness endpoint truoc khi expose MoMo/VNPAY.
+
+### Review truoc commit
+
+- Payment readiness/controller/method targeted suite: pass 10 tests.
+- Chua commit; cho user review patch.
+
+### Files chinh
+
+- `src/main/java/com/example/goride/payment/dto/PaymentProviderReadinessResponse.java`
+- `src/main/java/com/example/goride/payment/service/PaymentProviderReadinessService.java`
+- `src/main/java/com/example/goride/payment/controller/PaymentController.java`
+- `src/test/java/com/example/goride/payment/service/PaymentProviderReadinessServiceTests.java`
+- `src/test/java/com/example/goride/payment/controller/PaymentControllerTests.java`
+- `integrate-plan.md`
+- `plan.md`
+
+---
 ## Commit: `fix: keep searching trips after driver rejection`
 
 Branch: `develop`

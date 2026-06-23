@@ -4,10 +4,12 @@ import com.example.goride.common.error.BusinessException;
 import com.example.goride.common.error.ErrorCode;
 import com.example.goride.common.security.CurrentUser;
 import com.example.goride.payment.domain.PaymentStatus;
+import com.example.goride.payment.dto.PaymentProviderReadinessResponse;
 import com.example.goride.payment.dto.PaymentWebhookResponse;
 import com.example.goride.payment.dto.VnPayIpnResponse;
 import com.example.goride.payment.service.PaymentCheckoutService;
 import com.example.goride.payment.service.PaymentMethodService;
+import com.example.goride.payment.service.PaymentProviderReadinessService;
 import com.example.goride.payment.service.PaymentQueryService;
 import com.example.goride.payment.service.PaymentWebhookService;
 import org.junit.jupiter.api.Test;
@@ -15,6 +17,7 @@ import org.mockito.ArgumentCaptor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
+import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -25,6 +28,19 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class PaymentControllerTests {
+
+
+    @Test
+    void returnsProviderReadinessForAdminDiagnostics() {
+        PaymentProviderReadinessService readinessService = mock(PaymentProviderReadinessService.class);
+        PaymentProviderReadinessResponse readiness = mock(PaymentProviderReadinessResponse.class);
+        when(readinessService.listProviderReadiness()).thenReturn(List.of(readiness));
+        PaymentController controller = controller(mock(PaymentWebhookService.class), readinessService);
+
+        var response = controller.listPaymentProviderReadiness();
+
+        assertThat(response.data()).containsExactly(readiness);
+    }
 
     @Test
     void returnsNoContentForHandledMomoIpn() {
@@ -103,10 +119,18 @@ class PaymentControllerTests {
     }
 
     private PaymentController controller(PaymentWebhookService paymentWebhookService) {
+        return controller(paymentWebhookService, mock(PaymentProviderReadinessService.class));
+    }
+
+    private PaymentController controller(
+            PaymentWebhookService paymentWebhookService,
+            PaymentProviderReadinessService readinessService
+    ) {
         return new PaymentController(
                 mock(PaymentQueryService.class),
                 mock(PaymentCheckoutService.class),
                 mock(PaymentMethodService.class),
+                readinessService,
                 paymentWebhookService,
                 mock(CurrentUser.class)
         );
