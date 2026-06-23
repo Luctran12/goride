@@ -6,10 +6,12 @@ import com.example.goride.common.security.CurrentUser;
 import com.example.goride.payment.dto.PaymentCheckoutResponse;
 import com.example.goride.payment.dto.PaymentDetailResponse;
 import com.example.goride.payment.dto.PaymentMethodResponse;
+import com.example.goride.payment.dto.PaymentProviderReadinessResponse;
 import com.example.goride.payment.dto.PaymentWebhookResponse;
 import com.example.goride.payment.dto.VnPayIpnResponse;
 import com.example.goride.payment.service.PaymentCheckoutService;
 import com.example.goride.payment.service.PaymentMethodService;
+import com.example.goride.payment.service.PaymentProviderReadinessService;
 import com.example.goride.payment.service.PaymentQueryService;
 import com.example.goride.payment.service.PaymentWebhookService;
 import org.slf4j.Logger;
@@ -38,6 +40,7 @@ public class PaymentController {
     private final PaymentQueryService paymentQueryService;
     private final PaymentCheckoutService paymentCheckoutService;
     private final PaymentMethodService paymentMethodService;
+    private final PaymentProviderReadinessService paymentProviderReadinessService;
     private final PaymentWebhookService paymentWebhookService;
     private final CurrentUser currentUser;
 
@@ -45,12 +48,14 @@ public class PaymentController {
             PaymentQueryService paymentQueryService,
             PaymentCheckoutService paymentCheckoutService,
             PaymentMethodService paymentMethodService,
+            PaymentProviderReadinessService paymentProviderReadinessService,
             PaymentWebhookService paymentWebhookService,
             CurrentUser currentUser
     ) {
         this.paymentQueryService = paymentQueryService;
         this.paymentCheckoutService = paymentCheckoutService;
         this.paymentMethodService = paymentMethodService;
+        this.paymentProviderReadinessService = paymentProviderReadinessService;
         this.paymentWebhookService = paymentWebhookService;
         this.currentUser = currentUser;
     }
@@ -58,6 +63,12 @@ public class PaymentController {
     @GetMapping("/methods")
     public ApiResponse<List<PaymentMethodResponse>> listPaymentMethods() {
         return ApiResponse.ok(paymentMethodService.listPaymentMethods());
+    }
+
+    @GetMapping("/providers/readiness")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ApiResponse<List<PaymentProviderReadinessResponse>> listPaymentProviderReadiness() {
+        return ApiResponse.ok(paymentProviderReadinessService.listProviderReadiness());
     }
 
     @GetMapping("/trips/{tripId}")
