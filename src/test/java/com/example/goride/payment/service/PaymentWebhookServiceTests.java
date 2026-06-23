@@ -13,6 +13,9 @@ import com.example.goride.payment.provider.PaymentWebhookRequest;
 import com.example.goride.payment.provider.PaymentWebhookResult;
 import org.junit.jupiter.api.Test;
 
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 
@@ -20,11 +23,15 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class PaymentWebhookServiceTests {
+    private static final Instant FIXED_NOW = Instant.parse("2026-06-13T06:00:00Z");
 
     @Test
     void dispatchesWebhookToProviderByProviderName() {
         CapturingWebhookProvider provider = new CapturingWebhookProvider();
-        PaymentWebhookService service = new PaymentWebhookService(new PaymentProviderRegistry(List.of(provider)));
+        PaymentWebhookService service = new PaymentWebhookService(
+                new PaymentProviderRegistry(List.of(provider)),
+                fixedClock()
+        );
 
         var response = service.handleProviderWebhook(
                 " MoMo ",
@@ -41,11 +48,15 @@ class PaymentWebhookServiceTests {
         assertThat(provider.request.providerName()).isEqualTo("momo");
         assertThat(provider.request.headers()).containsEntry("x-signature", "signed");
         assertThat(provider.request.payload()).containsEntry("orderId", "txn-123");
+        assertThat(provider.request.receivedAt()).isEqualTo(FIXED_NOW);
     }
 
     @Test
     void rejectsUnsupportedProviderName() {
-        PaymentWebhookService service = new PaymentWebhookService(new PaymentProviderRegistry(List.of()));
+        PaymentWebhookService service = new PaymentWebhookService(
+                new PaymentProviderRegistry(List.of()),
+                fixedClock()
+        );
 
         assertThatThrownBy(() -> service.handleProviderWebhook("momo", Map.of(), Map.of()))
                 .isInstanceOfSatisfying(BusinessException.class, exception ->
@@ -56,13 +67,18 @@ class PaymentWebhookServiceTests {
     @Test
     void rejectsProviderWithoutWebhookSupport() {
         PaymentWebhookService service = new PaymentWebhookService(
-                new PaymentProviderRegistry(List.of(new CashPaymentProvider()))
+                new PaymentProviderRegistry(List.of(new CashPaymentProvider())),
+                fixedClock()
         );
 
         assertThatThrownBy(() -> service.handleProviderWebhook("cash", Map.of(), Map.of()))
                 .isInstanceOfSatisfying(BusinessException.class, exception ->
                         assertThat(exception.errorCode()).isEqualTo(ErrorCode.PAYMENT_PROVIDER_UNSUPPORTED)
                 );
+    }
+
+    private Clock fixedClock() {
+        return Clock.fixed(FIXED_NOW, ZoneOffset.UTC);
     }
 
     private static final class CapturingWebhookProvider implements PaymentProvider {
