@@ -8,15 +8,21 @@ import com.example.goride.payment.provider.PaymentWebhookResult;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
 import java.time.Instant;
 import java.util.Map;
 
 @Service
 public class PaymentWebhookService {
     private final PaymentProviderRegistry paymentProviderRegistry;
+    private final Clock clock;
 
-    public PaymentWebhookService(PaymentProviderRegistry paymentProviderRegistry) {
+    public PaymentWebhookService(
+            PaymentProviderRegistry paymentProviderRegistry,
+            Clock clock
+    ) {
         this.paymentProviderRegistry = paymentProviderRegistry;
+        this.clock = clock;
     }
 
     @Transactional
@@ -30,7 +36,7 @@ public class PaymentWebhookService {
                 provider.providerName(),
                 headers,
                 payload,
-                Instant.now()
+                Instant.now(clock)
         );
         PaymentWebhookResult result = provider.handleWebhook(request);
         return PaymentWebhookResponse.from(provider.providerName(), result);

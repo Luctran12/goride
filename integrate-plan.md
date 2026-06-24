@@ -1,6 +1,6 @@
 # GoRide Front-end Integration Plan
 
-Branch da kiem tra: `feature/request-tracing-logging`
+Branch da kiem tra: `feature/payment-sandbox-callback-uat-support`
 
 Muc tieu file nay:
 - Checklist chuc nang backend da co code va co the tich hop FE.
@@ -200,6 +200,7 @@ type PaymentStatus = "PENDING" | "COMPLETED" | "FAILED" | "REFUNDED";
 - [x] MoMo IPN success/failure cap nhat payment idempotent; success chay shared payment completion workflow.
 - [x] MoMo IPN hop le tra HTTP 204 khong co response body theo contract provider.
 - [x] MoMo/VNPAY callback ap dung freshness policy tren timestamp da ky; callback qua cu/tuong lai bi reject, duplicate terminal callback cung transaction reference van idempotent.
+- [x] MoMo/VNPAY webhook dispatch co service-level sandbox contract coverage cho success/failure/stale callback bang payload signed.
 - [x] Driver confirm da nhan tien mat.
 - [x] Payment `PENDING -> COMPLETED`, set `paidAt`.
 - [x] Payment completed workflow dung chung de notify va dua driver ve `AVAILABLE`.
@@ -252,7 +253,7 @@ type PaymentStatus = "PENDING" | "COMPLETED" | "FAILED" | "REFUNDED";
 ### Payment/rating/statistics
 
 - [x] Payment method metadata da expose `CASH`, `MOMO`, `VNPAY`; hien chi `CASH` enabled mac dinh.
-- [ ] MoMo va VNPAY da co signed checkout/webhook va freshness policy; ca hai van can sandbox account/E2E callback test that.
+- [ ] MoMo va VNPAY da co signed checkout/webhook, readiness diagnostics, freshness policy va service-level sandbox callback contract tests; ca hai van can sandbox account/E2E callback test that.
 
 ### Routing/maps
 
@@ -1147,6 +1148,7 @@ FE action:
 - Duplicate MoMo success cung `transId` la idempotent; callback conflict voi transaction reference da luu bi reject.
 - MoMo dung signed `responseTime`; VNPAY dung signed `vnp_PayDate` GMT+7. Callback qua cu hoac nam qua xa trong tuong lai tra validation error va khong cap nhat payment.
 - Provider retry qua freshness window van duoc acknowledge neu payment da terminal voi cung provider va transaction reference; retry conflict van bi reject.
+- Backend da co service-level contract tests cho MoMo success, VNPAY failure va stale callback reject bang signed payload; day khong thay the sandbox callback that tu provider.
 - Sau khi provider webhook mark payment `COMPLETED`, backend goi shared payment completion workflow de notify passenger/driver va dua driver ve `AVAILABLE`.
 
 Driver confirm cash:

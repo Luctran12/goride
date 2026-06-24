@@ -6,6 +6,42 @@
 
 ---
 
+## Commit: `test: add payment sandbox webhook contract coverage`
+
+Branch: `feature/payment-sandbox-callback-uat-support`
+
+Phase: Phase 1 - Payment provider completion, sandbox callback UAT support
+
+### Muc tieu
+
+Tang do tin cay cho buoc UAT sandbox MoMo/VNPAY bang service-level contract coverage: backend dispatch callback qua `PaymentWebhookService` voi signed payload giong provider, dung received time co the co dinh trong test, va van giu real merchant sandbox test la viec con lai.
+
+### Noi dung da trien khai
+
+- Inject `Clock` vao `PaymentWebhookService` de `PaymentWebhookRequest.receivedAt` co the test on dinh thay vi goi `Instant.now()` truc tiep.
+- Them `PaymentSandboxWebhookContractTests` chay qua provider registry va provider implementation that:
+  - MoMo signed IPN success cap nhat payment `COMPLETED` va goi completion workflow.
+  - VNPAY signed callback failure cap nhat payment `FAILED` va khong goi completion workflow.
+  - VNPAY signed callback qua cu bi reject theo freshness window truoc khi save payment.
+- Cap nhat `integrate-plan.md`, `plan.md` va `docs/pland.xlsx` de ghi ro backend da co contract coverage nhung van can sandbox account/E2E callback that.
+
+### Review truoc commit
+
+- Payment webhook/provider sandbox targeted suite: pass 41 tests.
+- Full `./mvnw.cmd test`: pass 337 tests.
+- `git diff --check`: pass.
+- CodeRabbit CLI: blocked vi `coderabbit` chua cai; installer mac dinh fail do khong co `sh`, installer qua Git Bash fail voi `Unsupported operating system: mingw64_nt-10.0-26200`.
+
+### Files chinh
+
+- `src/main/java/com/example/goride/payment/service/PaymentWebhookService.java`
+- `src/test/java/com/example/goride/payment/service/PaymentWebhookServiceTests.java`
+- `src/test/java/com/example/goride/payment/service/PaymentSandboxWebhookContractTests.java`
+- `integrate-plan.md`
+- `plan.md`
+- `docs/pland.xlsx`
+
+---
 ## Commit: `feat: add payment provider readiness diagnostics`
 
 Branch: `feature/payment-provider-sandbox-e2e`
