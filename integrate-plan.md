@@ -1,6 +1,6 @@
 # GoRide Front-end Integration Plan
 
-Branch da kiem tra: `feature/payment-sandbox-callback-uat-support`
+Branch da kiem tra: `feature/trip-completion-payment-integration`
 
 Muc tieu file nay:
 - Checklist chuc nang backend da co code va co the tich hop FE.
@@ -281,8 +281,9 @@ type PaymentStatus = "PENDING" | "COMPLETED" | "FAILED" | "REFUNDED";
 - [x] Co Testcontainers base dung PostGIS va Redis that cho integration test.
 - [x] Auth flow da duoc test qua HTTP/JWT/JPA/Redis: register, protected request, refresh rotation, logout revocation va duplicate phone.
 - [x] Booking -> Redis matching -> driver accept -> route pickup -> arrived -> route dropoff da duoc test qua full Spring HTTP flow va OSRM boundary local.
-- [ ] Trip start/completion va final fare chua co integration flow hoan chinh.
-- [ ] Tracking/payment/notification/admin chua co integration flow hoan chinh.
+- [x] Trip start/completion va final fare da co integration flow qua `BookingMatchingRoutingIntegrationTests`.
+- [x] Tracking REST fallback, payment detail, CASH checkout va driver payment-confirm da co integration flow qua `BookingMatchingRoutingIntegrationTests`.
+- [ ] Notification/admin chua co integration flow hoan chinh.
 - [ ] Docker-backed integration suite chua duoc cau hinh chay tren CI.
 
 ---
@@ -1082,7 +1083,7 @@ Response `data` voi CASH:
 
 FE action:
 - Goi sau trip `COMPLETED`/payment `PENDING` de biet payment method co can redirect khong.
-- Voi `CASH`, `checkoutRequired=false`, FE hien man hinh thanh toan tien mat va cho driver confirm.
+- Voi `CASH`, `checkoutRequired=false`, FE hien man hinh thanh toan tien mat va cho driver confirm; khong mo webview/checkout URL khi `checkoutUrl` null hoac khong co field.
 - Voi `VNPAY`, neu `checkoutRequired=true`, FE mo `checkoutUrl` va theo doi payment status/webhook flow.
 - Voi `MOMO`, neu backend expose `enabled=true`, FE mo `checkoutUrl` (`payUrl`) tu response; sau redirect refresh payment detail trong khi backend xu ly IPN.
 - Endpoint chi hop le cho payment `PENDING`; neu payment da completed backend tra `PAYMENT_INVALID_STATUS`, FE nen refresh payment detail.

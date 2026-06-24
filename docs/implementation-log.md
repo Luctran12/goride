@@ -6,6 +6,48 @@
 
 ---
 
+## Commit: `test: cover trip completion payment integration`
+
+Branch: `feature/trip-completion-payment-integration`
+
+Phase: Phase 5 - Integration confidence
+
+### Muc tieu
+
+Them coverage tich hop cho flow MVP sau khi driver da nhan booking: passenger tao booking, driver accept/arrived/start/complete, backend tinh final fare tu tracking history, tao cash payment pending, FE lay payment detail/checkout, driver confirm tien mat va duoc dua ve hang heartbeat/available.
+
+### Noi dung da trien khai
+
+- Mo rong `BookingMatchingRoutingIntegrationTests` bang scenario end-to-end moi dung MockMvc + Testcontainers PostGIS/Redis.
+- Refactor test helper admin/driver profile dung phone/email/license suffix rieng de moi scenario khong dung unique constraint.
+- Scenario moi cover:
+  - Booking CASH va matching driver gan nhat.
+  - Driver accept offer, update `ARRIVED`, `IN_PROGRESS`, `COMPLETED`.
+  - Driver location update trong `IN_PROGRESS`, passenger doc latest location qua REST fallback.
+  - Trip completed co `finalFare` va `completedAt`.
+  - Payment detail tra `PENDING`, `method=CASH`, amount khop `finalFare`.
+  - Cash checkout tra `checkoutRequired=false`.
+  - Driver goi `PATCH /payment-confirm`, payment thanh `COMPLETED`, `paidAt` duoc set.
+  - Driver heartbeat thanh cong sau payment completion workflow dua driver ve availability queue.
+- Cap nhat `plan.md`, `integrate-plan.md` va `docs/pland.xlsx` de danh dau trip completion/tracking/cash payment integration coverage da co.
+
+### Review truoc commit
+
+- Targeted `./mvnw.cmd -Dtest=BookingMatchingRoutingIntegrationTests test`: pass 2 tests.
+- Full `./mvnw.cmd test`: pass 338 tests.
+- `git diff --check`: pass.
+- CodeRabbit CLI: blocked. `coderabbit --version` khong tim thay lenh; installer mac dinh fail vi `sh` khong co trong PATH; installer qua Git Bash fail voi `Unsupported operating system: mingw64_nt-10.0-26200`.
+
+### Files chinh
+
+- `src/test/java/com/example/goride/integration/BookingMatchingRoutingIntegrationTests.java`
+- `plan.md`
+- `integrate-plan.md`
+- `docs/implementation-log.md`
+- `docs/pland.xlsx`
+
+---
+
 ## Commit: `test: add payment sandbox webhook contract coverage`
 
 Branch: `feature/payment-sandbox-callback-uat-support`
