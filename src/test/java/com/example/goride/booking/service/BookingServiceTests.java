@@ -9,6 +9,7 @@ import com.example.goride.booking.dto.BookingCancelRequest;
 import com.example.goride.booking.dto.BookingCreateRequest;
 import com.example.goride.booking.dto.BookingEstimateRequest;
 import com.example.goride.booking.dto.BookingLocationRequest;
+import com.example.goride.booking.event.BookingCancelledEvent;
 import com.example.goride.booking.event.BookingCreatedEvent;
 import com.example.goride.booking.repository.PricingConfigRepository;
 import com.example.goride.booking.repository.TripRepository;
@@ -270,12 +271,18 @@ class BookingServiceTests {
         var response = bookingService.cancelBooking(10L, 99L, new BookingCancelRequest(" Changed plan "));
 
         ArgumentCaptor<TripStatusHistory> historyCaptor = ArgumentCaptor.forClass(TripStatusHistory.class);
+        ArgumentCaptor<BookingCancelledEvent> eventCaptor = ArgumentCaptor.forClass(BookingCancelledEvent.class);
         verify(tripStatusHistoryRepository).save(historyCaptor.capture());
+        verify(eventPublisher).publishEvent(eventCaptor.capture());
         assertThat(response.status()).isEqualTo(TripStatus.CANCELLED);
         assertThat(response.cancelReason()).isEqualTo("Changed plan");
         assertThat(historyCaptor.getValue().getFromStatus()).isEqualTo(TripStatus.SEARCHING);
         assertThat(historyCaptor.getValue().getToStatus()).isEqualTo(TripStatus.CANCELLED);
         assertThat(historyCaptor.getValue().getChangedBy()).isSameAs(passenger);
+        assertThat(eventCaptor.getValue().tripId()).isEqualTo(99L);
+        assertThat(eventCaptor.getValue().passengerId()).isEqualTo(10L);
+        assertThat(eventCaptor.getValue().driverId()).isNull();
+        assertThat(eventCaptor.getValue().reason()).isEqualTo("Changed plan");
     }
 
     @Test

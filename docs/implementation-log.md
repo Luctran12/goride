@@ -6,6 +6,43 @@
 
 ---
 
+## Commit: `fix: dismiss driver offer on passenger cancellation`
+
+Branch: `feature/trip-completion-payment-integration`
+
+Phase: Phase 5 - Integration confidence / booking-matching bug fix
+
+### Muc tieu
+
+Khac phuc loi passenger huy booking khi trip dang `SEARCHING` nhung popup offer tren man hinh driver van hien thi cho toi khi TTL timeout.
+
+### Noi dung da trien khai
+
+- Them `BookingCancelledEvent` va publish sau transaction commit trong `BookingService.cancelBooking`.
+- Them `BookingCancelledMatchingListener` de doc active matching state trong Redis, release lock cua driver dang duoc offer va clear trip matching state.
+- Them `DriverOfferCancelledNotification` va mo rong `DriverOfferNotifier` de gui payload dismiss qua `/user/queue/trip-requests`.
+- Cap nhat `integrate-plan.md` huong dan FE dong offer modal khi nhan `type=TRIP_CANCELLED`, `action=DISMISS`.
+- Cap nhat `plan.md` ghi ro matching da cleanup/dismiss stale offer khi passenger huy.
+
+### Review truoc commit
+
+- Targeted `./mvnw.cmd -Dtest=BookingServiceTests,BookingCancelledMatchingListenerTests,WebSocketDriverOfferNotifierTests test`: pass 15 tests.
+- Full `./mvnw.cmd test`: chua chay trong buoc nay.
+- `git diff --check`: pass; chi con warning CRLF tren Windows.
+- CodeRabbit CLI: blocked vi `coderabbit` khong co trong PATH tren Windows hien tai.
+
+### Files chinh
+
+- `src/main/java/com/example/goride/booking/event/BookingCancelledEvent.java`
+- `src/main/java/com/example/goride/booking/service/BookingService.java`
+- `src/main/java/com/example/goride/matching/service/BookingCancelledMatchingListener.java`
+- `src/main/java/com/example/goride/matching/notification/DriverOfferCancelledNotification.java`
+- `src/main/java/com/example/goride/matching/notification/DriverOfferNotifier.java`
+- `src/main/java/com/example/goride/matching/notification/WebSocketDriverOfferNotifier.java`
+- `integrate-plan.md`
+- `plan.md`
+
+---
 ## Commit: `test: cover trip completion payment integration`
 
 Branch: `feature/trip-completion-payment-integration`
@@ -1918,7 +1955,7 @@ Cap nhat thong ke so chuyen da hoan thanh cua driver ngay khi trip chuyen sang `
 
 ### Review truoc commit
 
-- Da xac nhan increment chi nam trong nhánh `COMPLETED`, sau khi domain transition hop le.
+- Da xac nhan increment chi nam trong nhÃƒÂ¡nh `COMPLETED`, sau khi domain transition hop le.
 - Da xac nhan trip lock va profile lock cung nam trong transaction de tranh double-count theo concurrent complete request.
 - Da xac nhan transition khong phai `COMPLETED` khong query driver profile.
 - Da chay `./mvnw.cmd -Dtest=DriverTripStatusServiceTests test`: pass 8 tests.

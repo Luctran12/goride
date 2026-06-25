@@ -32,4 +32,23 @@ class WebSocketDriverOfferNotifierTests {
 
         verify(messagingTemplate).convertAndSendToUser("20", "/queue/trip-requests", notification);
     }
+
+    @Test
+    void sendsCancelledOfferToUserTripRequestsQueue() {
+        SimpMessagingTemplate messagingTemplate = mock(SimpMessagingTemplate.class);
+        WebSocketDriverOfferNotifier notifier = new WebSocketDriverOfferNotifier(messagingTemplate);
+        DriverOfferCancelledNotification notification = new DriverOfferCancelledNotification(
+                "TRIP_CANCELLED",
+                "DISMISS",
+                99L,
+                10L,
+                20L,
+                "Changed plan",
+                Instant.parse("2026-05-20T04:00:00Z")
+        );
+
+        notifier.notifyOfferCancelled(20L, notification);
+
+        verify(messagingTemplate).convertAndSendToUser("20", "/queue/trip-requests", notification);
+    }
 }

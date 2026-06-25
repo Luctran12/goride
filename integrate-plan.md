@@ -154,6 +154,7 @@ type PaymentStatus = "PENDING" | "COMPLETED" | "FAILED" | "REFUNDED";
 
 - [x] Sau khi booking created, backend tu dong tim driver gan nhat trong Redis.
 - [x] Gui offer toi driver qua WebSocket user queue.
+- [x] Khi passenger huy booking dang co offer active, backend clear matching state/driver lock va gui dismiss payload toi driver qua WebSocket user queue.
 - [x] Driver accept/reject offer.
 - [x] Driver accept thi trip chuyen `SEARCHING -> ACCEPTED`, driver status Redis thanh `BUSY`.
 - [x] Driver reject/timeout thi backend release offer hien tai, exclude driver do va thu driver tiep theo neu co candidate kha dung.
@@ -507,7 +508,7 @@ Response `data`:
 FE action:
 - Gui heartbeat khi app driver dang online, de xuat moi 20 giay va truoc `expiresAt`.
 - Moi heartbeat gui location moi nhat; backend cap nhat Redis GEO va `driver_profiles.last_location_at`.
-- Tam dung heartbeat khi driver bam offline hoặc logout.
+- Tam dung heartbeat khi driver bam offline hoáº·c logout.
 - Neu mat mang ngan, retry voi exponential backoff nhung khong de qua `expiresAt`.
 - Neu nhan `DRIVER_NOT_AVAILABLE`, dung heartbeat va hien nut "Bat dau nhan chuyen" de goi lai `PATCH /api/v1/drivers/me/status` voi `online=true`.
 - Heartbeat khong lam driver dang `BUSY` thanh `AVAILABLE`; FE tiep tuc gui heartbeat trong suot active trip.
@@ -679,6 +680,20 @@ Payload offer:
 }
 ```
 
+Payload dismiss khi passenger huy booking luc offer dang hien tren driver:
+
+```json
+{
+  "type": "TRIP_CANCELLED",
+  "action": "DISMISS",
+  "tripId": 99,
+  "passengerId": 10,
+  "driverId": 20,
+  "reason": "Changed plan",
+  "cancelledAt": "2026-05-27T10:00:10Z"
+}
+```
+
 Driver phan hoi:
 
 ```http
@@ -713,6 +728,7 @@ Response `data`:
 
 FE action:
 - Hien countdown den `expiresAt`.
+- Neu nhan payload co `type=TRIP_CANCELLED` va `action=DISMISS` cho offer hien tai, dong modal offer, dung countdown, khong goi accept/reject nua va co the refresh danh sach trip neu man hinh dang lien quan.
 - Neu accept thanh cong, mo man trip driver.
 - Neu reject thanh cong, dong modal offer; passenger trip van `SEARCHING` neu backend chua tim duoc driver tiep theo.
 - Neu `MATCHING_OFFER_EXPIRED`, dong offer va doi offer moi. Passenger van o man hinh dang tim tai xe cho toi khi co driver accept, co offer moi cho driver khac, hoac passenger tu huy.
@@ -1864,7 +1880,7 @@ Subscribe vao `/topic/trip/{tripId}/status` va `/topic/trip/{tripId}/location` c
 
 | Man hinh | Destination | Payload |
 |---|---|---|
-| Driver online/offer modal | `/user/queue/trip-requests` | `DriverOfferNotification` |
+| Driver online/offer modal | `/user/queue/trip-requests` | `DriverOfferNotification` hoac `DriverOfferCancelledNotification` |
 | Passenger/driver app shell | `/user/queue/notifications` | `UserNotification` |
 | Trip detail | `/topic/trip/{tripId}/status` | `TripStatusNotification` |
 | Passenger tracking | `/topic/trip/{tripId}/location` | `DriverLocationResponse` |
@@ -1902,7 +1918,7 @@ Subscribe vao `/topic/trip/{tripId}/status` va `/topic/trip/{tripId}/location` c
 - [ ] Profile onboarding: tao profile bang `POST /api/v1/drivers/me/profile`.
 - [ ] Approval waiting screen: doc `approvalStatus` tu `GET /api/v1/drivers/me/profile`; chi cho online khi status la `APPROVED`.
 - [ ] Online toggle with current GPS.
-- [ ] Offer modal from `/user/queue/trip-requests`.
+- [ ] Offer modal from `/user/queue/trip-requests`, including `TRIP_CANCELLED`/`DISMISS` payload to close stale offers.
 - [ ] Driver navigation: goi `POST /api/v1/drivers/trips/{tripId}/route`, ve GeoJSON route den pickup/dropoff va debounce re-route.
 - [ ] Trip workflow buttons: arrived/start/complete.
 - [ ] Location sender while `IN_PROGRESS`.

@@ -15,6 +15,15 @@ public class WebSocketDriverOfferNotifier implements DriverOfferNotifier {
 
     @Override
     public void notifyDriver(Long driverId, DriverOfferNotification notification) {
+        sendToTripRequestQueue(driverId, notification);
+    }
+
+    @Override
+    public void notifyOfferCancelled(Long driverId, DriverOfferCancelledNotification notification) {
+        sendToTripRequestQueue(driverId, notification);
+    }
+
+    private void sendToTripRequestQueue(Long driverId, Object notification) {
         messagingTemplate.convertAndSendToUser(
                 String.valueOf(driverId),
                 TRIP_REQUEST_QUEUE,

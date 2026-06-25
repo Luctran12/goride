@@ -10,6 +10,7 @@ import com.example.goride.booking.dto.BookingEstimateRequest;
 import com.example.goride.booking.dto.BookingLocationRequest;
 import com.example.goride.booking.dto.FareEstimateResponse;
 import com.example.goride.booking.dto.TripResponse;
+import com.example.goride.booking.event.BookingCancelledEvent;
 import com.example.goride.booking.event.BookingCreatedEvent;
 import com.example.goride.booking.repository.PricingConfigRepository;
 import com.example.goride.booking.repository.TripRepository;
@@ -175,6 +176,7 @@ public class BookingService {
                 user,
                 savedTrip.getCancelReason()
         ));
+        publishAfterCommit(BookingCancelledEvent.from(savedTrip));
         return TripResponse.from(savedTrip);
     }
 
@@ -219,7 +221,7 @@ public class BookingService {
         return GEOMETRY_FACTORY.createPoint(new Coordinate(location.lng().doubleValue(), location.lat().doubleValue()));
     }
 
-    private void publishAfterCommit(BookingCreatedEvent event) {
+    private void publishAfterCommit(Object event) {
         if (!TransactionSynchronizationManager.isSynchronizationActive()) {
             eventPublisher.publishEvent(event);
             return;
