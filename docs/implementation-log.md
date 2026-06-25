@@ -6,6 +6,42 @@
 
 ---
 
+## Commit: `test: cover notification flow integration`
+
+Branch: `feature/trip-completion-payment-integration`
+
+Phase: Phase 5 - Integration confidence
+
+### Muc tieu
+
+Tang coverage P1 cho notification flow bang integration test chay qua full Spring HTTP/JWT/JPA/Redis, gom FCM token CRUD va notification inbox/mark-read.
+
+### Noi dung da trien khai
+
+- Them `NotificationFlowIntegrationTests` dung Testcontainers PostGIS/Redis base hien co.
+- Test tao passenger bang REST auth register de lay JWT that.
+- Test goi `PUT /api/v1/notifications/fcm-token`, verify token duoc trim va luu Redis qua `FcmDeviceTokenStore`.
+- Test tao `UserNotification` qua `TripRealtimeNotifier`, verify inbox REST list tra notification da luu DB va payload deep-link.
+- Test goi `PATCH /api/v1/notifications/{notificationId}/read`, verify read/readAt.
+- Test goi `DELETE /api/v1/notifications/fcm-token`, verify Redis token da xoa.
+- Cap nhat `plan.md`, `integrate-plan.md` va `docs/pland.xlsx` de ghi nhan notification integration coverage da co.
+
+### Review truoc commit
+
+- Targeted `./mvnw.cmd -Dtest=NotificationFlowIntegrationTests test`: pass 1 test.
+- Full `./mvnw.cmd test`: chua chay trong buoc nay.
+- `git diff --check`: pass; chi con warning CRLF tren Windows.
+- CodeRabbit CLI: blocked vi `coderabbit` khong co trong PATH tren Windows hien tai.
+
+### Files chinh
+
+- `src/test/java/com/example/goride/integration/NotificationFlowIntegrationTests.java`
+- `plan.md`
+- `integrate-plan.md`
+- `docs/implementation-log.md`
+- `docs/pland.xlsx`
+
+---
 ## Commit: `fix: dismiss driver offer on passenger cancellation`
 
 Branch: `feature/trip-completion-payment-integration`
@@ -1955,7 +1991,7 @@ Cap nhat thong ke so chuyen da hoan thanh cua driver ngay khi trip chuyen sang `
 
 ### Review truoc commit
 
-- Da xac nhan increment chi nam trong nhÃƒÂ¡nh `COMPLETED`, sau khi domain transition hop le.
+- Da xac nhan increment chi nam trong nhÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡nh `COMPLETED`, sau khi domain transition hop le.
 - Da xac nhan trip lock va profile lock cung nam trong transaction de tranh double-count theo concurrent complete request.
 - Da xac nhan transition khong phai `COMPLETED` khong query driver profile.
 - Da chay `./mvnw.cmd -Dtest=DriverTripStatusServiceTests test`: pass 8 tests.

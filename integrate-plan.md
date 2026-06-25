@@ -284,7 +284,7 @@ type PaymentStatus = "PENDING" | "COMPLETED" | "FAILED" | "REFUNDED";
 - [x] Booking -> Redis matching -> driver accept -> route pickup -> arrived -> route dropoff da duoc test qua full Spring HTTP flow va OSRM boundary local.
 - [x] Trip start/completion va final fare da co integration flow qua `BookingMatchingRoutingIntegrationTests`.
 - [x] Tracking REST fallback, payment detail, CASH checkout va driver payment-confirm da co integration flow qua `BookingMatchingRoutingIntegrationTests`.
-- [ ] Notification/admin chua co integration flow hoan chinh.
+- [x] Notification inbox + FCM token REST flow da co `NotificationFlowIntegrationTests` qua HTTP/JWT/JPA/Redis.`r`n- [ ] Admin/provider sandbox chua co integration flow hoan chinh.
 - [ ] Docker-backed integration suite chua duoc cau hinh chay tren CI.
 
 ---
@@ -508,7 +508,7 @@ Response `data`:
 FE action:
 - Gui heartbeat khi app driver dang online, de xuat moi 20 giay va truoc `expiresAt`.
 - Moi heartbeat gui location moi nhat; backend cap nhat Redis GEO va `driver_profiles.last_location_at`.
-- Tam dung heartbeat khi driver bam offline hoáº·c logout.
+- Tam dung heartbeat khi driver bam offline hoÃ¡ÂºÂ·c logout.
 - Neu mat mang ngan, retry voi exponential backoff nhung khong de qua `expiresAt`.
 - Neu nhan `DRIVER_NOT_AVAILABLE`, dung heartbeat va hien nut "Bat dau nhan chuyen" de goi lai `PATCH /api/v1/drivers/me/status` voi `online=true`.
 - Heartbeat khong lam driver dang `BUSY` thanh `AVAILABLE`; FE tiep tuc gui heartbeat trong suot active trip.
