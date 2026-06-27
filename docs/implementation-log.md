@@ -6,6 +6,47 @@
 
 ---
 
+## Commit: `test: cover admin flow integration`
+
+Branch: `feature/trip-completion-payment-integration`
+
+Phase: Phase 5 - Integration confidence
+
+### Muc tieu
+
+Tang coverage P1 cho admin backend flow bang integration test chay qua HTTP/JWT/JPA/PostGIS, dong thoi sua loi `GET /api/v1/admin/trips` bi 500 tren Postgres khi khong truyen filter ngay thang.
+
+### Noi dung da trien khai
+
+- Them `AdminFlowIntegrationTests` dung Testcontainers PostGIS/Redis base hien co.
+- Test passenger bi chan `FORBIDDEN` khi goi admin dashboard.
+- Test driver tao profile `PENDING`, admin list pending drivers va approve driver.
+- Test admin tao/list/deactivate pricing config.
+- Test admin list trips khong filter tra `200` voi pagination mac dinh.
+- Test admin dashboard tra tong users/drivers/approval counts sau approve.
+- Sua `AdminTripService` dung JPA `Specification` thay vi JPQL optional null parameters de Postgres suy luan type on dinh.
+- Cap nhat `AdminTripServiceTests` theo repository `findAll(spec, pageable)`.
+- Cap nhat `plan.md`, `integrate-plan.md` va `docs/pland.xlsx` de ghi nhan admin integration coverage da co.
+
+### Review truoc commit
+
+- Targeted `./mvnw.cmd -Dtest=AdminFlowIntegrationTests,AdminTripServiceTests test`: pass 4 tests.
+- Full `./mvnw.cmd test`: chua chay trong buoc nay.
+- `git diff --check`: pass; chi con warning CRLF tren Windows.
+- CodeRabbit CLI: blocked vi `coderabbit` khong co trong PATH tren Windows hien tai.
+
+### Files chinh
+
+- `src/test/java/com/example/goride/integration/AdminFlowIntegrationTests.java`
+- `src/main/java/com/example/goride/booking/service/AdminTripService.java`
+- `src/main/java/com/example/goride/booking/repository/TripRepository.java`
+- `src/test/java/com/example/goride/booking/service/AdminTripServiceTests.java`
+- `plan.md`
+- `integrate-plan.md`
+- `docs/implementation-log.md`
+- `docs/pland.xlsx`
+
+---
 ## Commit: `test: cover notification flow integration`
 
 Branch: `feature/trip-completion-payment-integration`
@@ -1991,7 +2032,7 @@ Cap nhat thong ke so chuyen da hoan thanh cua driver ngay khi trip chuyen sang `
 
 ### Review truoc commit
 
-- Da xac nhan increment chi nam trong nhÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡nh `COMPLETED`, sau khi domain transition hop le.
+- Da xac nhan increment chi nam trong nhÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡nh `COMPLETED`, sau khi domain transition hop le.
 - Da xac nhan trip lock va profile lock cung nam trong transaction de tranh double-count theo concurrent complete request.
 - Da xac nhan transition khong phai `COMPLETED` khong query driver profile.
 - Da chay `./mvnw.cmd -Dtest=DriverTripStatusServiceTests test`: pass 8 tests.

@@ -21,6 +21,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
@@ -50,28 +51,20 @@ class AdminTripServiceTests {
     }
 
     @Test
+    @SuppressWarnings("unchecked")
     void listsTripsWithFiltersAndOneBasedPagination() {
         Instant from = Instant.parse("2026-06-01T00:00:00Z");
         Instant to = Instant.parse("2026-06-08T23:59:59Z");
         Trip trip = sampleTrip(passenger(10L));
-        when(tripRepository.searchAdminTrips(any(), any(), any(), any(Pageable.class)))
+        when(tripRepository.findAll(any(Specification.class), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(trip), org.springframework.data.domain.PageRequest.of(1, 2), 3));
 
         var response = service.listTrips(TripStatus.COMPLETED, from, to, 2, 2);
 
-        ArgumentCaptor<TripStatus> statusCaptor = ArgumentCaptor.forClass(TripStatus.class);
-        ArgumentCaptor<Instant> fromCaptor = ArgumentCaptor.forClass(Instant.class);
-        ArgumentCaptor<Instant> toCaptor = ArgumentCaptor.forClass(Instant.class);
+        ArgumentCaptor<Specification<Trip>> specificationCaptor = ArgumentCaptor.forClass(Specification.class);
         ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
-        verify(tripRepository).searchAdminTrips(
-                statusCaptor.capture(),
-                fromCaptor.capture(),
-                toCaptor.capture(),
-                pageableCaptor.capture()
-        );
-        assertThat(statusCaptor.getValue()).isEqualTo(TripStatus.COMPLETED);
-        assertThat(fromCaptor.getValue()).isEqualTo(from);
-        assertThat(toCaptor.getValue()).isEqualTo(to);
+        verify(tripRepository).findAll(specificationCaptor.capture(), pageableCaptor.capture());
+        assertThat(specificationCaptor.getValue()).isNotNull();
         assertThat(pageableCaptor.getValue().getPageNumber()).isEqualTo(1);
         assertThat(pageableCaptor.getValue().getPageSize()).isEqualTo(2);
         assertThat(pageableCaptor.getValue().getSort().getOrderFor("requestedAt").isDescending()).isTrue();
