@@ -1,5 +1,7 @@
 package com.example.goride.integration;
 
+import com.example.goride.tracking.dto.DriverLocationUpdateRequest;
+import com.example.goride.tracking.service.TripLocationTrackingService;
 import com.example.goride.user.domain.User;
 import com.example.goride.user.domain.UserRole;
 import com.example.goride.user.repository.UserRepository;
@@ -20,11 +22,13 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -46,6 +50,9 @@ class BookingMatchingRoutingIntegrationTests extends PostgresRedisIntegrationTes
 
     @Autowired
     private PasswordEncoder passwordEncoder;
+
+    @Autowired
+    private TripLocationTrackingService tripLocationTrackingService;
 
     @DynamicPropertySource
     static void routingProperties(DynamicPropertyRegistry registry) {
@@ -74,9 +81,9 @@ class BookingMatchingRoutingIntegrationTests extends PostgresRedisIntegrationTes
                 "flow.driver@example.com",
                 "DRIVER"
         );
-        AuthUser admin = seedAndLoginAdmin();
+        AuthUser admin = seedAndLoginAdmin("0909100003", "flow.admin@example.com");
 
-        createDriverProfile(driver.accessToken());
+        createDriverProfile(driver.accessToken(), "001");
         approveDriver(admin.accessToken(), driver.userId());
         setDriverOnline(driver.accessToken());
 
@@ -161,6 +168,158 @@ class BookingMatchingRoutingIntegrationTests extends PostgresRedisIntegrationTes
                 .andExpect(jsonPath("$.data.geometry.coordinates[1][1]").value(10.813));
     }
 
+    @Test
+    void completesTripCreatesCashPaymentAndReturnsDriverToHeartbeatQueue() throws Exception {
+        AuthUser passenger = register(
+                "Payment Flow Passenger",
+                "0909200001",
+                "payment.flow.passenger@example.com",
+                "PASSENGER"
+        );
+        AuthUser driver = register(
+                "Payment Flow Driver",
+                "0909200002",
+                "payment.flow.driver@example.com",
+                "DRIVER"
+        );
+        AuthUser admin = seedAndLoginAdmin("0909200003", "payment.flow.admin@example.com");
+
+        createDriverProfile(driver.accessToken(), "002");
+        approveDriver(admin.accessToken(), driver.userId());
+        setDriverOnline(driver.accessToken());
+
+        JsonNode booking = responseBody(mockMvc.perform(post("/api/v1/bookings")
+                        .header("Authorization", bearer(passenger.accessToken()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "pickup": {
+                                    "lat": 10.7769,
+                                    "lng": 106.7009,
+                                    "address": "Ben Thanh Market"
+                                  },
+                                  "dropoff": {
+                                    "lat": 10.8130,
+                                    "lng": 106.6650,
+                                    "address": "Tan Son Nhat Airport"
+                                  },
+                                  "vehicleType": "MOTORBIKE",
+                                  "paymentMethod": "CASH"
+                                }
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.status").value("SEARCHING"))
+                .andReturn());
+        long tripId = booking.at("/data/id").asLong();
+
+        mockMvc.perform(patch("/api/v1/drivers/trips/{tripId}/respond", tripId)
+                        .header("Authorization", bearer(driver.accessToken()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"action": "ACCEPT"}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("ACCEPTED"));
+
+        mockMvc.perform(patch("/api/v1/drivers/trips/{tripId}/status", tripId)
+                        .header("Authorization", bearer(driver.accessToken()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"status": "ARRIVED"}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("ARRIVED"));
+
+        mockMvc.perform(patch("/api/v1/drivers/trips/{tripId}/status", tripId)
+                        .header("Authorization", bearer(driver.accessToken()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"status": "IN_PROGRESS"}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("IN_PROGRESS"));
+
+        tripLocationTrackingService.updateDriverLocation(driver.userId(), new DriverLocationUpdateRequest(
+                BigDecimal.valueOf(10.7800),
+                BigDecimal.valueOf(106.7050),
+                BigDecimal.valueOf(45),
+                BigDecimal.valueOf(25)
+        ));
+        tripLocationTrackingService.updateDriverLocation(driver.userId(), new DriverLocationUpdateRequest(
+                BigDecimal.valueOf(10.7900),
+                BigDecimal.valueOf(106.7100),
+                BigDecimal.valueOf(50),
+                BigDecimal.valueOf(28)
+        ));
+
+        mockMvc.perform(get("/api/v1/tracking/trips/{tripId}/driver-location", tripId)
+                        .header("Authorization", bearer(passenger.accessToken())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.tripId").value(tripId))
+                .andExpect(jsonPath("$.data.driverId").value(driver.userId()))
+                .andExpect(jsonPath("$.data.lat").value(10.79))
+                .andExpect(jsonPath("$.data.lng").value(106.71));
+
+        mockMvc.perform(patch("/api/v1/drivers/trips/{tripId}/status", tripId)
+                        .header("Authorization", bearer(driver.accessToken()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"status": "COMPLETED"}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("COMPLETED"));
+
+        JsonNode completedTrip = responseBody(mockMvc.perform(get("/api/v1/bookings/{tripId}", tripId)
+                        .header("Authorization", bearer(passenger.accessToken())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("COMPLETED"))
+                .andExpect(jsonPath("$.data.completedAt").isNotEmpty())
+                .andReturn());
+        BigDecimal finalFare = completedTrip.at("/data/finalFare").decimalValue();
+        assertThat(finalFare).isPositive();
+
+        JsonNode pendingPayment = responseBody(mockMvc.perform(get("/api/v1/payments/trips/{tripId}", tripId)
+                        .header("Authorization", bearer(passenger.accessToken())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.method").value("CASH"))
+                .andExpect(jsonPath("$.data.status").value("PENDING"))
+                .andReturn());
+        assertThat(pendingPayment.at("/data/amount").decimalValue()).isEqualByComparingTo(finalFare);
+
+        JsonNode checkout = responseBody(mockMvc.perform(get("/api/v1/payments/trips/{tripId}/checkout", tripId)
+                        .header("Authorization", bearer(passenger.accessToken())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.checkoutRequired").value(false))
+                .andExpect(jsonPath("$.data.checkoutUrl").doesNotExist())
+                .andReturn());
+        assertThat(checkout.at("/data/amount").decimalValue()).isEqualByComparingTo(finalFare);
+
+        JsonNode confirmation = responseBody(mockMvc.perform(patch("/api/v1/drivers/trips/{tripId}/payment-confirm", tripId)
+                        .header("Authorization", bearer(driver.accessToken())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("COMPLETED"))
+                .andExpect(jsonPath("$.data.paidAt").isNotEmpty())
+                .andReturn());
+        assertThat(confirmation.at("/data/amount").decimalValue()).isEqualByComparingTo(finalFare);
+
+        mockMvc.perform(get("/api/v1/payments/trips/{tripId}", tripId)
+                        .header("Authorization", bearer(passenger.accessToken())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("COMPLETED"));
+
+        mockMvc.perform(post("/api/v1/drivers/me/heartbeat")
+                        .header("Authorization", bearer(driver.accessToken()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "lat": 10.7900,
+                                  "lng": 106.7100
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.online").value(true));
+    }
+
     private AuthUser register(String fullName, String phone, String email, String role) throws Exception {
         String request = objectMapper.writeValueAsString(java.util.Map.of(
                 "fullName", fullName,
@@ -180,11 +339,11 @@ class BookingMatchingRoutingIntegrationTests extends PostgresRedisIntegrationTes
         );
     }
 
-    private AuthUser seedAndLoginAdmin() throws Exception {
+    private AuthUser seedAndLoginAdmin(String phone, String email) throws Exception {
         User admin = userRepository.save(User.create(
-                "Flow Admin",
-                "0909100003",
-                "flow.admin@example.com",
+                "Flow Admin " + phone.substring(phone.length() - 2),
+                phone,
+                email,
                 passwordEncoder.encode("password123"),
                 Set.of(UserRole.ADMIN)
         ));
@@ -192,34 +351,34 @@ class BookingMatchingRoutingIntegrationTests extends PostgresRedisIntegrationTes
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
-                                  "phone": "0909100003",
+                                  "phone": "%s",
                                   "password": "password123"
                                 }
-                                """))
+                                """.formatted(phone)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.roles[0]").value("ADMIN"))
                 .andReturn());
         return new AuthUser(admin.getId(), response.at("/data/accessToken").asText());
     }
 
-    private void createDriverProfile(String driverToken) throws Exception {
+    private void createDriverProfile(String driverToken, String suffix) throws Exception {
         mockMvc.perform(post("/api/v1/drivers/me/profile")
                         .header("Authorization", bearer(driverToken))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
-                                  "licenseNumber": "FLOW-GPLX-001",
+                                  "licenseNumber": "FLOW-GPLX-%s",
                                   "licenseExpiry": "2030-12-31",
-                                  "idCardNumber": "FLOW-ID-001",
+                                  "idCardNumber": "FLOW-ID-%s",
                                   "portraitUrl": "https://example.com/flow-driver.jpg",
-                                  "vehiclePlate": "59-FLOW-01",
+                                  "vehiclePlate": "59-FLOW-%s",
                                   "vehicleType": "MOTORBIKE",
                                   "vehicleBrand": "Honda",
                                   "vehicleModel": "Wave",
                                   "vehicleColor": "Blue",
                                   "vehicleYear": 2024
                                 }
-                                """))
+                                """.formatted(suffix, suffix, suffix)))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.data.approvalStatus").value("PENDING"));
     }

@@ -1,6 +1,6 @@
 # GoRide Front-end Integration Plan
 
-Branch da kiem tra: `feature/payment-sandbox-callback-uat-support`
+Branch da kiem tra: `feature/trip-completion-payment-integration`
 
 Muc tieu file nay:
 - Checklist chuc nang backend da co code va co the tich hop FE.
@@ -154,6 +154,7 @@ type PaymentStatus = "PENDING" | "COMPLETED" | "FAILED" | "REFUNDED";
 
 - [x] Sau khi booking created, backend tu dong tim driver gan nhat trong Redis.
 - [x] Gui offer toi driver qua WebSocket user queue.
+- [x] Khi passenger huy booking dang co offer active, backend clear matching state/driver lock va gui dismiss payload toi driver qua WebSocket user queue.
 - [x] Driver accept/reject offer.
 - [x] Driver accept thi trip chuyen `SEARCHING -> ACCEPTED`, driver status Redis thanh `BUSY`.
 - [x] Driver reject/timeout thi backend release offer hien tai, exclude driver do va thu driver tiep theo neu co candidate kha dung.
@@ -281,9 +282,12 @@ type PaymentStatus = "PENDING" | "COMPLETED" | "FAILED" | "REFUNDED";
 - [x] Co Testcontainers base dung PostGIS va Redis that cho integration test.
 - [x] Auth flow da duoc test qua HTTP/JWT/JPA/Redis: register, protected request, refresh rotation, logout revocation va duplicate phone.
 - [x] Booking -> Redis matching -> driver accept -> route pickup -> arrived -> route dropoff da duoc test qua full Spring HTTP flow va OSRM boundary local.
-- [ ] Trip start/completion va final fare chua co integration flow hoan chinh.
-- [ ] Tracking/payment/notification/admin chua co integration flow hoan chinh.
-- [ ] Docker-backed integration suite chua duoc cau hinh chay tren CI.
+- [x] Trip start/completion va final fare da co integration flow qua `BookingMatchingRoutingIntegrationTests`.
+- [x] Tracking REST fallback, payment detail, CASH checkout va driver payment-confirm da co integration flow qua `BookingMatchingRoutingIntegrationTests`.
+- [x] Notification inbox + FCM token REST flow da co `NotificationFlowIntegrationTests` qua HTTP/JWT/JPA/Redis.
+- [x] Admin RBAC, driver approval, pricing, trip list va dashboard da co `AdminFlowIntegrationTests` qua HTTP/JWT/JPA/PostGIS.
+- [ ] Provider sandbox chua co integration flow hoan chinh.
+- [x] Docker-backed integration suite da duoc cau hinh chay tren GitHub Actions CI bang `.github/workflows/backend-ci.yml`; workflow dung Java 17, Maven cache va Docker-enabled runner de chay `./mvnw test`.
 
 ---
 
@@ -506,7 +510,7 @@ Response `data`:
 FE action:
 - Gui heartbeat khi app driver dang online, de xuat moi 20 giay va truoc `expiresAt`.
 - Moi heartbeat gui location moi nhat; backend cap nhat Redis GEO va `driver_profiles.last_location_at`.
-- Tam dung heartbeat khi driver bam offline hoặc logout.
+- Tam dung heartbeat khi driver bam offline hoÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚ÂºÃƒâ€šÃ‚Â·c logout.
 - Neu mat mang ngan, retry voi exponential backoff nhung khong de qua `expiresAt`.
 - Neu nhan `DRIVER_NOT_AVAILABLE`, dung heartbeat va hien nut "Bat dau nhan chuyen" de goi lai `PATCH /api/v1/drivers/me/status` voi `online=true`.
 - Heartbeat khong lam driver dang `BUSY` thanh `AVAILABLE`; FE tiep tuc gui heartbeat trong suot active trip.
@@ -678,6 +682,20 @@ Payload offer:
 }
 ```
 
+Payload dismiss khi passenger huy booking luc offer dang hien tren driver:
+
+```json
+{
+  "type": "TRIP_CANCELLED",
+  "action": "DISMISS",
+  "tripId": 99,
+  "passengerId": 10,
+  "driverId": 20,
+  "reason": "Changed plan",
+  "cancelledAt": "2026-05-27T10:00:10Z"
+}
+```
+
 Driver phan hoi:
 
 ```http
@@ -712,6 +730,7 @@ Response `data`:
 
 FE action:
 - Hien countdown den `expiresAt`.
+- Neu nhan payload co `type=TRIP_CANCELLED` va `action=DISMISS` cho offer hien tai, dong modal offer, dung countdown, khong goi accept/reject nua va co the refresh danh sach trip neu man hinh dang lien quan.
 - Neu accept thanh cong, mo man trip driver.
 - Neu reject thanh cong, dong modal offer; passenger trip van `SEARCHING` neu backend chua tim duoc driver tiep theo.
 - Neu `MATCHING_OFFER_EXPIRED`, dong offer va doi offer moi. Passenger van o man hinh dang tim tai xe cho toi khi co driver accept, co offer moi cho driver khac, hoac passenger tu huy.
@@ -1082,7 +1101,7 @@ Response `data` voi CASH:
 
 FE action:
 - Goi sau trip `COMPLETED`/payment `PENDING` de biet payment method co can redirect khong.
-- Voi `CASH`, `checkoutRequired=false`, FE hien man hinh thanh toan tien mat va cho driver confirm.
+- Voi `CASH`, `checkoutRequired=false`, FE hien man hinh thanh toan tien mat va cho driver confirm; khong mo webview/checkout URL khi `checkoutUrl` null hoac khong co field.
 - Voi `VNPAY`, neu `checkoutRequired=true`, FE mo `checkoutUrl` va theo doi payment status/webhook flow.
 - Voi `MOMO`, neu backend expose `enabled=true`, FE mo `checkoutUrl` (`payUrl`) tu response; sau redirect refresh payment detail trong khi backend xu ly IPN.
 - Endpoint chi hop le cho payment `PENDING`; neu payment da completed backend tra `PAYMENT_INVALID_STATUS`, FE nen refresh payment detail.
@@ -1863,7 +1882,7 @@ Subscribe vao `/topic/trip/{tripId}/status` va `/topic/trip/{tripId}/location` c
 
 | Man hinh | Destination | Payload |
 |---|---|---|
-| Driver online/offer modal | `/user/queue/trip-requests` | `DriverOfferNotification` |
+| Driver online/offer modal | `/user/queue/trip-requests` | `DriverOfferNotification` hoac `DriverOfferCancelledNotification` |
 | Passenger/driver app shell | `/user/queue/notifications` | `UserNotification` |
 | Trip detail | `/topic/trip/{tripId}/status` | `TripStatusNotification` |
 | Passenger tracking | `/topic/trip/{tripId}/location` | `DriverLocationResponse` |
@@ -1901,7 +1920,7 @@ Subscribe vao `/topic/trip/{tripId}/status` va `/topic/trip/{tripId}/location` c
 - [ ] Profile onboarding: tao profile bang `POST /api/v1/drivers/me/profile`.
 - [ ] Approval waiting screen: doc `approvalStatus` tu `GET /api/v1/drivers/me/profile`; chi cho online khi status la `APPROVED`.
 - [ ] Online toggle with current GPS.
-- [ ] Offer modal from `/user/queue/trip-requests`.
+- [ ] Offer modal from `/user/queue/trip-requests`, including `TRIP_CANCELLED`/`DISMISS` payload to close stale offers.
 - [ ] Driver navigation: goi `POST /api/v1/drivers/trips/{tripId}/route`, ve GeoJSON route den pickup/dropoff va debounce re-route.
 - [ ] Trip workflow buttons: arrived/start/complete.
 - [ ] Location sender while `IN_PROGRESS`.

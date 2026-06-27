@@ -6,6 +6,201 @@
 
 ---
 
+## Commit: `ci: run backend tests on github actions`
+
+Branch: `feature/trip-completion-payment-integration`
+
+Phase: Phase 5 - Integration confidence
+
+### Muc tieu
+
+Dua suite backend vao CI de moi push/PR len `main` hoac `develop` co the chay `./mvnw test` tren runner Linux co Docker, phu hop voi Testcontainers PostGIS/Redis hien co.
+
+### Noi dung da trien khai
+
+- Them `.github/workflows/backend-ci.yml`.
+- Workflow chay khi push len `main`, `develop`, `feature/**` va khi pull request vao `main`/`develop`.
+- Setup Java 17 Temurin dung Maven cache cua `actions/setup-java`.
+- Verify Docker bang `docker version` truoc khi chay test de loi Testcontainers ro rang hon.
+- Chay `./mvnw test` tren GitHub-hosted `ubuntu-latest` runner.
+- Dat concurrency theo workflow/ref de huy run cu khi push commit moi vao cung branch.
+- Cap nhat `plan.md`, `integrate-plan.md` va `docs/pland.xlsx` de danh dau CI wiring da co; provider sandbox E2E van con mo.
+
+### Review truoc commit
+
+- Local `git diff --check`: pass; chi con warning LF/CRLF tren Windows.
+- Full `./mvnw.cmd test`: khong can chay lai rieng cho thay doi YAML/docs nay, suite se duoc CI chay sau khi push.
+- CodeRabbit CLI: blocked vi `coderabbit` khong co trong PATH tren Windows hien tai.
+
+### Files chinh
+
+- `.github/workflows/backend-ci.yml`
+- `plan.md`
+- `integrate-plan.md`
+- `docs/implementation-log.md`
+- `docs/pland.xlsx`
+
+---
+
+## Commit: `test: cover admin flow integration`
+
+Branch: `feature/trip-completion-payment-integration`
+
+Phase: Phase 5 - Integration confidence
+
+### Muc tieu
+
+Tang coverage P1 cho admin backend flow bang integration test chay qua HTTP/JWT/JPA/PostGIS, dong thoi sua loi `GET /api/v1/admin/trips` bi 500 tren Postgres khi khong truyen filter ngay thang.
+
+### Noi dung da trien khai
+
+- Them `AdminFlowIntegrationTests` dung Testcontainers PostGIS/Redis base hien co.
+- Test passenger bi chan `FORBIDDEN` khi goi admin dashboard.
+- Test driver tao profile `PENDING`, admin list pending drivers va approve driver.
+- Test admin tao/list/deactivate pricing config.
+- Test admin list trips khong filter tra `200` voi pagination mac dinh.
+- Test admin dashboard tra tong users/drivers/approval counts sau approve.
+- Sua `AdminTripService` dung JPA `Specification` thay vi JPQL optional null parameters de Postgres suy luan type on dinh.
+- Cap nhat `AdminTripServiceTests` theo repository `findAll(spec, pageable)`.
+- Cap nhat `plan.md`, `integrate-plan.md` va `docs/pland.xlsx` de ghi nhan admin integration coverage da co.
+
+### Review truoc commit
+
+- Targeted `./mvnw.cmd -Dtest=AdminFlowIntegrationTests,AdminTripServiceTests test`: pass 4 tests.
+- Full `./mvnw.cmd test`: chua chay trong buoc nay.
+- `git diff --check`: pass; chi con warning CRLF tren Windows.
+- CodeRabbit CLI: blocked vi `coderabbit` khong co trong PATH tren Windows hien tai.
+
+### Files chinh
+
+- `src/test/java/com/example/goride/integration/AdminFlowIntegrationTests.java`
+- `src/main/java/com/example/goride/booking/service/AdminTripService.java`
+- `src/main/java/com/example/goride/booking/repository/TripRepository.java`
+- `src/test/java/com/example/goride/booking/service/AdminTripServiceTests.java`
+- `plan.md`
+- `integrate-plan.md`
+- `docs/implementation-log.md`
+- `docs/pland.xlsx`
+
+---
+
+## Commit: `test: cover notification flow integration`
+
+Branch: `feature/trip-completion-payment-integration`
+
+Phase: Phase 5 - Integration confidence
+
+### Muc tieu
+
+Tang coverage P1 cho notification flow bang integration test chay qua full Spring HTTP/JWT/JPA/Redis, gom FCM token CRUD va notification inbox/mark-read.
+
+### Noi dung da trien khai
+
+- Them `NotificationFlowIntegrationTests` dung Testcontainers PostGIS/Redis base hien co.
+- Test tao passenger bang REST auth register de lay JWT that.
+- Test goi `PUT /api/v1/notifications/fcm-token`, verify token duoc trim va luu Redis qua `FcmDeviceTokenStore`.
+- Test tao `UserNotification` qua `TripRealtimeNotifier`, verify inbox REST list tra notification da luu DB va payload deep-link.
+- Test goi `PATCH /api/v1/notifications/{notificationId}/read`, verify read/readAt.
+- Test goi `DELETE /api/v1/notifications/fcm-token`, verify Redis token da xoa.
+- Cap nhat `plan.md`, `integrate-plan.md` va `docs/pland.xlsx` de ghi nhan notification integration coverage da co.
+
+### Review truoc commit
+
+- Targeted `./mvnw.cmd -Dtest=NotificationFlowIntegrationTests test`: pass 1 test.
+- Full `./mvnw.cmd test`: chua chay trong buoc nay.
+- `git diff --check`: pass; chi con warning CRLF tren Windows.
+- CodeRabbit CLI: blocked vi `coderabbit` khong co trong PATH tren Windows hien tai.
+
+### Files chinh
+
+- `src/test/java/com/example/goride/integration/NotificationFlowIntegrationTests.java`
+- `plan.md`
+- `integrate-plan.md`
+- `docs/implementation-log.md`
+- `docs/pland.xlsx`
+
+---
+
+## Commit: `fix: dismiss driver offer on passenger cancellation`
+
+Branch: `feature/trip-completion-payment-integration`
+
+Phase: Phase 5 - Integration confidence / booking-matching bug fix
+
+### Muc tieu
+
+Khac phuc loi passenger huy booking khi trip dang `SEARCHING` nhung popup offer tren man hinh driver van hien thi cho toi khi TTL timeout.
+
+### Noi dung da trien khai
+
+- Them `BookingCancelledEvent` va publish sau transaction commit trong `BookingService.cancelBooking`.
+- Them `BookingCancelledMatchingListener` de doc active matching state trong Redis, release lock cua driver dang duoc offer va clear trip matching state.
+- Them `DriverOfferCancelledNotification` va mo rong `DriverOfferNotifier` de gui payload dismiss qua `/user/queue/trip-requests`.
+- Cap nhat `integrate-plan.md` huong dan FE dong offer modal khi nhan `type=TRIP_CANCELLED`, `action=DISMISS`.
+- Cap nhat `plan.md` ghi ro matching da cleanup/dismiss stale offer khi passenger huy.
+
+### Review truoc commit
+
+- Targeted `./mvnw.cmd -Dtest=BookingServiceTests,BookingCancelledMatchingListenerTests,WebSocketDriverOfferNotifierTests test`: pass 15 tests.
+- Full `./mvnw.cmd test`: chua chay trong buoc nay.
+- `git diff --check`: pass; chi con warning CRLF tren Windows.
+- CodeRabbit CLI: blocked vi `coderabbit` khong co trong PATH tren Windows hien tai.
+
+### Files chinh
+
+- `src/main/java/com/example/goride/booking/event/BookingCancelledEvent.java`
+- `src/main/java/com/example/goride/booking/service/BookingService.java`
+- `src/main/java/com/example/goride/matching/service/BookingCancelledMatchingListener.java`
+- `src/main/java/com/example/goride/matching/notification/DriverOfferCancelledNotification.java`
+- `src/main/java/com/example/goride/matching/notification/DriverOfferNotifier.java`
+- `src/main/java/com/example/goride/matching/notification/WebSocketDriverOfferNotifier.java`
+- `integrate-plan.md`
+- `plan.md`
+
+---
+
+## Commit: `test: cover trip completion payment integration`
+
+Branch: `feature/trip-completion-payment-integration`
+
+Phase: Phase 5 - Integration confidence
+
+### Muc tieu
+
+Them coverage tich hop cho flow MVP sau khi driver da nhan booking: passenger tao booking, driver accept/arrived/start/complete, backend tinh final fare tu tracking history, tao cash payment pending, FE lay payment detail/checkout, driver confirm tien mat va duoc dua ve hang heartbeat/available.
+
+### Noi dung da trien khai
+
+- Mo rong `BookingMatchingRoutingIntegrationTests` bang scenario end-to-end moi dung MockMvc + Testcontainers PostGIS/Redis.
+- Refactor test helper admin/driver profile dung phone/email/license suffix rieng de moi scenario khong dung unique constraint.
+- Scenario moi cover:
+  - Booking CASH va matching driver gan nhat.
+  - Driver accept offer, update `ARRIVED`, `IN_PROGRESS`, `COMPLETED`.
+  - Driver location update trong `IN_PROGRESS`, passenger doc latest location qua REST fallback.
+  - Trip completed co `finalFare` va `completedAt`.
+  - Payment detail tra `PENDING`, `method=CASH`, amount khop `finalFare`.
+  - Cash checkout tra `checkoutRequired=false`.
+  - Driver goi `PATCH /payment-confirm`, payment thanh `COMPLETED`, `paidAt` duoc set.
+  - Driver heartbeat thanh cong sau payment completion workflow dua driver ve availability queue.
+- Cap nhat `plan.md`, `integrate-plan.md` va `docs/pland.xlsx` de danh dau trip completion/tracking/cash payment integration coverage da co.
+
+### Review truoc commit
+
+- Targeted `./mvnw.cmd -Dtest=BookingMatchingRoutingIntegrationTests test`: pass 2 tests.
+- Full `./mvnw.cmd test`: pass 338 tests.
+- `git diff --check`: pass.
+- CodeRabbit CLI: blocked. `coderabbit --version` khong tim thay lenh; installer mac dinh fail vi `sh` khong co trong PATH; installer qua Git Bash fail voi `Unsupported operating system: mingw64_nt-10.0-26200`.
+
+### Files chinh
+
+- `src/test/java/com/example/goride/integration/BookingMatchingRoutingIntegrationTests.java`
+- `plan.md`
+- `integrate-plan.md`
+- `docs/implementation-log.md`
+- `docs/pland.xlsx`
+
+---
+
 ## Commit: `test: add payment sandbox webhook contract coverage`
 
 Branch: `feature/payment-sandbox-callback-uat-support`
@@ -42,6 +237,7 @@ Tang do tin cay cho buoc UAT sandbox MoMo/VNPAY bang service-level contract cove
 - `docs/pland.xlsx`
 
 ---
+
 ## Commit: `feat: add payment provider readiness diagnostics`
 
 Branch: `feature/payment-provider-sandbox-e2e`
@@ -79,6 +275,7 @@ Them buoc readiness gate cho MoMo/VNPAY truoc khi chay sandbox E2E that. Backend
 - `plan.md`
 
 ---
+
 ## Commit: `fix: keep searching trips after driver rejection`
 
 Branch: `develop`
@@ -1876,7 +2073,7 @@ Cap nhat thong ke so chuyen da hoan thanh cua driver ngay khi trip chuyen sang `
 
 ### Review truoc commit
 
-- Da xac nhan increment chi nam trong nhánh `COMPLETED`, sau khi domain transition hop le.
+- Da xac nhan increment chi nam trong nhÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡nh `COMPLETED`, sau khi domain transition hop le.
 - Da xac nhan trip lock va profile lock cung nam trong transaction de tranh double-count theo concurrent complete request.
 - Da xac nhan transition khong phai `COMPLETED` khong query driver profile.
 - Da chay `./mvnw.cmd -Dtest=DriverTripStatusServiceTests test`: pass 8 tests.

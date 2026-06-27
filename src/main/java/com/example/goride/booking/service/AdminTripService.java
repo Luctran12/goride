@@ -10,6 +10,7 @@ import com.example.goride.common.error.ErrorCode;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -39,7 +40,7 @@ public class AdminTripService {
                 size,
                 Sort.by(Sort.Direction.DESC, "requestedAt")
         );
-        Page<Trip> trips = tripRepository.searchAdminTrips(status, from, to, pageRequest);
+        Page<Trip> trips = tripRepository.findAll(adminTripSearch(status, from, to), pageRequest);
         return PageResponse.of(
                 trips.getContent().stream()
                         .map(TripResponse::from)
@@ -48,6 +49,29 @@ public class AdminTripService {
                 size,
                 trips.getTotalElements()
         );
+    }
+
+
+    private Specification<Trip> adminTripSearch(TripStatus status, Instant from, Instant to) {
+        return (root, query, criteriaBuilder) -> {
+            var predicate = criteriaBuilder.isNull(root.get("deletedAt"));
+            if (status != null) {
+                predicate = criteriaBuilder.and(predicate, criteriaBuilder.equal(root.get("status"), status));
+            }
+            if (from != null) {
+                predicate = criteriaBuilder.and(
+                        predicate,
+                        criteriaBuilder.greaterThanOrEqualTo(root.get("requestedAt"), from)
+                );
+            }
+            if (to != null) {
+                predicate = criteriaBuilder.and(
+                        predicate,
+                        criteriaBuilder.lessThanOrEqualTo(root.get("requestedAt"), to)
+                );
+            }
+            return predicate;
+        };
     }
 
     private void validateSearchRequest(Instant from, Instant to, int page, int size) {
