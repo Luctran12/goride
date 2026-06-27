@@ -6,6 +6,42 @@
 
 ---
 
+## Commit: `ci: run backend tests on github actions`
+
+Branch: `feature/trip-completion-payment-integration`
+
+Phase: Phase 5 - Integration confidence
+
+### Muc tieu
+
+Dua suite backend vao CI de moi push/PR len `main` hoac `develop` co the chay `./mvnw test` tren runner Linux co Docker, phu hop voi Testcontainers PostGIS/Redis hien co.
+
+### Noi dung da trien khai
+
+- Them `.github/workflows/backend-ci.yml`.
+- Workflow chay khi push len `main`, `develop`, `feature/**` va khi pull request vao `main`/`develop`.
+- Setup Java 17 Temurin dung Maven cache cua `actions/setup-java`.
+- Verify Docker bang `docker version` truoc khi chay test de loi Testcontainers ro rang hon.
+- Chay `./mvnw test` tren GitHub-hosted `ubuntu-latest` runner.
+- Dat concurrency theo workflow/ref de huy run cu khi push commit moi vao cung branch.
+- Cap nhat `plan.md`, `integrate-plan.md` va `docs/pland.xlsx` de danh dau CI wiring da co; provider sandbox E2E van con mo.
+
+### Review truoc commit
+
+- Local `git diff --check`: pass; chi con warning LF/CRLF tren Windows.
+- Full `./mvnw.cmd test`: khong can chay lai rieng cho thay doi YAML/docs nay, suite se duoc CI chay sau khi push.
+- CodeRabbit CLI: blocked vi `coderabbit` khong co trong PATH tren Windows hien tai.
+
+### Files chinh
+
+- `.github/workflows/backend-ci.yml`
+- `plan.md`
+- `integrate-plan.md`
+- `docs/implementation-log.md`
+- `docs/pland.xlsx`
+
+---
+
 ## Commit: `test: cover admin flow integration`
 
 Branch: `feature/trip-completion-payment-integration`
@@ -47,6 +83,7 @@ Tang coverage P1 cho admin backend flow bang integration test chay qua HTTP/JWT/
 - `docs/pland.xlsx`
 
 ---
+
 ## Commit: `test: cover notification flow integration`
 
 Branch: `feature/trip-completion-payment-integration`
@@ -83,6 +120,7 @@ Tang coverage P1 cho notification flow bang integration test chay qua full Sprin
 - `docs/pland.xlsx`
 
 ---
+
 ## Commit: `fix: dismiss driver offer on passenger cancellation`
 
 Branch: `feature/trip-completion-payment-integration`
@@ -120,6 +158,7 @@ Khac phuc loi passenger huy booking khi trip dang `SEARCHING` nhung popup offer 
 - `plan.md`
 
 ---
+
 ## Commit: `test: cover trip completion payment integration`
 
 Branch: `feature/trip-completion-payment-integration`
@@ -198,6 +237,7 @@ Tang do tin cay cho buoc UAT sandbox MoMo/VNPAY bang service-level contract cove
 - `docs/pland.xlsx`
 
 ---
+
 ## Commit: `feat: add payment provider readiness diagnostics`
 
 Branch: `feature/payment-provider-sandbox-e2e`
@@ -235,6 +275,7 @@ Them buoc readiness gate cho MoMo/VNPAY truoc khi chay sandbox E2E that. Backend
 - `plan.md`
 
 ---
+
 ## Commit: `fix: keep searching trips after driver rejection`
 
 Branch: `develop`

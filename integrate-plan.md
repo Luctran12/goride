@@ -287,7 +287,7 @@ type PaymentStatus = "PENDING" | "COMPLETED" | "FAILED" | "REFUNDED";
 - [x] Notification inbox + FCM token REST flow da co `NotificationFlowIntegrationTests` qua HTTP/JWT/JPA/Redis.
 - [x] Admin RBAC, driver approval, pricing, trip list va dashboard da co `AdminFlowIntegrationTests` qua HTTP/JWT/JPA/PostGIS.
 - [ ] Provider sandbox chua co integration flow hoan chinh.
-- [ ] Docker-backed integration suite chua duoc cau hinh chay tren CI.
+- [x] Docker-backed integration suite da duoc cau hinh chay tren GitHub Actions CI bang `.github/workflows/backend-ci.yml`; workflow dung Java 17, Maven cache va Docker-enabled runner de chay `./mvnw test`.
 
 ---
 
