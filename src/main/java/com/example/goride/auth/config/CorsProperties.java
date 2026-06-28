@@ -19,7 +19,14 @@ public record CorsProperties(
         allowedOriginPatterns = defaultList(allowedOriginPatterns);
         allowedMethods = defaultList(allowedMethods, "GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS");
         allowedHeaders = defaultList(allowedHeaders, "Authorization", "Content-Type", "X-Request-Id");
-        exposedHeaders = defaultList(exposedHeaders, "X-Request-Id");
+        exposedHeaders = defaultList(
+                exposedHeaders,
+                "X-Request-Id",
+                "Retry-After",
+                "X-RateLimit-Limit",
+                "X-RateLimit-Remaining",
+                "X-RateLimit-Reset"
+        );
         maxAgeSeconds = maxAgeSeconds > 0 ? maxAgeSeconds : 3600;
     }
 

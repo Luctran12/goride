@@ -1,6 +1,6 @@
-# GoRide Front-end Integration Plan
+﻿# GoRide Front-end Integration Plan
 
-Branch da kiem tra: `feature/production-health-readiness`
+Branch da kiem tra: `feature/rate-limit-policy`
 
 Muc tieu file nay:
 - Checklist chuc nang backend da co code va co the tich hop FE.
@@ -78,16 +78,65 @@ CORS_ALLOWED_ORIGINS=http://localhost:5173,https://app.example.com
 CORS_ALLOWED_ORIGIN_PATTERNS=
 CORS_ALLOWED_METHODS=GET,POST,PUT,PATCH,DELETE,OPTIONS
 CORS_ALLOWED_HEADERS=Authorization,Content-Type,X-Request-Id
-CORS_EXPOSED_HEADERS=X-Request-Id
+CORS_EXPOSED_HEADERS=X-Request-Id,Retry-After,X-RateLimit-Limit,X-RateLimit-Remaining,X-RateLimit-Reset
 CORS_ALLOW_CREDENTIALS=false
 CORS_MAX_AGE_SECONDS=3600
 ```
 
 FE action:
 - Web FE phai chay tren origin nam trong `CORS_ALLOWED_ORIGINS` hoac duoc match boi `CORS_ALLOWED_ORIGIN_PATTERNS`.
-- FE co the doc response header `X-Request-Id` vi backend expose header nay qua CORS.
+- FE co the doc response header `X-Request-Id`, `Retry-After` va `X-RateLimit-*` vi backend expose cac header nay qua CORS.
 - Neu browser bao CORS/preflight failed, kiem tra origin frontend thuc te va bien moi truong `CORS_ALLOWED_ORIGINS` cua backend.
 - Native mobile app thuong khong bi browser CORS, nhung web build va admin dashboard se can allowlist nay.
+
+### Rate limit cho REST API
+
+Backend bat token-bucket rate limit mac dinh cho REST API, theo client IP. Cac endpoint diagnostics/docs/WebSocket mac dinh duoc exclude: `/actuator/**`, `/v3/api-docs/**`, `/swagger-ui/**`, `/ws/**`, `/ws-native/**`.
+
+Runtime config:
+
+```properties
+RATE_LIMIT_ENABLED=true
+RATE_LIMIT_CAPACITY=120
+RATE_LIMIT_REFILL_TOKENS=120
+RATE_LIMIT_REFILL_PERIOD_SECONDS=60
+RATE_LIMIT_MAX_KEYS=10000
+RATE_LIMIT_EXCLUDED_PATHS=/actuator/**,/v3/api-docs/**,/swagger-ui/**,/swagger-ui.html,/ws/**,/ws-native/**
+RATE_LIMIT_USE_FORWARDED_FOR=false
+```
+
+Khi vuot gioi han, backend tra HTTP 429:
+
+```json
+{
+  "success": false,
+  "error": {
+    "code": "RATE_LIMIT_EXCEEDED",
+    "message": "Too many requests",
+    "details": {
+      "retryAfterSeconds": 60
+    }
+  },
+  "requestId": "fe-login-123",
+  "timestamp": "2026-06-28T04:45:00Z"
+}
+```
+
+Response headers lien quan:
+
+```http
+Retry-After: 60
+X-RateLimit-Limit: 120
+X-RateLimit-Remaining: 0
+X-RateLimit-Reset: 1782621960
+```
+
+FE action:
+- Khi gap HTTP 429 hoac `error.code=RATE_LIMIT_EXCEEDED`, dung retry tuc thi va schedule retry theo `Retry-After` hoac `error.details.retryAfterSeconds`.
+- Hien thong bao tam thoi, vi du "He thong dang nhan qua nhieu yeu cau, thu lai sau it giay".
+- Giu `requestId`, endpoint va thoi gian request de backend trace log.
+- Voi login/register/booking, disable nut submit trong thoi gian backoff de tranh tao retry storm.
+
 ### Auth header
 
 Tru cac API public, gui:
@@ -264,6 +313,7 @@ type PaymentStatus = "PENDING" | "COMPLETED" | "FAILED" | "REFUNDED";
 - [x] User xem danh sach notification inbox va mark read.
 - [x] STOMP `CONNECT` authenticate bang JWT trong header `Authorization`.
 - [x] STOMP `SUBSCRIBE` vao trip topic chi cho passenger/driver cua trip hoac admin.
+- [x] REST API co token-bucket rate limit, tra `RATE_LIMIT_EXCEEDED` HTTP 429 va headers `Retry-After`/`X-RateLimit-*`.
 - [x] Driver offer queue: `/user/queue/trip-requests`.
 - [x] User notification queue: `/user/queue/notifications`.
 - [x] Trip status topic: `/topic/trip/{tripId}/status`.
@@ -309,6 +359,7 @@ type PaymentStatus = "PENDING" | "COMPLETED" | "FAILED" | "REFUNDED";
 - [x] Notification inbox + FCM token REST flow da co `NotificationFlowIntegrationTests` qua HTTP/JWT/JPA/Redis.
 - [x] Admin RBAC, driver approval, pricing, trip list va dashboard da co `AdminFlowIntegrationTests` qua HTTP/JWT/JPA/PostGIS.
 - [ ] Provider sandbox chua co integration flow hoan chinh.
+- [x] Basic rate-limit integration coverage da co cho login throttle va actuator exclusion.
 - [x] Docker-backed integration suite da duoc cau hinh chay tren GitHub Actions CI bang `.github/workflows/backend-ci.yml`; workflow dung Java 17, Maven cache va Docker-enabled runner de chay `./mvnw test`.
 
 ---
@@ -532,7 +583,7 @@ Response `data`:
 FE action:
 - Gui heartbeat khi app driver dang online, de xuat moi 20 giay va truoc `expiresAt`.
 - Moi heartbeat gui location moi nhat; backend cap nhat Redis GEO va `driver_profiles.last_location_at`.
-- Tam dung heartbeat khi driver bam offline hoÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚ÂºÃƒâ€šÃ‚Â·c logout.
+- Tam dung heartbeat khi driver bam offline hoÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚ÂºÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â·c logout.
 - Neu mat mang ngan, retry voi exponential backoff nhung khong de qua `expiresAt`.
 - Neu nhan `DRIVER_NOT_AVAILABLE`, dung heartbeat va hien nut "Bat dau nhan chuyen" de goi lai `PATCH /api/v1/drivers/me/status` voi `online=true`.
 - Heartbeat khong lam driver dang `BUSY` thanh `AVAILABLE`; FE tiep tuc gui heartbeat trong suot active trip.
@@ -2014,6 +2065,7 @@ Subscribe vao `/topic/trip/{tripId}/status` va `/topic/trip/{tripId}/location` c
 | `PAYMENT_PROVIDER_ERROR` | Hien loi tam thoi cua cong thanh toan, cho retry checkout; khong danh dau payment da thanh cong. |
 | `ROUTING_PROVIDER_ERROR` | Hien khong the tinh lo trinh, giu du lieu pickup/dropoff va cho retry. |
 | `TRIP_ROUTE_NOT_AVAILABLE` | Dung navigation va refresh trip; status hien tai khong cho route pickup/dropoff. |
+| `RATE_LIMIT_EXCEEDED` | Dung retry tuc thi, doc `Retry-After`, disable action tam thoi va thu lai sau backoff. |
 | `TRIP_ALREADY_RATED` | An rating form, coi trip da danh gia. |
 | `DRIVER_LOCATION_NOT_FOUND` | Hien "Dang cho vi tri tai xe". |
 | `NOTIFICATION_NOT_FOUND` | Refresh inbox; notification khong ton tai hoac khong thuoc user. |
