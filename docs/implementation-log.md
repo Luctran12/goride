@@ -6,6 +6,49 @@
 
 ---
 
+## Commit: `feat: add actuator health readiness endpoints`
+
+Branch: `feature/production-health-readiness`
+
+Phase: Phase 4 - Production readiness
+
+### Muc tieu
+
+Bo sung health/readiness endpoints de deployment, load balancer va smoke test co the kiem tra trang thai app ma khong can JWT. Readiness phan biet dependency DB/Redis san sang voi liveness cua process ung dung.
+
+### Noi dung da trien khai
+
+- Them `spring-boot-starter-actuator`.
+- Them `src/main/resources/application.properties` chua management defaults commit duoc rieng, khong dung vao `application.yml` local.
+- Expose public `/actuator/health`, `/actuator/health/liveness`, `/actuator/health/readiness` va `/actuator/info` trong `SecurityConfig`.
+- Cau hinh health probes:
+  - Liveness chi include `livenessState`.
+  - Readiness include `readinessState`, `db`, `redis`.
+  - Khong show health details de tranh lo thong tin noi bo.
+- Dong bo `src/test/resources/application.properties` de integration tests thay dung actuator config.
+- Them `HealthReadinessIntegrationTests` chay qua full Spring security + Testcontainers PostGIS/Redis.
+- Cap nhat `plan.md`, `integrate-plan.md` va `docs/pland.xlsx` de danh dau health/readiness review da hoan thanh.
+
+### Review truoc commit
+
+- Targeted `./mvnw.cmd -Dtest=HealthReadinessIntegrationTests test`: pass 1 test voi Docker/Testcontainers.
+- `git diff --check`: pass; chi con warning LF/CRLF tren Windows.
+- Lan chay sandbox dau tien bi chan Docker pipe; rerun escalated thanh cong.
+- CodeRabbit CLI: blocked vi `coderabbit` khong co trong PATH tren Windows hien tai.
+
+### Files chinh
+
+- `pom.xml`
+- `src/main/java/com/example/goride/auth/config/SecurityConfig.java`
+- `src/main/resources/application.properties`
+- `src/test/resources/application.properties`
+- `src/test/java/com/example/goride/integration/HealthReadinessIntegrationTests.java`
+- `plan.md`
+- `integrate-plan.md`
+- `docs/implementation-log.md`
+- `docs/pland.xlsx`
+
+---
 ## Commit: `ci: run backend tests on github actions`
 
 Branch: `feature/trip-completion-payment-integration`

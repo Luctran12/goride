@@ -1,6 +1,6 @@
 # GoRide Front-end Integration Plan
 
-Branch da kiem tra: `feature/trip-completion-payment-integration`
+Branch da kiem tra: `feature/production-health-readiness`
 
 Muc tieu file nay:
 - Checklist chuc nang backend da co code va co the tich hop FE.
@@ -1823,6 +1823,35 @@ FE action:
 
 ---
 
+
+### 4.16 Health/readiness
+
+Dung cho FE/devops smoke check, load balancer va deployment probes. Cac endpoint nay public, khong gui bearer token.
+
+```http
+GET /actuator
+GET /actuator/health
+GET /actuator/health/liveness
+GET /actuator/health/readiness
+GET /actuator/info
+```
+
+Response discovery thanh cong co `_links`; response health thanh cong:
+
+```json
+{
+  "status": "UP"
+}
+```
+
+FE/devops action:
+- Dung `/actuator` de xem discovery links cua cac endpoint actuator expose.
+- Dung `/actuator/health/liveness` cho container/process liveness probe.
+- Dung `/actuator/health/readiness` cho readiness probe; endpoint nay phu thuoc DB va Redis nen co the tra non-2xx khi dependency chua san sang.
+- Dung `/actuator/info` de xac nhan app identity (`app.name=goride`) trong smoke test.
+- Khong hien thi cac endpoint nay nhu chuc nang nguoi dung; chi dung cho diagnostics/deployment.
+
+---
 ## 5. WebSocket integration
 
 ### Ket noi
