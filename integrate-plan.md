@@ -1,6 +1,6 @@
 # GoRide Front-end Integration Plan
 
-Branch da kiem tra: `feature/trip-completion-payment-integration`
+Branch da kiem tra: `feature/production-health-readiness`
 
 Muc tieu file nay:
 - Checklist chuc nang backend da co code va co the tich hop FE.
@@ -66,6 +66,28 @@ FE nen map `error.code` thay vi chi doc text message.
 - Error response cung co field `requestId`. Khi hien man loi/support, FE nen luu `requestId`, endpoint, thoi gian va `error.code` de backend tim dung log.
 - Khong dua access token, refresh token, password hoac thong tin nhay cam vao `X-Request-Id`.
 
+
+### CORS cho web frontend
+
+Backend bat CORS theo allowlist, mac dinh cho cac local web origins pho bien: `http://localhost:3000`, `http://localhost:5173`, `http://localhost:19006`, `http://127.0.0.1:5173`.
+
+Runtime config:
+
+```properties
+CORS_ALLOWED_ORIGINS=http://localhost:5173,https://app.example.com
+CORS_ALLOWED_ORIGIN_PATTERNS=
+CORS_ALLOWED_METHODS=GET,POST,PUT,PATCH,DELETE,OPTIONS
+CORS_ALLOWED_HEADERS=Authorization,Content-Type,X-Request-Id
+CORS_EXPOSED_HEADERS=X-Request-Id
+CORS_ALLOW_CREDENTIALS=false
+CORS_MAX_AGE_SECONDS=3600
+```
+
+FE action:
+- Web FE phai chay tren origin nam trong `CORS_ALLOWED_ORIGINS` hoac duoc match boi `CORS_ALLOWED_ORIGIN_PATTERNS`.
+- FE co the doc response header `X-Request-Id` vi backend expose header nay qua CORS.
+- Neu browser bao CORS/preflight failed, kiem tra origin frontend thuc te va bien moi truong `CORS_ALLOWED_ORIGINS` cua backend.
+- Native mobile app thuong khong bi browser CORS, nhung web build va admin dashboard se can allowlist nay.
 ### Auth header
 
 Tru cac API public, gui:
@@ -1823,6 +1845,35 @@ FE action:
 
 ---
 
+
+### 4.16 Health/readiness
+
+Dung cho FE/devops smoke check, load balancer va deployment probes. Cac endpoint nay public, khong gui bearer token.
+
+```http
+GET /actuator
+GET /actuator/health
+GET /actuator/health/liveness
+GET /actuator/health/readiness
+GET /actuator/info
+```
+
+Response discovery thanh cong co `_links`; response health thanh cong:
+
+```json
+{
+  "status": "UP"
+}
+```
+
+FE/devops action:
+- Dung `/actuator` de xem discovery links cua cac endpoint actuator expose.
+- Dung `/actuator/health/liveness` cho container/process liveness probe.
+- Dung `/actuator/health/readiness` cho readiness probe; endpoint nay phu thuoc DB va Redis nen co the tra non-2xx khi dependency chua san sang.
+- Dung `/actuator/info` de xac nhan app identity (`app.name=goride`) trong smoke test.
+- Khong hien thi cac endpoint nay nhu chuc nang nguoi dung; chi dung cho diagnostics/deployment.
+
+---
 ## 5. WebSocket integration
 
 ### Ket noi

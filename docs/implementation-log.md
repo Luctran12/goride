@@ -6,6 +6,95 @@
 
 ---
 
+## Commit: `feat: add configurable cors policy`
+
+Branch: `feature/production-health-readiness`
+
+Phase: Phase 4 - Production readiness
+
+### Muc tieu
+
+Them CORS allowlist co the cau hinh bang environment variables de web FE/admin dashboard goi backend an toan, dong thoi cho preflight `OPTIONS` di qua truoc JWT authentication va expose `X-Request-Id` cho FE trace loi.
+
+### Noi dung da trien khai
+
+- Them `CorsProperties` voi prefix `app.security.cors`.
+- Wire `http.cors(...)` trong `SecurityConfig` bang `CorsConfigurationSource` rieng.
+- Cau hinh default local origins trong `application.properties`:
+  - `http://localhost:3000`
+  - `http://localhost:5173`
+  - `http://localhost:19006`
+  - `http://127.0.0.1:5173`
+- Ho tro override qua env vars `CORS_ALLOWED_ORIGINS`, `CORS_ALLOWED_ORIGIN_PATTERNS`, `CORS_ALLOWED_METHODS`, `CORS_ALLOWED_HEADERS`, `CORS_EXPOSED_HEADERS`, `CORS_ALLOW_CREDENTIALS`, `CORS_MAX_AGE_SECONDS`.
+- Expose response header `X-Request-Id` qua CORS de FE doc duoc request trace id.
+- Them `SecurityCorsIntegrationTests` cover:
+  - Preflight tu allowed origin vao protected endpoint khong bi JWT chan.
+  - Actual request tu allowed origin co `Access-Control-Allow-Origin` va `Access-Control-Expose-Headers`.
+  - Origin ngoai allowlist bi reject.
+- Cap nhat `plan.md`, `integrate-plan.md` va `docs/pland.xlsx`.
+
+### Review truoc commit
+
+- Targeted `./mvnw.cmd -Dtest=SecurityCorsIntegrationTests test`: pass 3 tests.
+- `git diff --check`: pass; chi con warning LF/CRLF tren Windows.
+- CodeRabbit CLI: blocked vi `coderabbit` khong co trong PATH tren Windows hien tai.
+
+### Files chinh
+
+- `src/main/java/com/example/goride/auth/config/CorsProperties.java`
+- `src/main/java/com/example/goride/auth/config/SecurityConfig.java`
+- `src/main/resources/application.properties`
+- `src/test/resources/application.properties`
+- `src/test/java/com/example/goride/auth/config/SecurityCorsIntegrationTests.java`
+- `plan.md`
+- `integrate-plan.md`
+- `docs/implementation-log.md`
+- `docs/pland.xlsx`
+
+---
+## Commit: `feat: add actuator health readiness endpoints`
+
+Branch: `feature/production-health-readiness`
+
+Phase: Phase 4 - Production readiness
+
+### Muc tieu
+
+Bo sung health/readiness endpoints de deployment, load balancer va smoke test co the kiem tra trang thai app ma khong can JWT. Readiness phan biet dependency DB/Redis san sang voi liveness cua process ung dung.
+
+### Noi dung da trien khai
+
+- Them `spring-boot-starter-actuator`.
+- Them `src/main/resources/application.properties` chua management defaults commit duoc rieng, khong dung vao `application.yml` local.
+- Expose public `/actuator/health`, `/actuator/health/liveness`, `/actuator/health/readiness` va `/actuator/info` trong `SecurityConfig`.
+- Cau hinh health probes:
+  - Liveness chi include `livenessState`.
+  - Readiness include `readinessState`, `db`, `redis`.
+  - Khong show health details de tranh lo thong tin noi bo.
+- Dong bo `src/test/resources/application.properties` de integration tests thay dung actuator config.
+- Them `HealthReadinessIntegrationTests` chay qua full Spring security + Testcontainers PostGIS/Redis.
+- Cap nhat `plan.md`, `integrate-plan.md` va `docs/pland.xlsx` de danh dau health/readiness review da hoan thanh.
+
+### Review truoc commit
+
+- Targeted `./mvnw.cmd -Dtest=HealthReadinessIntegrationTests test`: pass 1 test voi Docker/Testcontainers.
+- `git diff --check`: pass; chi con warning LF/CRLF tren Windows.
+- Lan chay sandbox dau tien bi chan Docker pipe; rerun escalated thanh cong.
+- CodeRabbit CLI: blocked vi `coderabbit` khong co trong PATH tren Windows hien tai.
+
+### Files chinh
+
+- `pom.xml`
+- `src/main/java/com/example/goride/auth/config/SecurityConfig.java`
+- `src/main/resources/application.properties`
+- `src/test/resources/application.properties`
+- `src/test/java/com/example/goride/integration/HealthReadinessIntegrationTests.java`
+- `plan.md`
+- `integrate-plan.md`
+- `docs/implementation-log.md`
+- `docs/pland.xlsx`
+
+---
 ## Commit: `ci: run backend tests on github actions`
 
 Branch: `feature/trip-completion-payment-integration`
