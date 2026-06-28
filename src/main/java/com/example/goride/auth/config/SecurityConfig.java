@@ -5,6 +5,10 @@ import javax.crypto.spec.SecretKeySpec;
 
 import com.example.goride.auth.security.RestAccessDeniedHandler;
 import com.example.goride.auth.security.RestAuthenticationEntryPoint;
+import com.example.goride.common.ratelimit.InMemoryRateLimitStore;
+import com.example.goride.common.ratelimit.RateLimitFilter;
+import com.example.goride.common.ratelimit.RateLimitProperties;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nimbusds.jose.jwk.source.ImmutableSecret;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
@@ -26,20 +30,24 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import org.springframework.web.filter.CorsFilter;
 
 import java.nio.charset.StandardCharsets;
 
 @Configuration
 @EnableWebSecurity
 @EnableMethodSecurity
-@EnableConfigurationProperties({JwtProperties.class, CorsProperties.class})
+@EnableConfigurationProperties({JwtProperties.class, CorsProperties.class, RateLimitProperties.class})
 public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(
             HttpSecurity http,
             RestAuthenticationEntryPoint authenticationEntryPoint,
             RestAccessDeniedHandler accessDeniedHandler,
-            CorsConfigurationSource corsConfigurationSource
+            CorsConfigurationSource corsConfigurationSource,
+            RateLimitProperties rateLimitProperties,
+            InMemoryRateLimitStore rateLimitStore,
+            ObjectMapper objectMapper
     ) throws Exception {
         return http
                 .cors(cors -> cors.configurationSource(corsConfigurationSource))
@@ -74,6 +82,10 @@ public class SecurityConfig {
                 .exceptionHandling(exceptions -> exceptions
                         .authenticationEntryPoint(authenticationEntryPoint)
                         .accessDeniedHandler(accessDeniedHandler)
+                )
+                .addFilterAfter(
+                        new RateLimitFilter(rateLimitProperties, rateLimitStore, objectMapper),
+                        CorsFilter.class
                 )
                 .build();
     }

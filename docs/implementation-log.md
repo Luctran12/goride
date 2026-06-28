@@ -6,6 +6,51 @@
 
 ---
 
+## Commit: `feat: add api rate limiting`
+
+Branch: `feature/rate-limit-policy`
+
+Phase: Phase 4 - Production readiness
+
+### Muc tieu
+
+Them rate limit token-bucket co the cau hinh de bao ve API khoi request burst va cung cap contract HTTP 429 ro rang cho FE retry/backoff.
+
+### Noi dung da trien khai
+
+- Them `RateLimitProperties`, `RateLimitDecision`, `InMemoryRateLimitStore` va `RateLimitFilter`.
+- Wire filter vao Spring Security chain sau CORS de browser FE van doc duoc CORS response va headers rate-limit.
+- Mac dinh gioi han `120` request/phut theo client IP; co the override bang `RATE_LIMIT_*` environment variables.
+- Exclude mac dinh cac path diagnostics/docs/WebSocket: `/actuator/**`, `/v3/api-docs/**`, `/swagger-ui/**`, `/ws/**`, `/ws-native/**`.
+- Them error code `RATE_LIMIT_EXCEEDED` HTTP 429, response body co `retryAfterSeconds` va header `Retry-After`.
+- Expose `Retry-After`, `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset` qua CORS.
+- Them `RateLimitFilterIntegrationTests` cover login throttle va actuator exclusion.
+- Cap nhat `plan.md`, `integrate-plan.md` va `docs/pland.xlsx` de danh dau API rate limiting da co; production hardening tong the van can log shipping va metrics/tracing backend.
+
+### Review truoc commit
+
+- Targeted `./mvnw.cmd -Dtest=RateLimitFilterIntegrationTests,SecurityCorsIntegrationTests test`: pass 5 tests.
+- `git diff --check`: pass.
+- CodeRabbit CLI: blocked vi `coderabbit` khong co trong PATH tren Windows hien tai.
+
+### Files chinh
+
+- `src/main/java/com/example/goride/common/ratelimit/RateLimitProperties.java`
+- `src/main/java/com/example/goride/common/ratelimit/RateLimitDecision.java`
+- `src/main/java/com/example/goride/common/ratelimit/InMemoryRateLimitStore.java`
+- `src/main/java/com/example/goride/common/ratelimit/RateLimitFilter.java`
+- `src/main/java/com/example/goride/auth/config/SecurityConfig.java`
+- `src/main/java/com/example/goride/auth/config/CorsProperties.java`
+- `src/main/java/com/example/goride/common/error/ErrorCode.java`
+- `src/main/resources/application.properties`
+- `src/test/resources/application.properties`
+- `src/test/java/com/example/goride/common/ratelimit/RateLimitFilterIntegrationTests.java`
+- `src/test/java/com/example/goride/auth/config/SecurityCorsIntegrationTests.java`
+- `plan.md`
+- `integrate-plan.md`
+- `docs/implementation-log.md`
+- `docs/pland.xlsx`
+
 ## Commit: `feat: add configurable cors policy`
 
 Branch: `feature/production-health-readiness`
