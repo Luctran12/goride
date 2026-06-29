@@ -6,6 +6,49 @@
 
 ---
 
+## Commit: `feat: add prometheus observability metrics`
+
+Branch: `feature/observability-metrics`
+
+Phase: Phase 4 - Production readiness
+
+### Muc tieu
+
+Bo sung metrics foundation de devops co the scrape Prometheus, theo doi HTTP latency/status va trace rate-limit decisions theo allowed/rejected.
+
+### Noi dung da trien khai
+
+- Them dependency `micrometer-registry-prometheus`.
+- Expose `/actuator/metrics`, `/actuator/metrics/{meterName}` va `/actuator/prometheus` trong actuator config va Spring Security allowlist.
+- Gan common tag `application=goride` cho metrics.
+- Bat histogram cho `http.server.requests` qua config `HTTP_SERVER_REQUESTS_HISTOGRAM`.
+- Them custom metrics cho rate limiter:
+  - `goride.rate.limit.requests` voi tag `outcome=allowed|rejected`.
+  - `goride.rate.limit.buckets` gauge so in-memory buckets dang track.
+- Them `ObservabilityMetricsIntegrationTests` cover actuator discovery, Prometheus scrape endpoint va custom rate-limit metrics.
+- Dieu chinh `GorideApplicationTests` override readiness group trong no-DB test context de full suite load duoc application context.
+- Cap nhat `plan.md`, `integrate-plan.md` va `docs/pland.xlsx`; production hardening van con log shipping, distributed tracing va deployment dashboards.
+
+### Review truoc commit
+
+- Full `./mvnw.cmd test`: pass 350 tests, 0 failure, 0 error.
+- `git diff --check`: pass; chi con warning LF/CRLF tren Windows.
+- CodeRabbit CLI: blocked vi `coderabbit` khong co trong PATH; WSL bash khong co distro `/bin/bash`, Git Bash installer bao `Unsupported operating system: mingw64_nt-10.0-26200`.
+
+### Files chinh
+
+- `pom.xml`
+- `src/main/java/com/example/goride/auth/config/SecurityConfig.java`
+- `src/main/java/com/example/goride/common/ratelimit/RateLimitFilter.java`
+- `src/main/resources/application.properties`
+- `src/test/resources/application.properties`
+- `src/test/java/com/example/goride/GorideApplicationTests.java`
+- `src/test/java/com/example/goride/common/observability/ObservabilityMetricsIntegrationTests.java`
+- `plan.md`
+- `integrate-plan.md`
+- `docs/implementation-log.md`
+- `docs/pland.xlsx`
+
 ## Commit: `feat: add api rate limiting`
 
 Branch: `feature/rate-limit-policy`
@@ -31,7 +74,7 @@ Them rate limit token-bucket co the cau hinh de bao ve API khoi request burst va
 
 - Targeted `./mvnw.cmd -Dtest=RateLimitFilterIntegrationTests,SecurityCorsIntegrationTests test`: pass 5 tests.
 - `git diff --check`: pass.
-- CodeRabbit CLI: blocked vi `coderabbit` khong co trong PATH tren Windows hien tai.
+- CodeRabbit CLI: blocked vi `coderabbit` khong co trong PATH; WSL bash khong co distro `/bin/bash`, Git Bash installer bao `Unsupported operating system: mingw64_nt-10.0-26200`.
 
 ### Files chinh
 
@@ -82,7 +125,7 @@ Them CORS allowlist co the cau hinh bang environment variables de web FE/admin d
 
 - Targeted `./mvnw.cmd -Dtest=SecurityCorsIntegrationTests test`: pass 3 tests.
 - `git diff --check`: pass; chi con warning LF/CRLF tren Windows.
-- CodeRabbit CLI: blocked vi `coderabbit` khong co trong PATH tren Windows hien tai.
+- CodeRabbit CLI: blocked vi `coderabbit` khong co trong PATH; WSL bash khong co distro `/bin/bash`, Git Bash installer bao `Unsupported operating system: mingw64_nt-10.0-26200`.
 
 ### Files chinh
 
@@ -125,7 +168,7 @@ Bo sung health/readiness endpoints de deployment, load balancer va smoke test co
 - Targeted `./mvnw.cmd -Dtest=HealthReadinessIntegrationTests test`: pass 1 test voi Docker/Testcontainers.
 - `git diff --check`: pass; chi con warning LF/CRLF tren Windows.
 - Lan chay sandbox dau tien bi chan Docker pipe; rerun escalated thanh cong.
-- CodeRabbit CLI: blocked vi `coderabbit` khong co trong PATH tren Windows hien tai.
+- CodeRabbit CLI: blocked vi `coderabbit` khong co trong PATH; WSL bash khong co distro `/bin/bash`, Git Bash installer bao `Unsupported operating system: mingw64_nt-10.0-26200`.
 
 ### Files chinh
 
@@ -164,7 +207,7 @@ Dua suite backend vao CI de moi push/PR len `main` hoac `develop` co the chay `.
 
 - Local `git diff --check`: pass; chi con warning LF/CRLF tren Windows.
 - Full `./mvnw.cmd test`: khong can chay lai rieng cho thay doi YAML/docs nay, suite se duoc CI chay sau khi push.
-- CodeRabbit CLI: blocked vi `coderabbit` khong co trong PATH tren Windows hien tai.
+- CodeRabbit CLI: blocked vi `coderabbit` khong co trong PATH; WSL bash khong co distro `/bin/bash`, Git Bash installer bao `Unsupported operating system: mingw64_nt-10.0-26200`.
 
 ### Files chinh
 
@@ -203,7 +246,7 @@ Tang coverage P1 cho admin backend flow bang integration test chay qua HTTP/JWT/
 - Targeted `./mvnw.cmd -Dtest=AdminFlowIntegrationTests,AdminTripServiceTests test`: pass 4 tests.
 - Full `./mvnw.cmd test`: chua chay trong buoc nay.
 - `git diff --check`: pass; chi con warning CRLF tren Windows.
-- CodeRabbit CLI: blocked vi `coderabbit` khong co trong PATH tren Windows hien tai.
+- CodeRabbit CLI: blocked vi `coderabbit` khong co trong PATH; WSL bash khong co distro `/bin/bash`, Git Bash installer bao `Unsupported operating system: mingw64_nt-10.0-26200`.
 
 ### Files chinh
 
@@ -243,7 +286,7 @@ Tang coverage P1 cho notification flow bang integration test chay qua full Sprin
 - Targeted `./mvnw.cmd -Dtest=NotificationFlowIntegrationTests test`: pass 1 test.
 - Full `./mvnw.cmd test`: chua chay trong buoc nay.
 - `git diff --check`: pass; chi con warning CRLF tren Windows.
-- CodeRabbit CLI: blocked vi `coderabbit` khong co trong PATH tren Windows hien tai.
+- CodeRabbit CLI: blocked vi `coderabbit` khong co trong PATH; WSL bash khong co distro `/bin/bash`, Git Bash installer bao `Unsupported operating system: mingw64_nt-10.0-26200`.
 
 ### Files chinh
 
@@ -278,7 +321,7 @@ Khac phuc loi passenger huy booking khi trip dang `SEARCHING` nhung popup offer 
 - Targeted `./mvnw.cmd -Dtest=BookingServiceTests,BookingCancelledMatchingListenerTests,WebSocketDriverOfferNotifierTests test`: pass 15 tests.
 - Full `./mvnw.cmd test`: chua chay trong buoc nay.
 - `git diff --check`: pass; chi con warning CRLF tren Windows.
-- CodeRabbit CLI: blocked vi `coderabbit` khong co trong PATH tren Windows hien tai.
+- CodeRabbit CLI: blocked vi `coderabbit` khong co trong PATH; WSL bash khong co distro `/bin/bash`, Git Bash installer bao `Unsupported operating system: mingw64_nt-10.0-26200`.
 
 ### Files chinh
 

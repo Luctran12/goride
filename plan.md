@@ -1,4 +1,4 @@
-﻿# GoRide Project Completion Plan
+# GoRide Project Completion Plan
 
 Generated: 2026-06-15, Asia/Bangkok
 
@@ -6,13 +6,13 @@ Generated: 2026-06-15, Asia/Bangkok
 
 | Item | Status |
 | --- | --- |
-| Working branch | `feature/rate-limit-policy` |
-| Latest merged feature on develop | `feature/production-health-readiness` |
-| Develop merge commit | `merge: production health readiness` |
-| Test status | Full `./mvnw.cmd test` passed 338 tests on 2026-06-24; targeted `RateLimitFilterIntegrationTests,SecurityCorsIntegrationTests` passed 5 tests on 2026-06-28; backend CI workflow added locally, awaiting first GitHub run |
+| Working branch | `feature/observability-metrics` |
+| Latest merged feature on develop | `feature/rate-limit-policy` |
+| Develop merge commit | `merge: api rate limiting` |
+| Test status | Full `./mvnw.cmd test` passed 350 tests on 2026-06-28; backend CI workflow added locally, awaiting first GitHub run |
 | Diff hygiene | `git diff --check`: pass on 2026-06-28 |
 | CodeRabbit CLI | Blocked: CLI missing; installer via Git Bash reports unsupported OS `mingw64_nt-10.0-26200` |
-| Publish status | Production health readiness merged to `develop`; current rate-limit feature is in review flow |
+| Publish status | API rate limiting merged to `develop`; current observability metrics feature is in review flow |
 | Local config | `src/main/resources/application.yml` is environment-specific and must stay uncommitted |
 
 ## Completed Backend Modules
@@ -34,7 +34,7 @@ Generated: 2026-06-15, Asia/Bangkok
 | Notifications | Notification inbox, mark-read flow, in-app/WebSocket delivery, FCM token CRUD, Firebase Admin sender, ADC/service-account credential loading and startup validation | `/api/v1/notifications`, FCM token endpoints | FCM stays disabled by default; enabled deployments fail startup clearly when credentials are unavailable and never require committed credential JSON. |
 | Admin trip operations | Admin trip list/filter/detail-like views and dashboard metrics | `/api/v1/admin/trips`, `/api/v1/admin/dashboard` | Supports basic operations dashboard and trip monitoring. |
 | Integration test foundation | Docker-backed PostGIS/Redis base, full auth HTTP flow, booking-to-driver-routing flow, trip completion/payment flow, notification inbox/FCM token flow, admin dashboard/pricing/driver approval flow, and GitHub Actions backend CI wiring | `AuthFlowIntegrationTests`, `BookingMatchingRoutingIntegrationTests`, `NotificationFlowIntegrationTests`, `AdminFlowIntegrationTests`, `.github/workflows/backend-ci.yml` | Covers auth, booking/matching/routing, tracking/payment, Redis FCM token CRUD, notification inbox, admin RBAC, driver approval, pricing management, trip list and dashboard through the real Spring stack; CI now runs `./mvnw test` on Docker-enabled GitHub runners. |
-| Request tracing, error logging, CORS, rate limiting and health checks | HTTP correlation ID, response trace header/body, request completion logs, centralized exception/security logs, configurable CORS allowlist, in-memory token-bucket API rate limiting, Actuator health/liveness/readiness/info endpoints | `X-Request-Id`, `Retry-After`, `X-RateLimit-*`, all REST endpoints, CORS preflight, `/actuator/health`, `/actuator/health/liveness`, `/actuator/health/readiness`, `/actuator/info` | Logs method/path/status/duration without request bodies or secrets; unexpected 5xx errors retain stack traces; FE origins and rate-limit headers are exposed by config; excessive requests return `RATE_LIMIT_EXCEEDED` HTTP 429; readiness checks DB/Redis while liveness only reflects app state. |
+| Request tracing, error logging, CORS, rate limiting, metrics and health checks | HTTP correlation ID, response trace header/body, request completion logs, centralized exception/security logs, configurable CORS allowlist, in-memory token-bucket API rate limiting, Prometheus metrics export, Actuator health/liveness/readiness/info/metrics endpoints | `X-Request-Id`, `Retry-After`, `X-RateLimit-*`, all REST endpoints, CORS preflight, `/actuator/health`, `/actuator/health/liveness`, `/actuator/health/readiness`, `/actuator/info`, `/actuator/metrics`, `/actuator/prometheus` | Logs method/path/status/duration without request bodies or secrets; Prometheus exposes HTTP/server metrics plus `goride.rate.limit.requests` and `goride.rate.limit.buckets`; excessive requests return `RATE_LIMIT_EXCEEDED` HTTP 429; readiness checks DB/Redis while liveness only reflects app state. |
 | Documentation | Implementation log and frontend integration plan | `docs/implementation-log.md`, `integrate-plan.md` | Living docs describe commit history and integration contracts. |
 
 ## Unfinished Work
@@ -44,7 +44,7 @@ Generated: 2026-06-15, Asia/Bangkok
 | P0 | Payment providers | Finish MoMo/VNPAY sandbox E2E validation against real merchant flows; readiness endpoint and service-level signed callback contract tests now verify backend before UAT | Sandbox merchant accounts, callback URLs, provider test apps | Both online providers report `sandboxReady=true`, return usable checkout URLs and real sandbox success/failure callbacks reconcile internal payment/trip state. |
 | P0 | Webhook sandbox handling | Run real sandbox callback tests for MoMo and VNPAY; service-level success/failure/stale callback contract coverage is implemented | Sandbox callback payloads and merchant test accounts | Sandbox success/failure statuses map to internal payment states and provider acknowledgements meet real gateway expectations. |
 | P1 | E2E/integration tests | Auth, booking/matching/pickup-dropoff routing, trip completion, tracking fallback, cash payment confirmation, notification inbox/FCM token flow, admin flow and GitHub Actions backend CI wiring are covered; add provider sandbox E2E flow | Existing Testcontainers base, sandbox merchant accounts | Remaining provider sandbox happy paths run in CI/staging against database/Redis-compatible services and real provider sandbox callbacks. |
-| P1 | Production hardening | Request correlation, centralized error logging, configurable CORS allowlist, basic API rate limiting and Actuator health/readiness endpoints are implemented; add centralized log shipping and metrics/tracing backend | Deployment platform requirements | API has safe production defaults and operational visibility across instances; deployment can use public liveness/readiness probes, FE browser clients can use explicit allowed origins, and abusive request bursts are throttled with a documented 429 contract. |
+| P1 | Production hardening | Request correlation, centralized error logging, configurable CORS allowlist, basic API rate limiting, Actuator health/readiness and Prometheus metrics endpoints are implemented; add centralized log shipping and distributed tracing backend | Deployment platform requirements | API has safe production defaults and per-instance operational visibility; deployment can scrape Prometheus metrics, use liveness/readiness probes, and throttle abusive request bursts with a documented 429 contract. |
 | P1 | Database release strategy | Define production database migration/release SQL workflow without Flyway unless project policy changes | DBA/deployment convention | Schema changes are reproducible across environments and documented per release. |
 | P2 | Upload storage | Add driver document/avatar upload storage | S3-compatible storage, local dev storage, file validation | Driver can upload required files; admin can view verified document URLs. |
 | P2 | In-trip messaging | Add passenger-driver chat during active trip | WebSocket channel policy, persistence decision | Participants can exchange trip-scoped messages; unauthorized users cannot subscribe/send. |
@@ -73,6 +73,7 @@ Generated: 2026-06-15, Asia/Bangkok
 | Rating | `/api/v1/ratings`, rating status/list endpoints | Prompt passenger after completed trip, hide form after already rated. |
 | Notifications | `/api/v1/notifications`, FCM token endpoints, WebSocket notification channel | Register FCM token, render inbox/badge, mark notifications read. |
 | Admin trips/dashboard | `/api/v1/admin/trips`, `/api/v1/admin/dashboard` | Build admin operational dashboard and trip filter pages. |
+| Observability/devops smoke | `/actuator`, `/actuator/metrics`, `/actuator/prometheus` | Devops can scrape Prometheus metrics and inspect `goride.rate.limit.requests`, `goride.rate.limit.buckets`, and standard `http.server.requests`; keep these endpoints behind trusted network controls outside local dev. |
 | Rate limit handling | All REST endpoints except configured diagnostics/docs/WebSocket paths, `Retry-After`, `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset` | On HTTP 429, stop immediate retries, show a temporary overload message, schedule retry after `Retry-After`, and keep `requestId` for support. |
 | Error/support flow | All REST endpoints, `X-Request-Id` response header and error body | Generate a request ID per call and retain `requestId`, endpoint, time and `error.code` when reporting failures. |
 
@@ -83,7 +84,7 @@ Generated: 2026-06-15, Asia/Bangkok
 | Phase 1 | Payment provider completion | MoMo/VNPAY sandbox E2E validation, provider-specific freshness-window tuning, service-level callback contract coverage and real merchant callback tests. |
 | Phase 2 | Real-world routing | Fare estimation and assigned-driver pickup/dropoff GeoJSON routing implemented; production endpoint UAT, route request rate control, monitoring and timeout tuning remain. |
 | Phase 3 | Driver availability reliability | Heartbeat API, Redis TTL refresh and automatic database offline timeout implemented; production interval tuning and Redis/database soak testing remain. |
-| Phase 4 | Production readiness | Firebase secure credential loading, HTTP request correlation, centralized application error logging, configurable CORS allowlist, basic API rate limiting and Actuator health/readiness endpoints implemented; log aggregation, metrics/tracing backend, environment profiles and release SQL strategy remain. |
+| Phase 4 | Production readiness | Firebase secure credential loading, HTTP request correlation, centralized application error logging, configurable CORS allowlist, basic API rate limiting, Prometheus metrics and Actuator health/readiness endpoints implemented; log aggregation, distributed tracing backend, environment profiles and release SQL strategy remain. |
 | Phase 5 | Integration confidence | Testcontainers PostGIS/Redis foundation, auth flow, booking-to-matching-to-pickup/dropoff-routing flow, trip completion, tracking fallback, cash payment confirmation, notification inbox/FCM token flow, admin flow and backend CI workflow are implemented; provider sandbox E2E validation remains. |
 | Phase 6 | Product expansion | Uploads, messaging, scheduled rides, surge pricing, multi-city, analytics. |
 
@@ -97,6 +98,6 @@ Generated: 2026-06-15, Asia/Bangkok
 | Heartbeat timing is not production-calibrated | Aggressive intervals may create reconnect churn; loose intervals delay database cleanup | Start with a 20-second client heartbeat and 60-second timeout, then tune from staging disconnect and scheduler metrics. |
 | Firebase credential path still needs staging UAT | Credential loading is production-ready, but the real deployment identity/secret mount has not been exercised in this repository | Prefer attached workload identity/ADC; otherwise mount the JSON outside the image, set `GOOGLE_APPLICATION_CREDENTIALS`, and verify startup plus one test push in staging. |
 | Integration coverage is partial | Auth, booking/matching/driver-routing, trip completion, tracking fallback, cash payment confirmation, notification inbox/FCM token flow and admin flow now run through HTTP/JWT/JPA/Redis, and GitHub Actions runs the suite on pushes/PRs, but real provider sandbox regressions may still slip through | Reuse the Testcontainers base for remaining provider flows and validate real gateway callbacks before release candidate. |
-| Logs are local to each application instance | Request IDs, health probes and 429 throttling improve diagnosis, but logs can still be lost or fragmented across replicas | Ship stdout logs to a centralized platform and add retention, search, alert, rate-limit and health-probe dashboard rules before production scaling. |
+| Logs and metrics are still per-instance until deployment wiring is added | Request IDs, health probes, Prometheus metrics and 429 throttling improve diagnosis, but logs/metrics can still be fragmented across replicas | Ship stdout logs centrally, scrape each instance from Prometheus or the platform collector, and add retention/search/alert dashboards before production scaling. |
 | In-memory rate limiting is per application instance | Multiple replicas each keep their own bucket state, so global limits may be higher than configured | For MVP, keep conservative per-instance defaults; before scale-out, move buckets to Redis or an edge gateway if a global quota is required. |
 | FE uses the wrong WebSocket transport URL | SockJS calls to a native-only endpoint fail at `/ws/info`; native clients pointed at a SockJS root also fail | Use `/ws` with SockJS and `/ws-native` with native STOMP exactly as documented in `integrate-plan.md`. |

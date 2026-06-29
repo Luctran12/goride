@@ -9,6 +9,7 @@ import com.example.goride.common.ratelimit.InMemoryRateLimitStore;
 import com.example.goride.common.ratelimit.RateLimitFilter;
 import com.example.goride.common.ratelimit.RateLimitProperties;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.micrometer.core.instrument.MeterRegistry;
 import com.nimbusds.jose.jwk.source.ImmutableSecret;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
@@ -47,7 +48,8 @@ public class SecurityConfig {
             CorsConfigurationSource corsConfigurationSource,
             RateLimitProperties rateLimitProperties,
             InMemoryRateLimitStore rateLimitStore,
-            ObjectMapper objectMapper
+            ObjectMapper objectMapper,
+            MeterRegistry meterRegistry
     ) throws Exception {
         return http
                 .cors(cors -> cors.configurationSource(corsConfigurationSource))
@@ -64,6 +66,9 @@ public class SecurityConfig {
                                 "/actuator/health",
                                 "/actuator/health/**",
                                 "/actuator/info",
+                                "/actuator/metrics",
+                                "/actuator/metrics/**",
+                                "/actuator/prometheus",
                                 "/ws",
                                 "/ws/**",
                                 "/ws-native",
@@ -84,7 +89,7 @@ public class SecurityConfig {
                         .accessDeniedHandler(accessDeniedHandler)
                 )
                 .addFilterAfter(
-                        new RateLimitFilter(rateLimitProperties, rateLimitStore, objectMapper),
+                        new RateLimitFilter(rateLimitProperties, rateLimitStore, objectMapper, meterRegistry),
                         CorsFilter.class
                 )
                 .build();

@@ -1897,9 +1897,9 @@ FE action:
 ---
 
 
-### 4.16 Health/readiness
+### 4.16 Health/readiness/metrics
 
-Dung cho FE/devops smoke check, load balancer va deployment probes. Cac endpoint nay public, khong gui bearer token.
+Dung cho FE/devops smoke check, load balancer, deployment probes va Prometheus scrape. Cac endpoint nay public trong app, khong gui bearer token; production nen chi expose qua trusted network/API gateway rule.
 
 ```http
 GET /actuator
@@ -1907,6 +1907,9 @@ GET /actuator/health
 GET /actuator/health/liveness
 GET /actuator/health/readiness
 GET /actuator/info
+GET /actuator/metrics
+GET /actuator/metrics/{meterName}
+GET /actuator/prometheus
 ```
 
 Response discovery thanh cong co `_links`; response health thanh cong:
@@ -1917,11 +1920,24 @@ Response discovery thanh cong co `_links`; response health thanh cong:
 }
 ```
 
+Prometheus endpoint tra text exposition format. Metrics dang chu y:
+- `http.server.requests`: request count/latency/status theo URI pattern.
+- `goride.rate.limit.requests`: counter theo tag `outcome=allowed|rejected`.
+- `goride.rate.limit.buckets`: so bucket IP dang duoc in-memory rate limiter track.
+
+Runtime config:
+
+```properties
+PROMETHEUS_METRICS_ENABLED=true
+HTTP_SERVER_REQUESTS_HISTOGRAM=true
+```
+
 FE/devops action:
 - Dung `/actuator` de xem discovery links cua cac endpoint actuator expose.
 - Dung `/actuator/health/liveness` cho container/process liveness probe.
 - Dung `/actuator/health/readiness` cho readiness probe; endpoint nay phu thuoc DB va Redis nen co the tra non-2xx khi dependency chua san sang.
 - Dung `/actuator/info` de xac nhan app identity (`app.name=goride`) trong smoke test.
+- Dung `/actuator/prometheus` cho Prometheus/platform scraper; canh bao khi 5xx tang, latency tang, hoac `goride_rate_limit_requests_total{outcome="rejected"}` tang bat thuong.
 - Khong hien thi cac endpoint nay nhu chuc nang nguoi dung; chi dung cho diagnostics/deployment.
 
 ---
