@@ -3,6 +3,9 @@ package com.example.goride.common.ratelimit;
 import com.example.goride.common.api.ErrorResponse;
 import com.example.goride.common.error.ErrorCode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.Gauge;
+import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -27,15 +30,23 @@ public class RateLimitFilter extends OncePerRequestFilter {
     private final RateLimitProperties properties;
     private final InMemoryRateLimitStore rateLimitStore;
     private final ObjectMapper objectMapper;
+    private final Counter allowedRequests;
+    private final Counter rejectedRequests;
 
     public RateLimitFilter(
             RateLimitProperties properties,
             InMemoryRateLimitStore rateLimitStore,
-            ObjectMapper objectMapper
+            ObjectMapper objectMapper,
+            MeterRegistry meterRegistry
     ) {
         this.properties = properties;
         this.rateLimitStore = rateLimitStore;
         this.objectMapper = objectMapper;
+        this.allowedRequests = rateLimitCounter(meterRegistry, "allowed");
+        this.rejectedRequests = rateLimitCounter(meterRegistry, "rejected");
+        Gauge.builder("goride.rate.limit.buckets", rateLimitStore, InMemoryRateLimitStore::bucketCount)
+                .description("Number of in-memory rate limit buckets currently tracked")
+                .register(meterRegistry);
     }
 
     @Override
@@ -52,10 +63,12 @@ public class RateLimitFilter extends OncePerRequestFilter {
         RateLimitDecision decision = rateLimitStore.consume("ip:" + resolveClientIp(request), properties);
         applyRateLimitHeaders(response, decision);
         if (decision.allowed()) {
+            allowedRequests.increment();
             filterChain.doFilter(request, response);
             return;
         }
 
+        rejectedRequests.increment();
         response.setStatus(ErrorCode.RATE_LIMIT_EXCEEDED.httpStatus().value());
         response.setHeader(HttpHeaders.RETRY_AFTER, Long.toString(decision.retryAfterSeconds()));
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
@@ -67,6 +80,13 @@ public class RateLimitFilter extends OncePerRequestFilter {
                         Map.of("retryAfterSeconds", decision.retryAfterSeconds())
                 )
         );
+    }
+
+    private Counter rateLimitCounter(MeterRegistry meterRegistry, String outcome) {
+        return Counter.builder("goride.rate.limit.requests")
+                .description("Rate limit decisions for REST requests")
+                .tag("outcome", outcome)
+                .register(meterRegistry);
     }
 
     private boolean shouldSkip(HttpServletRequest request) {
