@@ -150,9 +150,11 @@ Quyet dinh quan trong: **Matching driver online dung Redis GEO, khong dung PostG
 Giai doan nay khong dung Flyway. Schema duoc tao va cap nhat chu yeu bang Hibernate/JPA trong moi truong local.
 
 Quy uoc lam viec:
-- `spring.jpa.hibernate.ddl-auto=update` cho local de di nhanh.
+- `spring.jpa.hibernate.ddl-auto=update` chi dung cho local de di nhanh.
+- Staging/production khong dua vao Hibernate `update`; moi thay doi schema can co release folder trong `db/releases/YYYYMMDD-short-name`.
+- Moi release folder gom `manifest.yml`, `precheck.sql`, `apply.sql`, `verify.sql`, `rollback.sql` va phai pass `scripts/validate-db-release.ps1` truoc review/deploy.
 - Khi doi schema lon hoac doi constraint, uu tien reset local DB thay vi tin rang `update` se sua moi thay doi phuc tap dung y.
-- Cac doan SQL ben duoi la schema tham chieu de doi chieu voi entity va de chuyen sang migration tool sau nay neu can.
+- Cac doan SQL ben duoi la schema tham chieu de doi chieu voi entity va de sinh release SQL thu cong khi can.
 
 ### 3.1 Extensions
 

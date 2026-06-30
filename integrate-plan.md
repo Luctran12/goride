@@ -1,6 +1,6 @@
 # GoRide Front-end Integration Plan
 
-Branch da kiem tra: `feature/rate-limit-policy`
+Branch da kiem tra: `feature/database-release-sql-workflow`
 
 Muc tieu file nay:
 - Checklist chuc nang backend da co code va co the tich hop FE.
@@ -362,6 +362,7 @@ type PaymentStatus = "PENDING" | "COMPLETED" | "FAILED" | "REFUNDED";
 - [ ] Provider sandbox chua co integration flow hoan chinh voi merchant account that; backend da co admin UAT plan endpoint de dieu phoi cau hinh va kich ban test.
 - [x] Basic rate-limit integration coverage da co cho login throttle va actuator exclusion.
 - [x] Docker-backed integration suite da duoc cau hinh chay tren GitHub Actions CI bang `.github/workflows/backend-ci.yml`; workflow dung Java 17, Maven cache va Docker-enabled runner de chay `./mvnw test`.
+- [x] Database release workflow khong dung Flyway da co `db/releases` template, manifest/precheck/apply/verify/rollback va validator PowerShell.
 
 ---
 
@@ -2068,6 +2069,42 @@ Subscribe vao `/topic/trip/{tripId}/status` va `/topic/trip/{tripId}/location` c
 
 ---
 
+### Database release workflow khong dung Flyway
+
+Backend khong expose API runtime cho muc nay. Day la quy trinh devops/backend de moi thay doi schema production co SQL duoc version control va review truoc khi chay.
+
+Thu muc release:
+
+```text
+db/releases/YYYYMMDD-short-name/
+  manifest.yml
+  precheck.sql
+  apply.sql
+  verify.sql
+  rollback.sql
+```
+
+Lenh validate truoc review/deploy:
+
+```powershell
+.\scripts\validate-db-release.ps1 -ReleasePath db\releases\YYYYMMDD-short-name
+```
+
+Hoac validate tat ca release folders:
+
+```powershell
+.\scripts\validate-db-release.ps1 -All
+```
+
+Devops/backend action:
+- Dung `db/releases/0000-template` khi co thay doi schema moi.
+- Chay `precheck.sql` truoc deploy, `apply.sql` trong cua so deploy, va `verify.sql` sau deploy.
+- Luu output precheck/verify voi release notes.
+- `apply.sql` mac dinh phai co `BEGIN;` va `COMMIT;`; neu operation Postgres khong transactional thi set `transactional: false` trong manifest va ghi ly do.
+- Neu co `DROP TABLE`, `TRUNCATE`, `DELETE FROM` hoac drop column, phai them comment `-- destructive-reviewed: true` sau review ro rang.
+- Khong dung Hibernate `ddl-auto=update` cho staging/production; chi dung local dev de di nhanh.
+
+---
 ## 6. Man hinh FE goi y theo flow
 
 ### Passenger app
