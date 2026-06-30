@@ -7,12 +7,14 @@ import com.example.goride.payment.dto.PaymentCheckoutResponse;
 import com.example.goride.payment.dto.PaymentDetailResponse;
 import com.example.goride.payment.dto.PaymentMethodResponse;
 import com.example.goride.payment.dto.PaymentProviderReadinessResponse;
+import com.example.goride.payment.dto.PaymentSandboxUatPlanResponse;
 import com.example.goride.payment.dto.PaymentWebhookResponse;
 import com.example.goride.payment.dto.VnPayIpnResponse;
 import com.example.goride.payment.service.PaymentCheckoutService;
 import com.example.goride.payment.service.PaymentMethodService;
 import com.example.goride.payment.service.PaymentProviderReadinessService;
 import com.example.goride.payment.service.PaymentQueryService;
+import com.example.goride.payment.service.PaymentSandboxUatPlanService;
 import com.example.goride.payment.service.PaymentWebhookService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -41,6 +43,7 @@ public class PaymentController {
     private final PaymentCheckoutService paymentCheckoutService;
     private final PaymentMethodService paymentMethodService;
     private final PaymentProviderReadinessService paymentProviderReadinessService;
+    private final PaymentSandboxUatPlanService paymentSandboxUatPlanService;
     private final PaymentWebhookService paymentWebhookService;
     private final CurrentUser currentUser;
 
@@ -49,6 +52,7 @@ public class PaymentController {
             PaymentCheckoutService paymentCheckoutService,
             PaymentMethodService paymentMethodService,
             PaymentProviderReadinessService paymentProviderReadinessService,
+            PaymentSandboxUatPlanService paymentSandboxUatPlanService,
             PaymentWebhookService paymentWebhookService,
             CurrentUser currentUser
     ) {
@@ -56,6 +60,7 @@ public class PaymentController {
         this.paymentCheckoutService = paymentCheckoutService;
         this.paymentMethodService = paymentMethodService;
         this.paymentProviderReadinessService = paymentProviderReadinessService;
+        this.paymentSandboxUatPlanService = paymentSandboxUatPlanService;
         this.paymentWebhookService = paymentWebhookService;
         this.currentUser = currentUser;
     }
@@ -69,6 +74,12 @@ public class PaymentController {
     @PreAuthorize("hasRole('ADMIN')")
     public ApiResponse<List<PaymentProviderReadinessResponse>> listPaymentProviderReadiness() {
         return ApiResponse.ok(paymentProviderReadinessService.listProviderReadiness());
+    }
+
+    @GetMapping("/providers/sandbox-uat-plan")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ApiResponse<PaymentSandboxUatPlanResponse> getPaymentSandboxUatPlan() {
+        return ApiResponse.ok(paymentSandboxUatPlanService.getSandboxUatPlan());
     }
 
     @GetMapping("/trips/{tripId}")

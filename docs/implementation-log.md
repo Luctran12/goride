@@ -6,6 +6,51 @@
 
 ---
 
+## Commit: `feat: add payment sandbox uat harness`
+
+Branch: `feature/payment-sandbox-uat-harness`
+
+Phase: Phase 1 - Payment provider completion, sandbox UAT handoff
+
+### Muc tieu
+
+Them endpoint admin/devops de tong hop checklist UAT sandbox cho MoMo/VNPAY tu readiness hien co, giup FE va nguoi van hanh biet provider nao da san sang test, callback endpoint nao can dang ky va con thieu cau hinh nao truoc khi expose online payment.
+
+### Noi dung da trien khai
+
+- Them `PaymentSandboxUatPlanResponse` voi prerequisites, provider checklist va validation scenarios.
+- Them `PaymentSandboxUatPlanService`:
+  - Doc readiness MoMo/VNPAY hien co va config callback da normalize.
+  - Tra `status` theo cac trang thai `NOT_REGISTERED`, `DISABLED`, `SANDBOX_DISABLED`, `BLOCKED_BY_CONFIG`, `READY_FOR_SANDBOX_UAT`.
+  - Tra endpoint checkout/webhook, `returnUrl`, `ipnUrl`, missing requirements, action cho FE va backend checks ma khong lo secret/access key.
+- Them admin endpoint `GET /api/v1/payments/providers/sandbox-uat-plan` trong `PaymentController`, bao ve bang `hasRole('ADMIN')`.
+- Them unit tests cho controller delegation va service output khi provider disabled, ready va sandbox mode bi tat.
+- Cap nhat `plan.md`, `integrate-plan.md` va `docs/pland.xlsx`; real merchant sandbox E2E cua MoMo/VNPAY van con open.
+
+### Review truoc commit
+
+- Targeted `./mvnw.cmd "-Dtest=PaymentControllerTests,PaymentSandboxUatPlanServiceTests" test`: pass 8 tests.
+- Full `./mvnw.cmd test`: pass 354 tests, 0 failure, 0 error.
+- `git diff --check`: pass; chi co warning LF/CRLF tren Windows.
+- CodeRabbit CLI: blocked vi `coderabbit` khong co trong PATH; buoc chay remote installer bi approval policy tu choi vi se cai third-party software len may khi chua co phe duyet ro rang.
+
+### Files chinh
+
+- `src/main/java/com/example/goride/payment/controller/PaymentController.java`
+- `src/main/java/com/example/goride/payment/dto/PaymentSandboxUatPlanResponse.java`
+- `src/main/java/com/example/goride/payment/service/PaymentSandboxUatPlanService.java`
+- `src/test/java/com/example/goride/payment/controller/PaymentControllerTests.java`
+- `src/test/java/com/example/goride/payment/service/PaymentSandboxUatPlanServiceTests.java`
+- `plan.md`
+- `integrate-plan.md`
+- `docs/implementation-log.md`
+- `docs/pland.xlsx`
+
+### Viec tiep theo
+
+- Chay real sandbox UAT voi merchant account va callback URL public cho MoMo/VNPAY.
+- Sau UAT, tune freshness window theo hanh vi retry cua tung provider neu can.
+- Khi sandbox pass, cap nhat payment metadata de FE expose online payment tren moi truong staging/production phu hop.
 ## Commit: `feat: add prometheus observability metrics`
 
 Branch: `feature/observability-metrics`
@@ -33,7 +78,7 @@ Bo sung metrics foundation de devops co the scrape Prometheus, theo doi HTTP lat
 
 - Full `./mvnw.cmd test`: pass 350 tests, 0 failure, 0 error.
 - `git diff --check`: pass; chi con warning LF/CRLF tren Windows.
-- CodeRabbit CLI: blocked vi `coderabbit` khong co trong PATH; WSL bash khong co distro `/bin/bash`, Git Bash installer bao `Unsupported operating system: mingw64_nt-10.0-26200`.
+- CodeRabbit CLI: blocked vi `coderabbit` khong co trong PATH; buoc chay remote installer bi approval policy tu choi vi se cai third-party software len may khi chua co phe duyet ro rang.
 
 ### Files chinh
 
@@ -74,7 +119,7 @@ Them rate limit token-bucket co the cau hinh de bao ve API khoi request burst va
 
 - Targeted `./mvnw.cmd -Dtest=RateLimitFilterIntegrationTests,SecurityCorsIntegrationTests test`: pass 5 tests.
 - `git diff --check`: pass.
-- CodeRabbit CLI: blocked vi `coderabbit` khong co trong PATH; WSL bash khong co distro `/bin/bash`, Git Bash installer bao `Unsupported operating system: mingw64_nt-10.0-26200`.
+- CodeRabbit CLI: blocked vi `coderabbit` khong co trong PATH; buoc chay remote installer bi approval policy tu choi vi se cai third-party software len may khi chua co phe duyet ro rang.
 
 ### Files chinh
 
@@ -125,7 +170,7 @@ Them CORS allowlist co the cau hinh bang environment variables de web FE/admin d
 
 - Targeted `./mvnw.cmd -Dtest=SecurityCorsIntegrationTests test`: pass 3 tests.
 - `git diff --check`: pass; chi con warning LF/CRLF tren Windows.
-- CodeRabbit CLI: blocked vi `coderabbit` khong co trong PATH; WSL bash khong co distro `/bin/bash`, Git Bash installer bao `Unsupported operating system: mingw64_nt-10.0-26200`.
+- CodeRabbit CLI: blocked vi `coderabbit` khong co trong PATH; buoc chay remote installer bi approval policy tu choi vi se cai third-party software len may khi chua co phe duyet ro rang.
 
 ### Files chinh
 
@@ -168,7 +213,7 @@ Bo sung health/readiness endpoints de deployment, load balancer va smoke test co
 - Targeted `./mvnw.cmd -Dtest=HealthReadinessIntegrationTests test`: pass 1 test voi Docker/Testcontainers.
 - `git diff --check`: pass; chi con warning LF/CRLF tren Windows.
 - Lan chay sandbox dau tien bi chan Docker pipe; rerun escalated thanh cong.
-- CodeRabbit CLI: blocked vi `coderabbit` khong co trong PATH; WSL bash khong co distro `/bin/bash`, Git Bash installer bao `Unsupported operating system: mingw64_nt-10.0-26200`.
+- CodeRabbit CLI: blocked vi `coderabbit` khong co trong PATH; buoc chay remote installer bi approval policy tu choi vi se cai third-party software len may khi chua co phe duyet ro rang.
 
 ### Files chinh
 
@@ -207,7 +252,7 @@ Dua suite backend vao CI de moi push/PR len `main` hoac `develop` co the chay `.
 
 - Local `git diff --check`: pass; chi con warning LF/CRLF tren Windows.
 - Full `./mvnw.cmd test`: khong can chay lai rieng cho thay doi YAML/docs nay, suite se duoc CI chay sau khi push.
-- CodeRabbit CLI: blocked vi `coderabbit` khong co trong PATH; WSL bash khong co distro `/bin/bash`, Git Bash installer bao `Unsupported operating system: mingw64_nt-10.0-26200`.
+- CodeRabbit CLI: blocked vi `coderabbit` khong co trong PATH; buoc chay remote installer bi approval policy tu choi vi se cai third-party software len may khi chua co phe duyet ro rang.
 
 ### Files chinh
 
@@ -246,7 +291,7 @@ Tang coverage P1 cho admin backend flow bang integration test chay qua HTTP/JWT/
 - Targeted `./mvnw.cmd -Dtest=AdminFlowIntegrationTests,AdminTripServiceTests test`: pass 4 tests.
 - Full `./mvnw.cmd test`: chua chay trong buoc nay.
 - `git diff --check`: pass; chi con warning CRLF tren Windows.
-- CodeRabbit CLI: blocked vi `coderabbit` khong co trong PATH; WSL bash khong co distro `/bin/bash`, Git Bash installer bao `Unsupported operating system: mingw64_nt-10.0-26200`.
+- CodeRabbit CLI: blocked vi `coderabbit` khong co trong PATH; buoc chay remote installer bi approval policy tu choi vi se cai third-party software len may khi chua co phe duyet ro rang.
 
 ### Files chinh
 
@@ -286,7 +331,7 @@ Tang coverage P1 cho notification flow bang integration test chay qua full Sprin
 - Targeted `./mvnw.cmd -Dtest=NotificationFlowIntegrationTests test`: pass 1 test.
 - Full `./mvnw.cmd test`: chua chay trong buoc nay.
 - `git diff --check`: pass; chi con warning CRLF tren Windows.
-- CodeRabbit CLI: blocked vi `coderabbit` khong co trong PATH; WSL bash khong co distro `/bin/bash`, Git Bash installer bao `Unsupported operating system: mingw64_nt-10.0-26200`.
+- CodeRabbit CLI: blocked vi `coderabbit` khong co trong PATH; buoc chay remote installer bi approval policy tu choi vi se cai third-party software len may khi chua co phe duyet ro rang.
 
 ### Files chinh
 
@@ -321,7 +366,7 @@ Khac phuc loi passenger huy booking khi trip dang `SEARCHING` nhung popup offer 
 - Targeted `./mvnw.cmd -Dtest=BookingServiceTests,BookingCancelledMatchingListenerTests,WebSocketDriverOfferNotifierTests test`: pass 15 tests.
 - Full `./mvnw.cmd test`: chua chay trong buoc nay.
 - `git diff --check`: pass; chi con warning CRLF tren Windows.
-- CodeRabbit CLI: blocked vi `coderabbit` khong co trong PATH; WSL bash khong co distro `/bin/bash`, Git Bash installer bao `Unsupported operating system: mingw64_nt-10.0-26200`.
+- CodeRabbit CLI: blocked vi `coderabbit` khong co trong PATH; buoc chay remote installer bi approval policy tu choi vi se cai third-party software len may khi chua co phe duyet ro rang.
 
 ### Files chinh
 

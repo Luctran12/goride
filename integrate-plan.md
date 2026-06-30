@@ -1,4 +1,4 @@
-﻿# GoRide Front-end Integration Plan
+# GoRide Front-end Integration Plan
 
 Branch da kiem tra: `feature/rate-limit-policy`
 
@@ -260,6 +260,7 @@ type PaymentStatus = "PENDING" | "COMPLETED" | "FAILED" | "REFUNDED";
 - [x] Co runtime config foundation cho MoMo/VNPay provider, mac dinh disabled.
 - [x] FE co the lay danh sach payment method/provider metadata tu backend.
 - [x] Admin/devops co the kiem tra readiness MoMo/VNPAY sandbox truoc khi enable checkout that.
+- [x] Admin/devops co payment sandbox UAT plan de xem callback endpoint, missing config va kich ban test truoc khi expose online payment.
 - [x] Backend reject booking neu `paymentMethod` chua duoc enable.
 - [x] Co checkout foundation endpoint cho payment `PENDING`.
 - [x] Co webhook foundation endpoint cho payment provider external callback.
@@ -326,7 +327,7 @@ type PaymentStatus = "PENDING" | "COMPLETED" | "FAILED" | "REFUNDED";
 ### Payment/rating/statistics
 
 - [x] Payment method metadata da expose `CASH`, `MOMO`, `VNPAY`; hien chi `CASH` enabled mac dinh.
-- [ ] MoMo va VNPAY da co signed checkout/webhook, readiness diagnostics, freshness policy va service-level sandbox callback contract tests; ca hai van can sandbox account/E2E callback test that.
+- [ ] MoMo va VNPAY da co signed checkout/webhook, readiness diagnostics, sandbox UAT plan, freshness policy va service-level sandbox callback contract tests; ca hai van can sandbox account/E2E callback test that.
 
 ### Routing/maps
 
@@ -358,7 +359,7 @@ type PaymentStatus = "PENDING" | "COMPLETED" | "FAILED" | "REFUNDED";
 - [x] Tracking REST fallback, payment detail, CASH checkout va driver payment-confirm da co integration flow qua `BookingMatchingRoutingIntegrationTests`.
 - [x] Notification inbox + FCM token REST flow da co `NotificationFlowIntegrationTests` qua HTTP/JWT/JPA/Redis.
 - [x] Admin RBAC, driver approval, pricing, trip list va dashboard da co `AdminFlowIntegrationTests` qua HTTP/JWT/JPA/PostGIS.
-- [ ] Provider sandbox chua co integration flow hoan chinh.
+- [ ] Provider sandbox chua co integration flow hoan chinh voi merchant account that; backend da co admin UAT plan endpoint de dieu phoi cau hinh va kich ban test.
 - [x] Basic rate-limit integration coverage da co cho login throttle va actuator exclusion.
 - [x] Docker-backed integration suite da duoc cau hinh chay tren GitHub Actions CI bang `.github/workflows/backend-ci.yml`; workflow dung Java 17, Maven cache va Docker-enabled runner de chay `./mvnw test`.
 
@@ -1103,6 +1104,60 @@ Admin/devops action:
 - Khong log/commit secret; response chi tra ten requirement bi thieu, khong tra gia tri config.
 - Neu `checkoutReady=false`, checkout URL chua nen duoc test tren FE.
 - Neu `webhookReady=false`, chua nen chay callback sandbox vi backend se reject callback hoac khong reconcile duoc payment.
+
+#### Admin lay payment sandbox UAT plan
+
+```http
+GET /api/v1/payments/providers/sandbox-uat-plan
+Authorization: Bearer <adminToken>
+```
+
+Response `data` gom prerequisites, danh sach provider va cac scenario can test truoc khi mo online payment cho user that:
+
+```json
+{
+  "prerequisites": [
+    "Expose backend through a public HTTPS URL that the payment sandbox can call.",
+    "Configure provider sandbox merchant credentials through environment variables or secret manager."
+  ],
+  "providers": [
+    {
+      "method": "MOMO",
+      "provider": "momo",
+      "displayName": "MoMo",
+      "status": "READY_FOR_SANDBOX_UAT",
+      "enabled": true,
+      "sandbox": true,
+      "checkoutReady": true,
+      "webhookReady": true,
+      "sandboxReady": true,
+      "checkoutEndpoint": "GET /api/v1/payments/trips/{tripId}/checkout",
+      "webhookEndpoint": "POST /api/v1/payments/providers/momo/webhook",
+      "returnUrl": "https://app.example/payments/momo/return",
+      "ipnUrl": "https://api.example/api/v1/payments/providers/momo/webhook",
+      "missingRequirements": [],
+      "frontendActions": [
+        "Show this payment method only when GET /api/v1/payments/methods marks it enabled.",
+        "After provider redirect, call GET /api/v1/payments/trips/{tripId} until payment status is terminal."
+      ],
+      "backendChecks": [
+        "Confirm checkout returns a provider URL without PAYMENT_PROVIDER_ERROR.",
+        "Confirm duplicate terminal callbacks are accepted idempotently with the same transaction reference."
+      ]
+    }
+  ],
+  "validationScenarios": [
+    "Create a completed trip payment, open the checkout URL, then finish a sandbox success payment.",
+    "Replay the same signed provider callback and verify the terminal payment update is idempotent."
+  ]
+}
+```
+
+Admin/devops action:
+- Dung endpoint nay cung voi readiness de chot checklist truoc UAT sandbox that.
+- `status=DISABLED`, `NOT_REGISTERED`, `SANDBOX_DISABLED` hoac `BLOCKED_BY_CONFIG` thi FE khong expose online payment cho user that.
+- `returnUrl` va `ipnUrl` chi la URL callback da cau hinh; response khong tra merchant secret/access key.
+- Endpoint nay khong thay the real sandbox callback tu MoMo/VNPAY; no chi giup FE/admin biet can test gi va callback endpoint nao can dang ky voi provider.
 #### Runtime config cho provider online
 
 Backend da co config foundation cho MoMo/VNPay, mac dinh disabled.

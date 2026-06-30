@@ -6,13 +6,13 @@ Generated: 2026-06-15, Asia/Bangkok
 
 | Item | Status |
 | --- | --- |
-| Working branch | `feature/observability-metrics` |
-| Latest merged feature on develop | `feature/rate-limit-policy` |
-| Develop merge commit | `merge: api rate limiting` |
-| Test status | Full `./mvnw.cmd test` passed 350 tests on 2026-06-28; backend CI workflow added locally, awaiting first GitHub run |
-| Diff hygiene | `git diff --check`: pass on 2026-06-28 |
-| CodeRabbit CLI | Blocked: CLI missing; installer via Git Bash reports unsupported OS `mingw64_nt-10.0-26200` |
-| Publish status | API rate limiting merged to `develop`; current observability metrics feature is in review flow |
+| Working branch | `feature/payment-sandbox-uat-harness` |
+| Latest merged feature on develop | `feature/observability-metrics` |
+| Develop merge commit | `merge: prometheus observability metrics` |
+| Test status | Full `./mvnw.cmd test` passed 354 tests on 2026-06-30; targeted payment sandbox UAT tests passed 8 tests |
+| Diff hygiene | `git diff --check` passed on 2026-06-30; LF/CRLF normalization warnings only |
+| CodeRabbit CLI | Blocked: `coderabbit` is not in PATH; remote installer execution was rejected by approval policy because it would install third-party software on the user machine without explicit approval |
+| Publish status | Prometheus observability metrics merged to `develop`; OTLP tracing branch is held unmerged; current payment sandbox UAT harness is in review flow |
 | Local config | `src/main/resources/application.yml` is environment-specific and must stay uncommitted |
 
 ## Completed Backend Modules
@@ -29,7 +29,7 @@ Generated: 2026-06-15, Asia/Bangkok
 | WebSocket security | JWT-authenticated STOMP `CONNECT`, trip topic authorization, user-specific messaging, SockJS/native endpoint compatibility | `/ws` for SockJS, `/ws-native` for native STOMP, trip subscription topics | `GET /ws/info` is supported for SockJS clients while native clients retain a dedicated endpoint. |
 | Realtime tracking | Driver location updates from accepted trip onward, REST fallback for latest location/history, trip location notifications | `POST /api/v1/tracking/trips/{tripId}/driver-location`, WebSocket driver location channel | Caches/broadcasts driver location for `ACCEPTED`, `ARRIVED`, `IN_PROGRESS`; persists history for fare only during `IN_PROGRESS`. |
 | Cash payment | Cash payment record, payment detail, cash confirmation, payment completion workflow | `/api/v1/payments/trips/{tripId}`, driver payment confirmation endpoint | CASH path is implemented end to end enough for MVP trip completion. |
-| Payment checkout and webhook foundation | Payment provider registry/config properties, checkout entry point, webhook entry point, payment method metadata, signed VNPAY and MoMo checkout/callback flows, configurable callback freshness/replay policy | `/api/v1/payments/methods`, `/api/v1/payments/providers/readiness`, `/api/v1/payments/trips/{tripId}/checkout`, `/api/v1/payments/providers/{providerName}/webhook` | CASH works end to end; VNPAY and MoMo support signed checkout/callbacks, readiness diagnostics, service-level sandbox callback contract coverage, stale/future callback rejection and idempotent terminal retries. |
+| Payment checkout and webhook foundation | Payment provider registry/config properties, checkout entry point, webhook entry point, payment method metadata, admin readiness and sandbox UAT plan, signed VNPAY and MoMo checkout/callback flows, configurable callback freshness/replay policy | `/api/v1/payments/methods`, `/api/v1/payments/providers/readiness`, `/api/v1/payments/providers/sandbox-uat-plan`, `/api/v1/payments/trips/{tripId}/checkout`, `/api/v1/payments/providers/{providerName}/webhook` | CASH works end to end; VNPAY and MoMo support signed checkout/callbacks, readiness diagnostics, UAT checklist handoff, service-level sandbox callback contract coverage, stale/future callback rejection and idempotent terminal retries. |
 | Rating | Passenger trip rating, duplicate prevention/status, driver public ratings, Redis rating sync | `/api/v1/ratings`, `/api/v1/ratings/trips/{tripId}/me`, `/api/v1/drivers/{driverId}/ratings` | Rating data is available for frontend review displays. |
 | Notifications | Notification inbox, mark-read flow, in-app/WebSocket delivery, FCM token CRUD, Firebase Admin sender, ADC/service-account credential loading and startup validation | `/api/v1/notifications`, FCM token endpoints | FCM stays disabled by default; enabled deployments fail startup clearly when credentials are unavailable and never require committed credential JSON. |
 | Admin trip operations | Admin trip list/filter/detail-like views and dashboard metrics | `/api/v1/admin/trips`, `/api/v1/admin/dashboard` | Supports basic operations dashboard and trip monitoring. |
@@ -41,8 +41,8 @@ Generated: 2026-06-15, Asia/Bangkok
 
 | Priority | Area | Work To Complete | Dependencies | Acceptance Criteria |
 | --- | --- | --- | --- | --- |
-| P0 | Payment providers | Finish MoMo/VNPAY sandbox E2E validation against real merchant flows; readiness endpoint and service-level signed callback contract tests now verify backend before UAT | Sandbox merchant accounts, callback URLs, provider test apps | Both online providers report `sandboxReady=true`, return usable checkout URLs and real sandbox success/failure callbacks reconcile internal payment/trip state. |
-| P0 | Webhook sandbox handling | Run real sandbox callback tests for MoMo and VNPAY; service-level success/failure/stale callback contract coverage is implemented | Sandbox callback payloads and merchant test accounts | Sandbox success/failure statuses map to internal payment states and provider acknowledgements meet real gateway expectations. |
+| P0 | Payment providers | Finish MoMo/VNPAY sandbox E2E validation against real merchant flows; readiness endpoint, sandbox UAT plan endpoint and service-level signed callback contract tests now verify backend before UAT | Sandbox merchant accounts, callback URLs, provider test apps | Both online providers report `sandboxReady=true`, return usable checkout URLs and real sandbox success/failure callbacks reconcile internal payment/trip state. |
+| P0 | Webhook sandbox handling | Run real sandbox callback tests for MoMo and VNPAY; service-level success/failure/stale callback contract coverage plus admin UAT checklist are implemented | Sandbox callback payloads and merchant test accounts | Sandbox success/failure statuses map to internal payment states and provider acknowledgements meet real gateway expectations. |
 | P1 | E2E/integration tests | Auth, booking/matching/pickup-dropoff routing, trip completion, tracking fallback, cash payment confirmation, notification inbox/FCM token flow, admin flow and GitHub Actions backend CI wiring are covered; add provider sandbox E2E flow | Existing Testcontainers base, sandbox merchant accounts | Remaining provider sandbox happy paths run in CI/staging against database/Redis-compatible services and real provider sandbox callbacks. |
 | P1 | Production hardening | Request correlation, centralized error logging, configurable CORS allowlist, basic API rate limiting, Actuator health/readiness and Prometheus metrics endpoints are implemented; add centralized log shipping and distributed tracing backend | Deployment platform requirements | API has safe production defaults and per-instance operational visibility; deployment can scrape Prometheus metrics, use liveness/readiness probes, and throttle abusive request bursts with a documented 429 contract. |
 | P1 | Database release strategy | Define production database migration/release SQL workflow without Flyway unless project policy changes | DBA/deployment convention | Schema changes are reproducible across environments and documented per release. |
@@ -69,7 +69,7 @@ Generated: 2026-06-15, Asia/Bangkok
 | Driver navigation | `POST /api/v1/drivers/trips/{tripId}/route` | Send current GPS, draw returned GeoJSON `LineString`, route to pickup while accepted and dropoff after arrival, then re-route only when movement/time threshold is reached. |
 | Trip status | Driver trip status endpoints and trip WebSocket topic | Render status timeline: accepted, arrived, in progress, completed/cancelled. |
 | Realtime tracking | `/ws` SockJS or `/ws-native` native STOMP location topic, REST fallback tracking endpoints | Subscribe for live driver location after a driver is assigned; passenger can display driver approach during `ACCEPTED`/`ARRIVED` and trip movement during `IN_PROGRESS`. |
-| Payment | `/api/v1/payments/methods`, `/api/v1/payments/trips/{tripId}`, `/checkout`, webhook-driven state | Support CASH fully; show VNPAY/MoMo only when provider metadata says enabled; open returned checkout URL and refresh payment detail after redirect while signed callbacks update state. |
+| Payment | `/api/v1/payments/methods`, `/api/v1/payments/providers/readiness`, `/api/v1/payments/providers/sandbox-uat-plan`, `/api/v1/payments/trips/{tripId}`, `/checkout`, webhook-driven state | Support CASH fully; show VNPAY/MoMo only when provider metadata says enabled; admin/devops can use sandbox UAT plan to see missing config, callback endpoints and test scenarios; open returned checkout URL and refresh payment detail after redirect while signed callbacks update state. |
 | Rating | `/api/v1/ratings`, rating status/list endpoints | Prompt passenger after completed trip, hide form after already rated. |
 | Notifications | `/api/v1/notifications`, FCM token endpoints, WebSocket notification channel | Register FCM token, render inbox/badge, mark notifications read. |
 | Admin trips/dashboard | `/api/v1/admin/trips`, `/api/v1/admin/dashboard` | Build admin operational dashboard and trip filter pages. |
@@ -81,7 +81,7 @@ Generated: 2026-06-15, Asia/Bangkok
 
 | Phase | Goal | Main Deliverables |
 | --- | --- | --- |
-| Phase 1 | Payment provider completion | MoMo/VNPAY sandbox E2E validation, provider-specific freshness-window tuning, service-level callback contract coverage and real merchant callback tests. |
+| Phase 1 | Payment provider completion | MoMo/VNPAY sandbox E2E validation, provider-specific freshness-window tuning, admin UAT plan handoff, service-level callback contract coverage and real merchant callback tests. |
 | Phase 2 | Real-world routing | Fare estimation and assigned-driver pickup/dropoff GeoJSON routing implemented; production endpoint UAT, route request rate control, monitoring and timeout tuning remain. |
 | Phase 3 | Driver availability reliability | Heartbeat API, Redis TTL refresh and automatic database offline timeout implemented; production interval tuning and Redis/database soak testing remain. |
 | Phase 4 | Production readiness | Firebase secure credential loading, HTTP request correlation, centralized application error logging, configurable CORS allowlist, basic API rate limiting, Prometheus metrics and Actuator health/readiness endpoints implemented; log aggregation, distributed tracing backend, environment profiles and release SQL strategy remain. |
@@ -92,7 +92,7 @@ Generated: 2026-06-15, Asia/Bangkok
 
 | Risk | Impact | Mitigation |
 | --- | --- | --- |
-| Online payment providers are still not production-complete | Frontend should not expose MoMo/VNPAY in production without real sandbox/UAT validation | Keep CASH as MVP; use readiness plus service-level signed callback tests before UAT, then enable online methods only after full real sandbox callback validation. |
+| Online payment providers are still not production-complete | Frontend should not expose MoMo/VNPAY in production without real sandbox/UAT validation | Keep CASH as MVP; use readiness, sandbox UAT plan and service-level signed callback tests before UAT, then enable online methods only after full real sandbox callback validation. |
 | Webhook freshness defaults need sandbox validation | The 24-hour age and 5-minute future-skew defaults are configurable but not yet calibrated against real merchant retries | Validate both gateways in sandbox; service-level tests already cover signed success/failure/stale callbacks, then tune provider-specific windows without weakening signature or transaction-reference checks. |
 | Routing endpoint is not production-calibrated | Fare estimates and driver navigation geometry are implemented, but endpoint capacity, route request rate and Vietnamese road quality are not validated | Use a controlled OSRM-compatible endpoint, debounce/re-route on FE, add rate/latency metrics, and tune timeout/profile during UAT. |
 | Heartbeat timing is not production-calibrated | Aggressive intervals may create reconnect churn; loose intervals delay database cleanup | Start with a 20-second client heartbeat and 60-second timeout, then tune from staging disconnect and scheduler metrics. |
