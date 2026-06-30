@@ -6,6 +6,64 @@
 
 ---
 
+## Commit: `chore: add database release sql workflow`
+
+Branch: `feature/database-release-sql-workflow`
+
+Phase: Phase 4 - Production readiness, database release strategy without Flyway
+
+### Muc tieu
+
+Thiet lap quy trinh release database co version control vi project khong dung Flyway. Muc tieu la moi thay doi schema staging/production co SQL rieng, co precheck, apply, verify, rollback va co validator truoc khi review/deploy.
+
+### Noi dung da trien khai
+
+- Them `db/releases/README.md` mo ta quy uoc release SQL khong dung Flyway.
+- Them template `db/releases/0000-template` gom:
+  - `manifest.yml`
+  - `precheck.sql`
+  - `apply.sql`
+  - `verify.sql`
+  - `rollback.sql`
+- Them `scripts/validate-db-release.ps1`:
+  - Validate tung release folder bang `-ReleasePath` hoac tat ca bang `-All`.
+  - Kiem tra required files va required manifest fields.
+  - Dam bao `release_id` khop ten folder.
+  - Yeu cau `BEGIN;`/`COMMIT;` trong `apply.sql` khi `transactional=true`.
+  - Chan SQL destructive neu chua co comment `-- destructive-reviewed: true`.
+  - Khong ket noi DB va khong thuc thi SQL.
+- Them `docs/database-release-process.md` voi checklist deploy, rollback va GoRide-specific notes cho Postgres/PostGIS.
+- Cap nhat `docs/backend-implementation.md`, `plan.md`, `integrate-plan.md` va `docs/pland.xlsx` de danh dau database release strategy da co workflow.
+
+### Review truoc commit
+
+- `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/validate-db-release.ps1 -ReleasePath db/releases/0000-template`: pass.
+- `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/validate-db-release.ps1 -All`: pass.
+- Full `./mvnw.cmd test`: pending; branch nay chi thay doi docs/script release SQL.
+- `git diff --check`: pass; chi co warning LF/CRLF tren Windows.
+- CodeRabbit CLI: blocked vi `coderabbit` khong co trong PATH; remote installer bi approval policy tu choi vi se cai third-party software len may khi chua co phe duyet ro rang.
+
+### Files chinh
+
+- `db/releases/README.md`
+- `db/releases/0000-template/manifest.yml`
+- `db/releases/0000-template/precheck.sql`
+- `db/releases/0000-template/apply.sql`
+- `db/releases/0000-template/verify.sql`
+- `db/releases/0000-template/rollback.sql`
+- `scripts/validate-db-release.ps1`
+- `docs/database-release-process.md`
+- `docs/backend-implementation.md`
+- `plan.md`
+- `integrate-plan.md`
+- `docs/implementation-log.md`
+- `docs/pland.xlsx`
+
+### Viec tiep theo
+
+- Khi commit schema moi, tao release folder that tu template thay vi sua DB truc tiep.
+- Can quyet dinh environment production se set Hibernate schema mode nao de khong mutate schema tu dong.
+- Tiep tuc cac muc con lai: real payment sandbox UAT, log shipping/distributed tracing deployment, upload storage.
 ## Commit: `feat: add payment sandbox uat harness`
 
 Branch: `feature/payment-sandbox-uat-harness`
@@ -51,6 +109,7 @@ Them endpoint admin/devops de tong hop checklist UAT sandbox cho MoMo/VNPAY tu r
 - Chay real sandbox UAT voi merchant account va callback URL public cho MoMo/VNPAY.
 - Sau UAT, tune freshness window theo hanh vi retry cua tung provider neu can.
 - Khi sandbox pass, cap nhat payment metadata de FE expose online payment tren moi truong staging/production phu hop.
+
 ## Commit: `feat: add prometheus observability metrics`
 
 Branch: `feature/observability-metrics`

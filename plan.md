@@ -6,13 +6,13 @@ Generated: 2026-06-15, Asia/Bangkok
 
 | Item | Status |
 | --- | --- |
-| Working branch | `feature/payment-sandbox-uat-harness` |
-| Latest merged feature on develop | `feature/observability-metrics` |
-| Develop merge commit | `merge: prometheus observability metrics` |
-| Test status | Full `./mvnw.cmd test` passed 354 tests on 2026-06-30; targeted payment sandbox UAT tests passed 8 tests |
+| Working branch | `feature/database-release-sql-workflow` |
+| Latest merged feature on develop | `feature/payment-sandbox-uat-harness` |
+| Develop merge commit | `merge: payment sandbox uat harness` |
+| Test status | `scripts/validate-db-release.ps1` passed for `db/releases/0000-template`; full Maven suite not rerun yet for this docs/script-only branch |
 | Diff hygiene | `git diff --check` passed on 2026-06-30; LF/CRLF normalization warnings only |
 | CodeRabbit CLI | Blocked: `coderabbit` is not in PATH; remote installer execution was rejected by approval policy because it would install third-party software on the user machine without explicit approval |
-| Publish status | Prometheus observability metrics merged to `develop`; OTLP tracing branch is held unmerged; current payment sandbox UAT harness is in review flow |
+| Publish status | Payment sandbox UAT harness merged and pushed to `develop`; OTLP tracing branch is held unmerged; current database release workflow is in review flow |
 | Local config | `src/main/resources/application.yml` is environment-specific and must stay uncommitted |
 
 ## Completed Backend Modules
@@ -35,6 +35,7 @@ Generated: 2026-06-15, Asia/Bangkok
 | Admin trip operations | Admin trip list/filter/detail-like views and dashboard metrics | `/api/v1/admin/trips`, `/api/v1/admin/dashboard` | Supports basic operations dashboard and trip monitoring. |
 | Integration test foundation | Docker-backed PostGIS/Redis base, full auth HTTP flow, booking-to-driver-routing flow, trip completion/payment flow, notification inbox/FCM token flow, admin dashboard/pricing/driver approval flow, and GitHub Actions backend CI wiring | `AuthFlowIntegrationTests`, `BookingMatchingRoutingIntegrationTests`, `NotificationFlowIntegrationTests`, `AdminFlowIntegrationTests`, `.github/workflows/backend-ci.yml` | Covers auth, booking/matching/routing, tracking/payment, Redis FCM token CRUD, notification inbox, admin RBAC, driver approval, pricing management, trip list and dashboard through the real Spring stack; CI now runs `./mvnw test` on Docker-enabled GitHub runners. |
 | Request tracing, error logging, CORS, rate limiting, metrics and health checks | HTTP correlation ID, response trace header/body, request completion logs, centralized exception/security logs, configurable CORS allowlist, in-memory token-bucket API rate limiting, Prometheus metrics export, Actuator health/liveness/readiness/info/metrics endpoints | `X-Request-Id`, `Retry-After`, `X-RateLimit-*`, all REST endpoints, CORS preflight, `/actuator/health`, `/actuator/health/liveness`, `/actuator/health/readiness`, `/actuator/info`, `/actuator/metrics`, `/actuator/prometheus` | Logs method/path/status/duration without request bodies or secrets; Prometheus exposes HTTP/server metrics plus `goride.rate.limit.requests` and `goride.rate.limit.buckets`; excessive requests return `RATE_LIMIT_EXCEEDED` HTTP 429; readiness checks DB/Redis while liveness only reflects app state. |
+| Database release strategy | Versioned SQL release folders, manifest/precheck/apply/verify/rollback template, PowerShell validator and manual deployment process without Flyway | `db/releases`, `scripts/validate-db-release.ps1`, `docs/database-release-process.md` | Staging/production schema changes now have a reproducible reviewable SQL workflow; Hibernate `ddl-auto=update` remains local-only. |
 | Documentation | Implementation log and frontend integration plan | `docs/implementation-log.md`, `integrate-plan.md` | Living docs describe commit history and integration contracts. |
 
 ## Unfinished Work
@@ -45,7 +46,6 @@ Generated: 2026-06-15, Asia/Bangkok
 | P0 | Webhook sandbox handling | Run real sandbox callback tests for MoMo and VNPAY; service-level success/failure/stale callback contract coverage plus admin UAT checklist are implemented | Sandbox callback payloads and merchant test accounts | Sandbox success/failure statuses map to internal payment states and provider acknowledgements meet real gateway expectations. |
 | P1 | E2E/integration tests | Auth, booking/matching/pickup-dropoff routing, trip completion, tracking fallback, cash payment confirmation, notification inbox/FCM token flow, admin flow and GitHub Actions backend CI wiring are covered; add provider sandbox E2E flow | Existing Testcontainers base, sandbox merchant accounts | Remaining provider sandbox happy paths run in CI/staging against database/Redis-compatible services and real provider sandbox callbacks. |
 | P1 | Production hardening | Request correlation, centralized error logging, configurable CORS allowlist, basic API rate limiting, Actuator health/readiness and Prometheus metrics endpoints are implemented; add centralized log shipping and distributed tracing backend | Deployment platform requirements | API has safe production defaults and per-instance operational visibility; deployment can scrape Prometheus metrics, use liveness/readiness probes, and throttle abusive request bursts with a documented 429 contract. |
-| P1 | Database release strategy | Define production database migration/release SQL workflow without Flyway unless project policy changes | DBA/deployment convention | Schema changes are reproducible across environments and documented per release. |
 | P2 | Upload storage | Add driver document/avatar upload storage | S3-compatible storage, local dev storage, file validation | Driver can upload required files; admin can view verified document URLs. |
 | P2 | In-trip messaging | Add passenger-driver chat during active trip | WebSocket channel policy, persistence decision | Participants can exchange trip-scoped messages; unauthorized users cannot subscribe/send. |
 | P2 | Scheduled rides | Support future pickup time and scheduled dispatch | Scheduler, matching delay policy, cancellation rules | Passenger can create scheduled ride; dispatch starts at configured lead time. |
@@ -84,7 +84,7 @@ Generated: 2026-06-15, Asia/Bangkok
 | Phase 1 | Payment provider completion | MoMo/VNPAY sandbox E2E validation, provider-specific freshness-window tuning, admin UAT plan handoff, service-level callback contract coverage and real merchant callback tests. |
 | Phase 2 | Real-world routing | Fare estimation and assigned-driver pickup/dropoff GeoJSON routing implemented; production endpoint UAT, route request rate control, monitoring and timeout tuning remain. |
 | Phase 3 | Driver availability reliability | Heartbeat API, Redis TTL refresh and automatic database offline timeout implemented; production interval tuning and Redis/database soak testing remain. |
-| Phase 4 | Production readiness | Firebase secure credential loading, HTTP request correlation, centralized application error logging, configurable CORS allowlist, basic API rate limiting, Prometheus metrics and Actuator health/readiness endpoints implemented; log aggregation, distributed tracing backend, environment profiles and release SQL strategy remain. |
+| Phase 4 | Production readiness | Firebase secure credential loading, HTTP request correlation, centralized application error logging, configurable CORS allowlist, basic API rate limiting, Prometheus metrics, Actuator health/readiness endpoints and SQL release workflow are implemented; log aggregation, distributed tracing backend and environment profiles remain. |
 | Phase 5 | Integration confidence | Testcontainers PostGIS/Redis foundation, auth flow, booking-to-matching-to-pickup/dropoff-routing flow, trip completion, tracking fallback, cash payment confirmation, notification inbox/FCM token flow, admin flow and backend CI workflow are implemented; provider sandbox E2E validation remains. |
 | Phase 6 | Product expansion | Uploads, messaging, scheduled rides, surge pricing, multi-city, analytics. |
 
@@ -100,4 +100,5 @@ Generated: 2026-06-15, Asia/Bangkok
 | Integration coverage is partial | Auth, booking/matching/driver-routing, trip completion, tracking fallback, cash payment confirmation, notification inbox/FCM token flow and admin flow now run through HTTP/JWT/JPA/Redis, and GitHub Actions runs the suite on pushes/PRs, but real provider sandbox regressions may still slip through | Reuse the Testcontainers base for remaining provider flows and validate real gateway callbacks before release candidate. |
 | Logs and metrics are still per-instance until deployment wiring is added | Request IDs, health probes, Prometheus metrics and 429 throttling improve diagnosis, but logs/metrics can still be fragmented across replicas | Ship stdout logs centrally, scrape each instance from Prometheus or the platform collector, and add retention/search/alert dashboards before production scaling. |
 | In-memory rate limiting is per application instance | Multiple replicas each keep their own bucket state, so global limits may be higher than configured | For MVP, keep conservative per-instance defaults; before scale-out, move buckets to Redis or an edge gateway if a global quota is required. |
+| Manual SQL releases can drift without discipline | Without Flyway, missed SQL folders or unverified manual changes can desynchronize environments | Require a `db/releases` folder per schema change, run the validator, archive precheck/verify output and keep production `ddl-auto` non-mutating. |
 | FE uses the wrong WebSocket transport URL | SockJS calls to a native-only endpoint fail at `/ws/info`; native clients pointed at a SockJS root also fail | Use `/ws` with SockJS and `/ws-native` with native STOMP exactly as documented in `integrate-plan.md`. |
