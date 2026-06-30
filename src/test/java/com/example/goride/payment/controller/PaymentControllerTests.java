@@ -5,12 +5,14 @@ import com.example.goride.common.error.ErrorCode;
 import com.example.goride.common.security.CurrentUser;
 import com.example.goride.payment.domain.PaymentStatus;
 import com.example.goride.payment.dto.PaymentProviderReadinessResponse;
+import com.example.goride.payment.dto.PaymentSandboxUatPlanResponse;
 import com.example.goride.payment.dto.PaymentWebhookResponse;
 import com.example.goride.payment.dto.VnPayIpnResponse;
 import com.example.goride.payment.service.PaymentCheckoutService;
 import com.example.goride.payment.service.PaymentMethodService;
 import com.example.goride.payment.service.PaymentProviderReadinessService;
 import com.example.goride.payment.service.PaymentQueryService;
+import com.example.goride.payment.service.PaymentSandboxUatPlanService;
 import com.example.goride.payment.service.PaymentWebhookService;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -29,7 +31,6 @@ import static org.mockito.Mockito.when;
 
 class PaymentControllerTests {
 
-
     @Test
     void returnsProviderReadinessForAdminDiagnostics() {
         PaymentProviderReadinessService readinessService = mock(PaymentProviderReadinessService.class);
@@ -40,6 +41,26 @@ class PaymentControllerTests {
         var response = controller.listPaymentProviderReadiness();
 
         assertThat(response.data()).containsExactly(readiness);
+    }
+
+    @Test
+    void returnsSandboxUatPlanForAdminDiagnostics() {
+        PaymentSandboxUatPlanService uatPlanService = mock(PaymentSandboxUatPlanService.class);
+        PaymentSandboxUatPlanResponse plan = new PaymentSandboxUatPlanResponse(
+                List.of("Configure sandbox credentials"),
+                List.of(),
+                List.of("Run success callback")
+        );
+        when(uatPlanService.getSandboxUatPlan()).thenReturn(plan);
+        PaymentController controller = controller(
+                mock(PaymentWebhookService.class),
+                mock(PaymentProviderReadinessService.class),
+                uatPlanService
+        );
+
+        var response = controller.getPaymentSandboxUatPlan();
+
+        assertThat(response.data()).isSameAs(plan);
     }
 
     @Test
@@ -119,18 +140,31 @@ class PaymentControllerTests {
     }
 
     private PaymentController controller(PaymentWebhookService paymentWebhookService) {
-        return controller(paymentWebhookService, mock(PaymentProviderReadinessService.class));
+        return controller(
+                paymentWebhookService,
+                mock(PaymentProviderReadinessService.class),
+                mock(PaymentSandboxUatPlanService.class)
+        );
     }
 
     private PaymentController controller(
             PaymentWebhookService paymentWebhookService,
             PaymentProviderReadinessService readinessService
     ) {
+        return controller(paymentWebhookService, readinessService, mock(PaymentSandboxUatPlanService.class));
+    }
+
+    private PaymentController controller(
+            PaymentWebhookService paymentWebhookService,
+            PaymentProviderReadinessService readinessService,
+            PaymentSandboxUatPlanService uatPlanService
+    ) {
         return new PaymentController(
                 mock(PaymentQueryService.class),
                 mock(PaymentCheckoutService.class),
                 mock(PaymentMethodService.class),
                 readinessService,
+                uatPlanService,
                 paymentWebhookService,
                 mock(CurrentUser.class)
         );
