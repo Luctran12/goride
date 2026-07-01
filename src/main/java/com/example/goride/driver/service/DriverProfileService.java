@@ -78,6 +78,11 @@ public class DriverProfileService {
                 request.vehicleColor(),
                 request.vehicleYear()
         );
+        profile.updateDocumentUrls(
+                request.licenseImageUrl(),
+                request.idCardImageUrl(),
+                request.vehicleRegistrationUrl()
+        );
 
         return DriverProfileResponse.from(driverProfileRepository.save(profile));
     }

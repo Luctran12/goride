@@ -1,0 +1,25 @@
+release_id: 20260630-driver-document-urls
+title: Add driver document URL columns
+author: Codex
+created_at: 2026-06-30
+risk: low
+transactional: true
+requires_downtime: false
+applies_after:
+  - 0000-template
+related_commit: pending
+environments:
+  - staging
+  - production
+objects:
+  - driver_profiles
+pre_deploy_checks:
+  - Run precheck.sql and confirm the three document URL columns do not already exist or match the expected nullable VARCHAR(500) shape.
+deploy_steps:
+  - Run apply.sql inside the normal database release window.
+post_deploy_checks:
+  - Run verify.sql and confirm all three columns exist as nullable VARCHAR(500).
+rollback_plan:
+  - Run rollback.sql only if the application release is rolled back and no document URLs need to be preserved.
+notes:
+  - These columns are nullable so existing driver profiles remain valid.

@@ -38,3 +38,6 @@ build/
 !.env.example
 firebase-service-account*.json
 secrets/
+
+### Local uploads ###
+uploads/

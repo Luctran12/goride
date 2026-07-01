@@ -69,6 +69,7 @@ public class SecurityConfig {
                                 "/actuator/metrics",
                                 "/actuator/metrics/**",
                                 "/actuator/prometheus",
+                                "/uploads/**",
                                 "/ws",
                                 "/ws/**",
                                 "/ws-native",

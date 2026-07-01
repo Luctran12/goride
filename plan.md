@@ -6,13 +6,13 @@ Generated: 2026-06-15, Asia/Bangkok
 
 | Item | Status |
 | --- | --- |
-| Working branch | `feature/database-release-sql-workflow` |
-| Latest merged feature on develop | `feature/payment-sandbox-uat-harness` |
-| Develop merge commit | `merge: payment sandbox uat harness` |
-| Test status | `scripts/validate-db-release.ps1` passed for `db/releases/0000-template`; full Maven suite not rerun yet for this docs/script-only branch |
-| Diff hygiene | `git diff --check` passed on 2026-06-30; LF/CRLF normalization warnings only |
+| Working branch | `feature/upload-storage` |
+| Latest merged feature on develop | `feature/database-release-sql-workflow` |
+| Develop merge commit | `merge: database release sql workflow` |
+| Test status | Full `./mvnw.cmd test` passed after R2 provider: 366 tests, 0 failures, 0 errors; targeted R2/local storage tests passed: 8 tests |
+| Diff hygiene | `git diff --check` passed on 2026-07-01 after R2 provider changes; LF/CRLF normalization warnings only |
 | CodeRabbit CLI | Blocked: `coderabbit` is not in PATH; remote installer execution was rejected by approval policy because it would install third-party software on the user machine without explicit approval |
-| Publish status | Payment sandbox UAT harness merged and pushed to `develop`; OTLP tracing branch is held unmerged; current database release workflow is in review flow |
+| Publish status | Database release workflow merged into local `develop`; current upload storage branch is in review flow and has not been merged/pushed |
 | Local config | `src/main/resources/application.yml` is environment-specific and must stay uncommitted |
 
 ## Completed Backend Modules
@@ -20,8 +20,9 @@ Generated: 2026-06-15, Asia/Bangkok
 | Module | Completed Scope | API / Channel | Notes |
 | --- | --- | --- | --- |
 | Auth and JWT | Register, login, refresh token, logout, JWT generation/validation, role-aware security context | `POST /api/v1/auth/register`, `POST /api/v1/auth/login`, `POST /api/v1/auth/refresh`, `POST /api/v1/auth/logout` | Backend foundation is ready for passenger, driver, and admin sign-in flows. |
-| User profile | Current user profile, update profile, admin user list/detail/create/update/status controls | `GET/PUT /api/users/me`, admin user endpoints under `/api/users` | Covers user account management and admin CRUD workflows. |
-| Driver profile and availability | Driver profile creation/update, document/profile data, admin approval flow, online/offline status, heartbeat refresh and automatic stale-driver timeout | `/api/v1/drivers/me/profile`, `/api/v1/drivers/me/status`, `POST /api/v1/drivers/me/heartbeat`, admin approval endpoints | Redis TTL removes stale drivers from matching immediately; a scheduled batch synchronizes expired online state back to the database. |
+| User profile | Current user profile, update profile, avatar upload, admin user list/detail/create/update/status controls | `GET/PUT /api/users/me`, `POST /api/users/me/avatar`, admin user endpoints under `/api/users` | Covers user account management, avatar URL persistence and admin CRUD workflows. |
+| Upload storage foundation | Local filesystem upload storage for dev, Cloudflare R2/S3-compatible provider for staging/production, image content-type and size validation, driver document upload URLs and user avatar upload | `POST /api/users/me/avatar`, `POST /api/v1/uploads/driver-documents/{documentType}` | Local/dev storage is ready; Cloudflare R2 provider is implemented and production now needs bucket/domain/secret UAT before launch. |
+| Driver profile and availability | Driver profile creation/update, uploaded portrait/license/ID/vehicle-registration URL metadata, admin approval flow, online/offline status, heartbeat refresh and automatic stale-driver timeout | `/api/v1/drivers/me/profile`, `/api/v1/drivers/me/status`, `POST /api/v1/drivers/me/heartbeat`, admin approval endpoints | Admin pending-driver responses include uploaded document URLs when FE submits them during onboarding. |
 | Pricing and routing | Fare estimate, OSRM-compatible route distance/duration, driver navigation GeoJSON/steps, configurable estimate fallback, pricing configuration and admin pricing management | `/api/v1/bookings/estimate`, `POST /api/v1/drivers/trips/{tripId}/route`, `/api/v1/pricing`, `/api/v1/admin/pricing` | Estimate/create booking can use routed distance/time; assigned drivers can request pickup/dropoff routes; completed-trip fare still uses actual tracking history. |
 | Booking | Create booking, booking detail, passenger history/listing, cancellation rules/status updates | `/api/v1/bookings` and related detail/cancel/list endpoints | Booking lifecycle is connected to matching and trip creation. |
 | Trip lifecycle | Driver response, arrived/start/complete transitions, passenger/driver trip history, payment confirmation hooks | `/api/v1/drivers/trips/{tripId}/respond`, `/status`, `/payment-confirm` | Trip completion can compute final fare from tracking history. |
@@ -46,7 +47,7 @@ Generated: 2026-06-15, Asia/Bangkok
 | P0 | Webhook sandbox handling | Run real sandbox callback tests for MoMo and VNPAY; service-level success/failure/stale callback contract coverage plus admin UAT checklist are implemented | Sandbox callback payloads and merchant test accounts | Sandbox success/failure statuses map to internal payment states and provider acknowledgements meet real gateway expectations. |
 | P1 | E2E/integration tests | Auth, booking/matching/pickup-dropoff routing, trip completion, tracking fallback, cash payment confirmation, notification inbox/FCM token flow, admin flow and GitHub Actions backend CI wiring are covered; add provider sandbox E2E flow | Existing Testcontainers base, sandbox merchant accounts | Remaining provider sandbox happy paths run in CI/staging against database/Redis-compatible services and real provider sandbox callbacks. |
 | P1 | Production hardening | Request correlation, centralized error logging, configurable CORS allowlist, basic API rate limiting, Actuator health/readiness and Prometheus metrics endpoints are implemented; add centralized log shipping and distributed tracing backend | Deployment platform requirements | API has safe production defaults and per-instance operational visibility; deployment can scrape Prometheus metrics, use liveness/readiness probes, and throttle abusive request bursts with a documented 429 contract. |
-| P2 | Upload storage | Add driver document/avatar upload storage | S3-compatible storage, local dev storage, file validation | Driver can upload required files; admin can view verified document URLs. |
+| P2 | Upload storage production UAT | Cloudflare R2/S3-compatible provider is implemented; provision bucket/API token/public base URL, verify real upload/read access and decide private document access policy | Cloudflare account, R2 bucket, custom/public domain or signed URL policy, deployment secrets | Uploaded files survive redeploys and scale-out; avatar/document URLs are stable; credentials stay outside Git; failed R2 writes return structured `FILE_STORAGE_ERROR`. |
 | P2 | In-trip messaging | Add passenger-driver chat during active trip | WebSocket channel policy, persistence decision | Participants can exchange trip-scoped messages; unauthorized users cannot subscribe/send. |
 | P2 | Scheduled rides | Support future pickup time and scheduled dispatch | Scheduler, matching delay policy, cancellation rules | Passenger can create scheduled ride; dispatch starts at configured lead time. |
 | P2 | Surge pricing | Add dynamic surge rules beyond static pricing config | Demand/supply metrics, admin controls | Fare estimate reflects surge multiplier with transparent breakdown. |
@@ -58,8 +59,8 @@ Generated: 2026-06-15, Asia/Bangkok
 | Screen / Flow | Backend Endpoint / Channel | Frontend Action |
 | --- | --- | --- |
 | Auth | `/api/v1/auth/register`, `/login`, `/refresh`, `/logout` | Store access token safely, refresh before expiry, clear local session on logout/401. |
-| Passenger profile | `/api/users/me` | Load and update current passenger profile. |
-| Driver onboarding | `/api/v1/drivers/me/profile` | Submit driver profile/document metadata and display approval status. |
+| Passenger profile | `/api/users/me`, `POST /api/users/me/avatar` | Load/update current passenger profile; upload avatar with multipart `file` and use returned `avatarUrl`. |
+| Driver onboarding | `POST /api/v1/uploads/driver-documents/{PORTRAIT|LICENSE|ID_CARD|VEHICLE_REGISTRATION}`, `/api/v1/drivers/me/profile` | Upload required images first, then submit returned URLs as `portraitUrl`, `licenseImageUrl`, `idCardImageUrl`, `vehicleRegistrationUrl`; display approval status. |
 | Driver availability | `PATCH /api/v1/drivers/me/status`, `POST /api/v1/drivers/me/heartbeat` | Start heartbeat after going online, send current coordinates before the returned expiry, and return to the online action when heartbeat reports `DRIVER_NOT_AVAILABLE`. |
 | Admin user management | `/api/users` admin endpoints | Build list, filter/search, create/update, status controls. |
 | Admin driver approval | `/api/v1/admin/drivers/pending`, approval endpoint | Review pending drivers and approve/reject with reason. |
@@ -86,7 +87,7 @@ Generated: 2026-06-15, Asia/Bangkok
 | Phase 3 | Driver availability reliability | Heartbeat API, Redis TTL refresh and automatic database offline timeout implemented; production interval tuning and Redis/database soak testing remain. |
 | Phase 4 | Production readiness | Firebase secure credential loading, HTTP request correlation, centralized application error logging, configurable CORS allowlist, basic API rate limiting, Prometheus metrics, Actuator health/readiness endpoints and SQL release workflow are implemented; log aggregation, distributed tracing backend and environment profiles remain. |
 | Phase 5 | Integration confidence | Testcontainers PostGIS/Redis foundation, auth flow, booking-to-matching-to-pickup/dropoff-routing flow, trip completion, tracking fallback, cash payment confirmation, notification inbox/FCM token flow, admin flow and backend CI workflow are implemented; provider sandbox E2E validation remains. |
-| Phase 6 | Product expansion | Uploads, messaging, scheduled rides, surge pricing, multi-city, analytics. |
+| Phase 6 | Product expansion | Local upload foundation and Cloudflare R2 provider are implemented; R2 deployment UAT, messaging, scheduled rides, surge pricing, multi-city and analytics remain. |
 
 ## Risks
 
@@ -101,4 +102,5 @@ Generated: 2026-06-15, Asia/Bangkok
 | Logs and metrics are still per-instance until deployment wiring is added | Request IDs, health probes, Prometheus metrics and 429 throttling improve diagnosis, but logs/metrics can still be fragmented across replicas | Ship stdout logs centrally, scrape each instance from Prometheus or the platform collector, and add retention/search/alert dashboards before production scaling. |
 | In-memory rate limiting is per application instance | Multiple replicas each keep their own bucket state, so global limits may be higher than configured | For MVP, keep conservative per-instance defaults; before scale-out, move buckets to Redis or an edge gateway if a global quota is required. |
 | Manual SQL releases can drift without discipline | Without Flyway, missed SQL folders or unverified manual changes can desynchronize environments | Require a `db/releases` folder per schema change, run the validator, archive precheck/verify output and keep production `ddl-auto` non-mutating. |
+| R2 deployment config is not yet exercised | Upload code supports Cloudflare R2, but missing bucket/domain/API token config will block startup when `STORAGE_PROVIDER=r2` | Create R2 bucket/API token outside Git, set `CLOUDFLARE_R2_*` env vars, verify one avatar and one driver document upload in staging, and keep local storage only for dev. |
 | FE uses the wrong WebSocket transport URL | SockJS calls to a native-only endpoint fail at `/ws/info`; native clients pointed at a SockJS root also fail | Use `/ws` with SockJS and `/ws-native` with native STOMP exactly as documented in `integrate-plan.md`. |

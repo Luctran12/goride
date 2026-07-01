@@ -69,6 +69,41 @@ class DriverProfileServiceTests {
     }
 
     @Test
+    void createMyProfilePersistsDocumentUrls() {
+        User driver = withUserId(User.create("Driver", "0901234567", null, "hash", Set.of(UserRole.DRIVER)), 10L);
+        when(userRepository.findByIdAndDeletedAtIsNull(10L)).thenReturn(Optional.of(driver));
+        when(driverProfileRepository.save(any(DriverProfile.class))).thenAnswer(invocation ->
+                withProfileId(invocation.getArgument(0), 20L)
+        );
+        DriverProfileUpsertRequest request = new DriverProfileUpsertRequest(
+                "GPLX123456",
+                LocalDate.now().plusYears(2),
+                "012345678901",
+                "/uploads/driver-documents/portraits/10/portrait.png",
+                "/uploads/driver-documents/licenses/10/license.png",
+                "/uploads/driver-documents/id-cards/10/id-card.png",
+                "/uploads/driver-documents/vehicle-registrations/10/registration.png",
+                "51A-123.45",
+                VehicleType.CAR_4_SEAT,
+                "Toyota",
+                "Vios",
+                "White",
+                (short) 2022
+        );
+
+        var response = driverProfileService.createMyProfile(10L, request);
+
+        ArgumentCaptor<DriverProfile> profileCaptor = ArgumentCaptor.forClass(DriverProfile.class);
+        verify(driverProfileRepository).save(profileCaptor.capture());
+        assertThat(profileCaptor.getValue().getLicenseImageUrl()).isEqualTo(request.licenseImageUrl());
+        assertThat(profileCaptor.getValue().getIdCardImageUrl()).isEqualTo(request.idCardImageUrl());
+        assertThat(profileCaptor.getValue().getVehicleRegistrationUrl()).isEqualTo(request.vehicleRegistrationUrl());
+        assertThat(response.licenseImageUrl()).isEqualTo(request.licenseImageUrl());
+        assertThat(response.idCardImageUrl()).isEqualTo(request.idCardImageUrl());
+        assertThat(response.vehicleRegistrationUrl()).isEqualTo(request.vehicleRegistrationUrl());
+    }
+
+    @Test
     void createMyProfileRejectsNonDriverUser() {
         User passenger = withUserId(User.create("Passenger", "0901234567", null, "hash", Set.of(UserRole.PASSENGER)), 10L);
         when(userRepository.findByIdAndDeletedAtIsNull(10L)).thenReturn(Optional.of(passenger));

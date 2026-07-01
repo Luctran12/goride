@@ -122,6 +122,15 @@ public class UserService {
     }
 
     @Transactional
+    public UserResponse updateMyAvatar(Long userId, String avatarUrl) {
+        User user = userRepository.findByIdAndDeletedAtIsNull(userId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+
+        user.updateDetails(user.getFullName(), user.getPhone(), user.getEmail(), avatarUrl);
+        return userMapper.toResponse(userRepository.save(user));
+    }
+
+    @Transactional
     public void changeMyPassword(Long userId, UserPasswordChangeRequest request) {
         User user = userRepository.findByIdAndDeletedAtIsNull(userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));

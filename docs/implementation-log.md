@@ -5,6 +5,118 @@
 > Tu commit `feat: add matching driver search` tro di, moi commit backend can cap nhat file nay trong cung commit.
 
 ---
+## Commit: `feat: add cloudflare r2 storage provider`
+
+Branch: `feature/upload-storage`
+
+Phase: Phase 6 - Product expansion, production upload storage
+
+### Muc tieu
+
+Them storage provider Cloudflare R2/S3-compatible de upload avatar va driver documents len object storage khi staging/production set `STORAGE_PROVIDER=r2`, trong khi van giu local filesystem provider lam mac dinh cho dev/test.
+
+### Noi dung da trien khai
+
+- Them AWS SDK v2 S3 dependency va `R2StorageConfig` tao `S3Client` dung endpoint Cloudflare R2, region `auto`, path-style access va timeout cau hinh duoc.
+- Mo rong `FileStorageProperties` voi `provider=local|r2` va nhom config `app.storage.r2.*`.
+- Refactor validation/object-key/public-URL upload vao `FileStorageSupport` de local va R2 dung chung rule.
+- Them `R2FileStorageService`:
+  - Validate file rong, size limit va content type nhu local provider.
+  - Upload object bang `PutObject` voi bucket/key/content type/content length.
+  - Tra `StoredFile.url` theo `CLOUDFLARE_R2_PUBLIC_BASE_URL + objectKey`.
+  - Map loi IO/R2 SDK thanh `FILE_STORAGE_ERROR`.
+- Dieu chinh local resource handler `/uploads/**` chi active khi provider la `local`.
+- Them env vars trong `application.properties`: `STORAGE_PROVIDER`, `CLOUDFLARE_R2_ENDPOINT`, `CLOUDFLARE_R2_BUCKET`, `CLOUDFLARE_R2_ACCESS_KEY`, `CLOUDFLARE_R2_SECRET_KEY`, `CLOUDFLARE_R2_PUBLIC_BASE_URL`, timeout va path-style flag.
+- Cap nhat `plan.md`, `integrate-plan.md`, `docs/backend-implementation.md` va `docs/pland.xlsx` de ghi ro R2 provider da co code, con can bucket/secret/domain UAT.
+
+### Review truoc commit
+
+- Targeted `./mvnw.cmd "-Dtest=R2FileStorageServiceTests,R2StorageConfigTests,LocalFileStorageServiceTests" test`: pass 8 tests.
+- Full `./mvnw.cmd test`: pass 366 tests, 0 failure, 0 error.
+- `git diff --check`: pass; chi co warning LF/CRLF tren Windows.
+- CodeRabbit CLI: blocked vi `coderabbit` khong co trong PATH; remote installer can approval ro rang truoc khi cai third-party software.
+
+### Files chinh
+
+- `pom.xml`
+- `src/main/java/com/example/goride/storage/config/FileStorageProperties.java`
+- `src/main/java/com/example/goride/storage/config/FileStorageConfig.java`
+- `src/main/java/com/example/goride/storage/config/R2StorageConfig.java`
+- `src/main/java/com/example/goride/storage/service/FileStorageSupport.java`
+- `src/main/java/com/example/goride/storage/service/LocalFileStorageService.java`
+- `src/main/java/com/example/goride/storage/service/R2FileStorageService.java`
+- `src/main/resources/application.properties`
+- `src/test/java/com/example/goride/storage/config/R2StorageConfigTests.java`
+- `src/test/java/com/example/goride/storage/service/R2FileStorageServiceTests.java`
+- `plan.md`
+- `integrate-plan.md`
+- `docs/backend-implementation.md`
+- `docs/implementation-log.md`
+- `docs/pland.xlsx`
+
+### Viec tiep theo
+
+- Tao R2 bucket, API token va public/custom domain ngoai repo.
+- Set env vars `CLOUDFLARE_R2_*` tren staging, upload thu mot avatar va mot driver document.
+- Neu giay to tai xe can private access, them signed URL/proxy download thay vi public bucket truoc production.
+
+## Commit: `feat: add upload storage foundation`
+
+Branch: `feature/upload-storage`
+
+Phase: Phase 6 - Product expansion, upload storage foundation
+
+### Muc tieu
+
+Them nen tang upload file cho avatar user va anh ho so tai xe de FE co the upload anh truoc khi tao ho so driver. Backend validate file, luu local trong dev/demo, tra public URL va luu document URL vao driver profile response de admin co the xem khi duyet.
+
+### Noi dung da trien khai
+
+- Them storage module local filesystem:
+  - `FileStorageProperties` voi `STORAGE_LOCAL_ROOT`, `STORAGE_PUBLIC_BASE_URL`, `STORAGE_MAX_FILE_SIZE`, `STORAGE_ALLOWED_CONTENT_TYPES`.
+  - `LocalFileStorageService` validate file rong, size limit va content type `image/jpeg`, `image/png`, `image/webp`.
+  - Public resource handler `/uploads/**` cho local/dev.
+- Them API upload:
+  - `POST /api/users/me/avatar` multipart `file`, upload va cap nhat `users.avatar_url`.
+  - `POST /api/v1/uploads/driver-documents/{documentType}` multipart `file` cho `PORTRAIT`, `LICENSE`, `ID_CARD`, `VEHICLE_REGISTRATION`.
+- Them response upload driver document gom `documentType`, `url`, `objectKey`, `contentType`, `sizeBytes`.
+- Mo rong `DriverProfile` voi `licenseImageUrl`, `idCardImageUrl`, `vehicleRegistrationUrl` de admin xem URL tai lieu trong pending profile/approval response.
+- Them SQL release `db/releases/20260630-driver-document-urls` cho 3 cot driver document URL.
+- Them `FILE_UPLOAD_INVALID` va `FILE_STORAGE_ERROR`; upload qua dung luong tra loi co cau truc thay vi 500.
+- Cap nhat `plan.md`, `integrate-plan.md`, `docs/backend-implementation.md` va `docs/pland.xlsx`.
+
+### Review truoc commit
+
+- Targeted `./mvnw.cmd "-Dtest=LocalFileStorageServiceTests,FileUploadControllerTests,UserProfileControllerTests,UserServiceTests,DriverProfileServiceTests" test`: pass 29 tests.
+- `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/validate-db-release.ps1 -ReleasePath db/releases/20260630-driver-document-urls`: pass.
+- Full `./mvnw.cmd test`: pass 362 tests, 0 failure, 0 error.
+- `git diff --check`: pass; chi co warning LF/CRLF tren Windows.
+- CodeRabbit CLI: blocked vi `coderabbit` khong co trong PATH; remote installer can approval ro rang truoc khi cai third-party software.
+
+### Files chinh
+
+- `src/main/java/com/example/goride/storage/**`
+- `src/main/java/com/example/goride/user/controller/UserProfileController.java`
+- `src/main/java/com/example/goride/user/service/UserService.java`
+- `src/main/java/com/example/goride/driver/domain/DriverProfile.java`
+- `src/main/java/com/example/goride/driver/dto/DriverProfileUpsertRequest.java`
+- `src/main/java/com/example/goride/driver/dto/DriverProfileResponse.java`
+- `db/releases/20260630-driver-document-urls/**`
+- `src/test/java/com/example/goride/storage/**`
+- `src/test/java/com/example/goride/user/controller/UserProfileControllerTests.java`
+- `src/test/java/com/example/goride/user/service/UserServiceTests.java`
+- `src/test/java/com/example/goride/driver/service/DriverProfileServiceTests.java`
+- `plan.md`
+- `integrate-plan.md`
+- `docs/backend-implementation.md`
+- `docs/implementation-log.md`
+- `docs/pland.xlsx`
+
+### Viec tiep theo
+
+- Quyet dinh production storage: S3-compatible bucket, CDN URL hoac persistent volume.
+- Neu dung S3, them provider rieng sau abstraction `FileStorageService` va giu local provider cho dev/test.
+- Can full regression suite truoc khi merge neu review chap nhan scope nay.
 
 ## Commit: `chore: add database release sql workflow`
 
