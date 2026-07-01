@@ -57,6 +57,15 @@ public class DriverProfile {
     @Column(name = "portrait_url", nullable = false, length = 500)
     private String portraitUrl;
 
+    @Column(name = "license_image_url", length = 500)
+    private String licenseImageUrl;
+
+    @Column(name = "id_card_image_url", length = 500)
+    private String idCardImageUrl;
+
+    @Column(name = "vehicle_registration_url", length = 500)
+    private String vehicleRegistrationUrl;
+
     @Column(name = "vehicle_plate", nullable = false, length = 30)
     private String vehiclePlate;
 
@@ -175,6 +184,12 @@ public class DriverProfile {
         this.totalTrips++;
     }
 
+    public void updateDocumentUrls(String licenseImageUrl, String idCardImageUrl, String vehicleRegistrationUrl) {
+        this.licenseImageUrl = normalizeOptional(licenseImageUrl);
+        this.idCardImageUrl = normalizeOptional(idCardImageUrl);
+        this.vehicleRegistrationUrl = normalizeOptional(vehicleRegistrationUrl);
+    }
+
     public void updateAverageRating(BigDecimal averageRating, int totalRatings) {
         if (averageRating == null) {
             throw new IllegalArgumentException("averageRating must not be null");
@@ -220,6 +235,18 @@ public class DriverProfile {
 
     public String getPortraitUrl() {
         return portraitUrl;
+    }
+
+    public String getLicenseImageUrl() {
+        return licenseImageUrl;
+    }
+
+    public String getIdCardImageUrl() {
+        return idCardImageUrl;
+    }
+
+    public String getVehicleRegistrationUrl() {
+        return vehicleRegistrationUrl;
     }
 
     public String getVehiclePlate() {

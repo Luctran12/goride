@@ -205,6 +205,26 @@ class UserServiceTests {
     }
 
     @Test
+    void updateMyAvatarStoresUploadedAvatarUrl() {
+        User user = withId(User.create(
+                "Name",
+                "0901234567",
+                "a@example.com",
+                "hash",
+                Set.of(UserRole.PASSENGER)
+        ), 1L);
+        when(userRepository.findByIdAndDeletedAtIsNull(1L)).thenReturn(Optional.of(user));
+        when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        var response = userService.updateMyAvatar(1L, "/uploads/avatars/1/avatar.png");
+
+        assertThat(response.avatarUrl()).isEqualTo("/uploads/avatars/1/avatar.png");
+        assertThat(user.getFullName()).isEqualTo("Name");
+        assertThat(user.getPhone()).isEqualTo("0901234567");
+        assertThat(user.getEmail()).isEqualTo("a@example.com");
+    }
+
+    @Test
     void updateMyProfileRejectsDuplicateEmail() {
         User user = withId(User.create("Name", "0901234567", "old@example.com", "hash", Set.of(UserRole.PASSENGER)), 1L);
         when(userRepository.findByIdAndDeletedAtIsNull(1L)).thenReturn(Optional.of(user));

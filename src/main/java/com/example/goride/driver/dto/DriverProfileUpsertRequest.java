@@ -25,6 +25,15 @@ public record DriverProfileUpsertRequest(
         @Size(max = 500)
         String portraitUrl,
 
+        @Size(max = 500)
+        String licenseImageUrl,
+
+        @Size(max = 500)
+        String idCardImageUrl,
+
+        @Size(max = 500)
+        String vehicleRegistrationUrl,
+
         @NotBlank
         @Size(max = 30)
         String vehiclePlate,
@@ -43,4 +52,32 @@ public record DriverProfileUpsertRequest(
 
         Short vehicleYear
 ) {
+    public DriverProfileUpsertRequest(
+            String licenseNumber,
+            LocalDate licenseExpiry,
+            String idCardNumber,
+            String portraitUrl,
+            String vehiclePlate,
+            VehicleType vehicleType,
+            String vehicleBrand,
+            String vehicleModel,
+            String vehicleColor,
+            Short vehicleYear
+    ) {
+        this(
+                licenseNumber,
+                licenseExpiry,
+                idCardNumber,
+                portraitUrl,
+                null,
+                null,
+                null,
+                vehiclePlate,
+                vehicleType,
+                vehicleBrand,
+                vehicleModel,
+                vehicleColor,
+                vehicleYear
+        );
+    }
 }

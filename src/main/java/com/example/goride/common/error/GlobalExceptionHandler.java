@@ -14,6 +14,7 @@ import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -86,6 +87,25 @@ public class GlobalExceptionHandler {
                 request.getRequestURI()
         );
         return validationError(Map.of("requestBody", "Request body is malformed or unreadable"));
+    }
+
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<ErrorResponse> handleMaxUploadSizeExceeded(
+            MaxUploadSizeExceededException exception,
+            HttpServletRequest request
+    ) {
+        log.warn(
+                "Upload size exceeded method={} path={}",
+                request.getMethod(),
+                request.getRequestURI()
+        );
+        return ResponseEntity
+                .status(HttpStatus.BAD_REQUEST)
+                .body(ErrorResponse.of(
+                        ErrorCode.FILE_UPLOAD_INVALID,
+                        "Uploaded file is too large",
+                        Map.of()
+                ));
     }
 
     @ExceptionHandler(AuthenticationException.class)

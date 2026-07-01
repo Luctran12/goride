@@ -223,6 +223,9 @@ CREATE TABLE driver_profiles (
     license_expiry      DATE         NOT NULL,
     id_card_number      VARCHAR(20)  NOT NULL UNIQUE,
     portrait_url        VARCHAR(500) NOT NULL,
+    license_image_url   VARCHAR(500),
+    id_card_image_url   VARCHAR(500),
+    vehicle_registration_url VARCHAR(500),
     vehicle_plate       VARCHAR(30)  NOT NULL UNIQUE,
     vehicle_type        VARCHAR(20)  NOT NULL,
     vehicle_brand       VARCHAR(50),
@@ -912,6 +915,32 @@ Implementations:
 
 ---
 
+### 11.3 Upload storage
+
+Backend co `FileStorageService` de tach upload API khoi storage provider.
+
+Implementations hien co:
+- `LocalFileStorageService`: mac dinh cho local/dev, luu file duoi `uploads/` va serve `/uploads/**`.
+- `R2FileStorageService`: dung Cloudflare R2/S3-compatible API khi `STORAGE_PROVIDER=r2`.
+
+Runtime R2 can cac bien moi truong:
+
+```text
+STORAGE_PROVIDER=r2
+CLOUDFLARE_R2_ENDPOINT=https://<account-id>.r2.cloudflarestorage.com
+CLOUDFLARE_R2_REGION=auto
+CLOUDFLARE_R2_BUCKET=goride-uploads
+CLOUDFLARE_R2_ACCESS_KEY=<r2-access-key>
+CLOUDFLARE_R2_SECRET_KEY=<r2-secret-key>
+CLOUDFLARE_R2_PUBLIC_BASE_URL=https://cdn.example.com
+```
+
+Quy tac:
+- Khong commit R2 credential.
+- Avatar co the public qua CDN/custom domain.
+- Anh giay to tai xe nen review lai privacy; neu bucket khong public, them signed URL/proxy download cho admin/driver truoc production.
+
+---
 ## 12. Error Codes
 
 | Code | HTTP | Khi nao |
@@ -1082,7 +1111,7 @@ Giu lai:
 Cat/trien khai sau:
 - Web Admin UI
 - FCM push notification
-- Upload anh that len S3
+- Cloudflare R2/S3-compatible storage deployment UAT
 - MoMo/VNPay
 - Surge pricing dong
 - Scheduled rides
@@ -1100,4 +1129,4 @@ Cat/trien khai sau:
 5. API tao booking khong nhan `estimatedFare` lam source of truth.
 6. WebSocket offer driver dung `/user/queue/trip-requests` thay vi public topic theo driver id.
 7. Them race-condition lock khi matching.
-8. Deployment AWS/Railway duoc dua ra ngoai MVP backend; truoc mat tap trung local + test.
+8. Deployment AWS/Railway duoc dua ra ngoai MVP backend; upload storage hien co local dev va Cloudflare R2 provider cho staging/production khi duoc cau hinh env.

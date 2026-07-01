@@ -32,6 +32,8 @@ public enum ErrorCode {
     PAYMENT_PROVIDER_UNSUPPORTED(HttpStatus.UNPROCESSABLE_ENTITY, "Payment provider is not supported"),
     PAYMENT_PROVIDER_ERROR(HttpStatus.BAD_GATEWAY, "Payment provider request failed"),
     ROUTING_PROVIDER_ERROR(HttpStatus.BAD_GATEWAY, "Routing provider request failed"),
+    FILE_UPLOAD_INVALID(HttpStatus.BAD_REQUEST, "Uploaded file is invalid"),
+    FILE_STORAGE_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "File storage failed"),
     TRIP_ROUTE_NOT_AVAILABLE(HttpStatus.UNPROCESSABLE_ENTITY, "Routing is not available for this trip status"),
     PAYMENT_INVALID_STATUS(HttpStatus.UNPROCESSABLE_ENTITY, "Payment status is invalid"),
     NO_DRIVER_AVAILABLE(HttpStatus.UNPROCESSABLE_ENTITY, "No driver is available nearby"),

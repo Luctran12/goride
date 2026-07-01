@@ -1,6 +1,6 @@
 # GoRide Front-end Integration Plan
 
-Branch da kiem tra: `feature/database-release-sql-workflow`
+Branch da kiem tra: `feature/upload-storage`
 
 Muc tieu file nay:
 - Checklist chuc nang backend da co code va co the tich hop FE.
@@ -208,6 +208,16 @@ type PaymentStatus = "PENDING" | "COMPLETED" | "FAILED" | "REFUNDED";
 - [x] User doi mat khau.
 - [x] Admin tao/xem/list/cap nhat/xoa user.
 - [x] Admin suspend/activate user qua `status`.
+
+
+### Upload storage
+
+- [x] User upload avatar bang multipart `file`, backend validate content type/size, luu local dev hoac Cloudflare R2 theo config va cap nhat `avatarUrl`.
+- [x] Driver upload anh portrait, license, ID card va vehicle registration bang multipart `file`.
+- [x] Backend tra public URL va object key cho FE; FE dua URL vao driver profile request.
+- [x] Admin pending-driver response co cac field document URL neu driver da submit.
+- [x] Local `/uploads/**` public resource serving da co cho dev/test.
+- [ ] Production S3-compatible/persistent volume storage chua trien khai.
 
 ### Booking va trip
 
@@ -479,6 +489,93 @@ FE action:
 
 ---
 
+### 4.1.1 Upload avatar va driver documents
+
+#### Upload avatar user
+
+```http
+POST /api/users/me/avatar
+Authorization: Bearer <accessToken>
+Content-Type: multipart/form-data
+```
+
+Multipart field:
+
+```text
+file=<image/jpeg|image/png|image/webp>
+```
+
+Response `data`:
+
+```json
+{
+  "avatarUrl": "/uploads/avatars/10/8e8f...png"
+}
+```
+
+Backend se validate file khong rong, dung content type, khong vuot `STORAGE_MAX_FILE_SIZE`, luu file vao local dev hoac Cloudflare R2 theo `STORAGE_PROVIDER`, va cap nhat `users.avatar_url`.
+
+#### Upload driver documents
+
+```http
+POST /api/v1/uploads/driver-documents/{documentType}
+Authorization: Bearer <driverToken>
+Content-Type: multipart/form-data
+```
+
+`documentType`:
+
+```ts
+type DriverDocumentType = "PORTRAIT" | "LICENSE" | "ID_CARD" | "VEHICLE_REGISTRATION";
+```
+
+Multipart field:
+
+```text
+file=<image/jpeg|image/png|image/webp>
+```
+
+Response `data`:
+
+```json
+{
+  "documentType": "LICENSE",
+  "url": "/uploads/driver-documents/licenses/10/8e8f...png",
+  "objectKey": "driver-documents/licenses/10/8e8f...png",
+  "contentType": "image/png",
+  "sizeBytes": 123456
+}
+```
+
+FE action:
+- Upload `PORTRAIT`, `LICENSE`, `ID_CARD`, `VEHICLE_REGISTRATION` truoc khi tao driver profile.
+- Dung `url` tra ve de gan vao `portraitUrl`, `licenseImageUrl`, `idCardImageUrl`, `vehicleRegistrationUrl` trong request tao profile.
+- Neu gap `FILE_UPLOAD_INVALID`, hien loi file rong/sai dinh dang/qua dung luong va cho user chon lai file.
+- Local/dev co the dung URL `/uploads/**`; production nen set `STORAGE_PROVIDER=r2` va `CLOUDFLARE_R2_PUBLIC_BASE_URL` tro den custom/public domain cua bucket.
+
+
+Runtime config Cloudflare R2 cho staging/production:
+
+```properties
+STORAGE_PROVIDER=r2
+CLOUDFLARE_R2_ENDPOINT=https://<account-id>.r2.cloudflarestorage.com
+CLOUDFLARE_R2_REGION=auto
+CLOUDFLARE_R2_BUCKET=goride-uploads
+CLOUDFLARE_R2_ACCESS_KEY=<r2-access-key>
+CLOUDFLARE_R2_SECRET_KEY=<r2-secret-key>
+CLOUDFLARE_R2_PUBLIC_BASE_URL=https://cdn.example.com
+CLOUDFLARE_R2_PATH_STYLE_ACCESS_ENABLED=true
+CLOUDFLARE_R2_API_CALL_TIMEOUT=30s
+CLOUDFLARE_R2_API_CALL_ATTEMPT_TIMEOUT=10s
+```
+
+Ghi chu FE/devops:
+- Khi `STORAGE_PROVIDER=local`, URL tra ve dang `/uploads/...` va chi dung local/dev.
+- Khi `STORAGE_PROVIDER=r2`, backend upload object len bucket R2 va tra URL theo `CLOUDFLARE_R2_PUBLIC_BASE_URL + objectKey`.
+- Backend fail startup neu bat R2 ma thieu endpoint, bucket, access key, secret key hoac public base URL; khong commit cac secret nay vao repo.
+- Neu bucket/document can private access, giu API upload hien tai nhung can them commit signed URL/proxy download cho admin/driver truoc khi launch production.
+---
+
 ### 4.2 Driver profile
 
 #### Tao driver profile
@@ -495,7 +592,10 @@ Request:
   "licenseNumber": "GPLX123456",
   "licenseExpiry": "2028-12-31",
   "idCardNumber": "079000000000",
-  "portraitUrl": "https://cdn.example.com/driver.jpg",
+  "portraitUrl": "/uploads/driver-documents/portraits/10/portrait.png",
+  "licenseImageUrl": "/uploads/driver-documents/licenses/10/license.png",
+  "idCardImageUrl": "/uploads/driver-documents/id-cards/10/id-card.png",
+  "vehicleRegistrationUrl": "/uploads/driver-documents/vehicle-registrations/10/registration.png",
   "vehiclePlate": "59A1-12345",
   "vehicleType": "MOTORBIKE",
   "vehicleBrand": "Honda",
@@ -505,7 +605,7 @@ Request:
 }
 ```
 
-Response `data`: `DriverProfileResponse`.
+Response `data`: `DriverProfileResponse`, gom them `licenseImageUrl`, `idCardImageUrl`, `vehicleRegistrationUrl` neu FE da submit.
 
 FE action:
 - Sau khi tao profile, hien trang "Dang cho duyet".
@@ -1603,7 +1703,7 @@ Request reject:
 }
 ```
 
-Response `data`: `DriverProfileResponse`.
+Response `data`: `DriverProfileResponse`, gom them `licenseImageUrl`, `idCardImageUrl`, `vehicleRegistrationUrl` neu FE da submit.
 
 FE action:
 - Sau approve, driver co the bat online.
