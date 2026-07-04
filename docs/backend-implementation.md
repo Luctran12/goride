@@ -941,6 +941,30 @@ Quy tac:
 - Anh giay to tai xe nen review lai privacy; neu bucket khong public, them signed URL/proxy download cho admin/driver truoc production.
 
 ---
+
+### 11.4 In-trip messaging
+
+Backend co module `chat` cho message text theo tung trip.
+
+REST contract:
+- `GET /api/v1/trips/{tripId}/messages?page=1&size=50`: passenger/driver cua trip va admin xem lich su, tra `PageResponse<TripMessageResponse>` sap xep moi nhat truoc.
+- `POST /api/v1/trips/{tripId}/messages`: passenger/assigned driver gui message text, tra `201 Created` va message da luu.
+
+WebSocket contract:
+- FE gui `SEND /app/trip.message` voi `{ "tripId": 99, "body": "..." }`.
+- Backend broadcast message da luu qua `/topic/trip/{tripId}/messages`.
+- `TripTopicSubscriptionAuthorizer` cho `/topic/trip/{tripId}/messages` dung chung rule voi status/location: passenger cua trip, driver cua trip hoac admin moi subscribe duoc.
+
+Rule nghiep vu:
+- Chi passenger va assigned driver duoc gui message.
+- Chi gui khi trip status la `ACCEPTED`, `ARRIVED` hoac `IN_PROGRESS`.
+- Admin duoc xem history/subscription de support, khong gui thay participant.
+- Body trim, bat buoc khong rong va toi da 1000 ky tu.
+
+Database:
+- SQL release `db/releases/20260701-trip-messages` tao bang `trip_messages` voi FK den `trips` va `users`.
+
+---
 ## 12. Error Codes
 
 | Code | HTTP | Khi nao |
@@ -960,6 +984,7 @@ Quy tac:
 | `PASSENGER_HAS_ACTIVE_TRIP` | 422 | Passenger co trip active |
 | `TRIP_CANNOT_BE_CANCELLED` | 422 | Status khong cho huy |
 | `TRIP_STATUS_INVALID_TRANSITION` | 422 | State machine reject |
+| `TRIP_MESSAGE_NOT_AVAILABLE` | 422 | Trip chua/khong con cho phep chat |
 | `LOCATION_OUT_OF_SERVICE_AREA` | 422 | Ngoai vung phuc vu |
 | `NO_DRIVER_AVAILABLE` | 422 | Khong co driver |
 | `INTERNAL_SERVER_ERROR` | 500 | Loi khong xac dinh |
@@ -1130,3 +1155,4 @@ Cat/trien khai sau:
 6. WebSocket offer driver dung `/user/queue/trip-requests` thay vi public topic theo driver id.
 7. Them race-condition lock khi matching.
 8. Deployment AWS/Railway duoc dua ra ngoai MVP backend; upload storage hien co local dev va Cloudflare R2 provider cho staging/production khi duoc cau hinh env.
+9. Attachment/read receipt/typing indicator cho chat duoc de sau MVP text messaging.

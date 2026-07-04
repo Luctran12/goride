@@ -6,13 +6,13 @@ Generated: 2026-06-15, Asia/Bangkok
 
 | Item | Status |
 | --- | --- |
-| Working branch | `feature/upload-storage` |
-| Latest merged feature on develop | `feature/database-release-sql-workflow` |
-| Develop merge commit | `merge: database release sql workflow` |
-| Test status | Full `./mvnw.cmd test` passed after R2 provider: 366 tests, 0 failures, 0 errors; targeted R2/local storage tests passed: 8 tests |
-| Diff hygiene | `git diff --check` passed on 2026-07-01 after R2 provider changes; LF/CRLF normalization warnings only |
-| CodeRabbit CLI | Blocked: `coderabbit` is not in PATH; remote installer execution was rejected by approval policy because it would install third-party software on the user machine without explicit approval |
-| Publish status | Database release workflow merged into local `develop`; current upload storage branch is in review flow and has not been merged/pushed |
+| Working branch | `feature/in-trip-messaging` |
+| Latest merged feature on develop | `feature/upload-storage` |
+| Develop merge commit | `merge: upload storage cloudflare r2` |
+| Test status | Full `./mvnw.cmd test` passed after in-trip messaging: 379 tests, 0 failures, 0 errors; targeted chat tests passed: 18 tests |
+| Diff hygiene | `git diff --check` passed on 2026-07-01 after in-trip messaging changes; LF/CRLF normalization warnings only |
+| CodeRabbit CLI | Blocked: `coderabbit` is not in PATH; installer script is Linux/macOS-only and WSL on this machine cannot launch `/bin/bash` |
+| Publish status | Upload storage/R2 merged into local `develop`; current in-trip messaging branch is in implementation flow and has not been merged/pushed |
 | Local config | `src/main/resources/application.yml` is environment-specific and must stay uncommitted |
 
 ## Completed Backend Modules
@@ -29,6 +29,7 @@ Generated: 2026-06-15, Asia/Bangkok
 | Matching | Nearby driver lookup, offer dispatch, accept/reject handling, timeout handling, retry/no-driver flow, rematch on driver availability | Internal matching services and driver availability events | Initial no-candidate booking remains `SEARCHING`; driver reject/offer timeout also keeps the trip searchable when no immediate next driver is available; driver online/heartbeat events retry unmatched searching trips and dispatch offers when a candidate becomes available; passenger cancellation clears active matching state/driver lock and dismisses the stale driver offer. |
 | WebSocket security | JWT-authenticated STOMP `CONNECT`, trip topic authorization, user-specific messaging, SockJS/native endpoint compatibility | `/ws` for SockJS, `/ws-native` for native STOMP, trip subscription topics | `GET /ws/info` is supported for SockJS clients while native clients retain a dedicated endpoint. |
 | Realtime tracking | Driver location updates from accepted trip onward, REST fallback for latest location/history, trip location notifications | `POST /api/v1/tracking/trips/{tripId}/driver-location`, WebSocket driver location channel | Caches/broadcasts driver location for `ACCEPTED`, `ARRIVED`, `IN_PROGRESS`; persists history for fare only during `IN_PROGRESS`. |
+| In-trip messaging | Passenger-driver trip chat, persisted message history, REST send/history fallback, STOMP send and trip topic broadcast with subscription authorization | `GET/POST /api/v1/trips/{tripId}/messages`, `/app/trip.message`, `/topic/trip/{tripId}/messages` | Passenger and assigned driver can send during `ACCEPTED`, `ARRIVED`, `IN_PROGRESS`; admin can read/subscribe for support but cannot send as a participant. |
 | Cash payment | Cash payment record, payment detail, cash confirmation, payment completion workflow | `/api/v1/payments/trips/{tripId}`, driver payment confirmation endpoint | CASH path is implemented end to end enough for MVP trip completion. |
 | Payment checkout and webhook foundation | Payment provider registry/config properties, checkout entry point, webhook entry point, payment method metadata, admin readiness and sandbox UAT plan, signed VNPAY and MoMo checkout/callback flows, configurable callback freshness/replay policy | `/api/v1/payments/methods`, `/api/v1/payments/providers/readiness`, `/api/v1/payments/providers/sandbox-uat-plan`, `/api/v1/payments/trips/{tripId}/checkout`, `/api/v1/payments/providers/{providerName}/webhook` | CASH works end to end; VNPAY and MoMo support signed checkout/callbacks, readiness diagnostics, UAT checklist handoff, service-level sandbox callback contract coverage, stale/future callback rejection and idempotent terminal retries. |
 | Rating | Passenger trip rating, duplicate prevention/status, driver public ratings, Redis rating sync | `/api/v1/ratings`, `/api/v1/ratings/trips/{tripId}/me`, `/api/v1/drivers/{driverId}/ratings` | Rating data is available for frontend review displays. |
@@ -48,7 +49,6 @@ Generated: 2026-06-15, Asia/Bangkok
 | P1 | E2E/integration tests | Auth, booking/matching/pickup-dropoff routing, trip completion, tracking fallback, cash payment confirmation, notification inbox/FCM token flow, admin flow and GitHub Actions backend CI wiring are covered; add provider sandbox E2E flow | Existing Testcontainers base, sandbox merchant accounts | Remaining provider sandbox happy paths run in CI/staging against database/Redis-compatible services and real provider sandbox callbacks. |
 | P1 | Production hardening | Request correlation, centralized error logging, configurable CORS allowlist, basic API rate limiting, Actuator health/readiness and Prometheus metrics endpoints are implemented; add centralized log shipping and distributed tracing backend | Deployment platform requirements | API has safe production defaults and per-instance operational visibility; deployment can scrape Prometheus metrics, use liveness/readiness probes, and throttle abusive request bursts with a documented 429 contract. |
 | P2 | Upload storage production UAT | Cloudflare R2/S3-compatible provider is implemented; provision bucket/API token/public base URL, verify real upload/read access and decide private document access policy | Cloudflare account, R2 bucket, custom/public domain or signed URL policy, deployment secrets | Uploaded files survive redeploys and scale-out; avatar/document URLs are stable; credentials stay outside Git; failed R2 writes return structured `FILE_STORAGE_ERROR`. |
-| P2 | In-trip messaging | Add passenger-driver chat during active trip | WebSocket channel policy, persistence decision | Participants can exchange trip-scoped messages; unauthorized users cannot subscribe/send. |
 | P2 | Scheduled rides | Support future pickup time and scheduled dispatch | Scheduler, matching delay policy, cancellation rules | Passenger can create scheduled ride; dispatch starts at configured lead time. |
 | P2 | Surge pricing | Add dynamic surge rules beyond static pricing config | Demand/supply metrics, admin controls | Fare estimate reflects surge multiplier with transparent breakdown. |
 | P2 | Multi-city/service area | Add city/service zone configuration | Geofence data and admin controls | Bookings outside active service zones are rejected or handled according to policy. |
@@ -70,6 +70,7 @@ Generated: 2026-06-15, Asia/Bangkok
 | Driver navigation | `POST /api/v1/drivers/trips/{tripId}/route` | Send current GPS, draw returned GeoJSON `LineString`, route to pickup while accepted and dropoff after arrival, then re-route only when movement/time threshold is reached. |
 | Trip status | Driver trip status endpoints and trip WebSocket topic | Render status timeline: accepted, arrived, in progress, completed/cancelled. |
 | Realtime tracking | `/ws` SockJS or `/ws-native` native STOMP location topic, REST fallback tracking endpoints | Subscribe for live driver location after a driver is assigned; passenger can display driver approach during `ACCEPTED`/`ARRIVED` and trip movement during `IN_PROGRESS`. |
+| In-trip messaging | `GET/POST /api/v1/trips/{tripId}/messages`, `/app/trip.message`, `/topic/trip/{tripId}/messages` | Load message history on trip detail, subscribe to realtime messages, send text while trip is `ACCEPTED`, `ARRIVED` or `IN_PROGRESS`, and handle `TRIP_MESSAGE_NOT_AVAILABLE` by disabling chat input. |
 | Payment | `/api/v1/payments/methods`, `/api/v1/payments/providers/readiness`, `/api/v1/payments/providers/sandbox-uat-plan`, `/api/v1/payments/trips/{tripId}`, `/checkout`, webhook-driven state | Support CASH fully; show VNPAY/MoMo only when provider metadata says enabled; admin/devops can use sandbox UAT plan to see missing config, callback endpoints and test scenarios; open returned checkout URL and refresh payment detail after redirect while signed callbacks update state. |
 | Rating | `/api/v1/ratings`, rating status/list endpoints | Prompt passenger after completed trip, hide form after already rated. |
 | Notifications | `/api/v1/notifications`, FCM token endpoints, WebSocket notification channel | Register FCM token, render inbox/badge, mark notifications read. |
@@ -87,7 +88,7 @@ Generated: 2026-06-15, Asia/Bangkok
 | Phase 3 | Driver availability reliability | Heartbeat API, Redis TTL refresh and automatic database offline timeout implemented; production interval tuning and Redis/database soak testing remain. |
 | Phase 4 | Production readiness | Firebase secure credential loading, HTTP request correlation, centralized application error logging, configurable CORS allowlist, basic API rate limiting, Prometheus metrics, Actuator health/readiness endpoints and SQL release workflow are implemented; log aggregation, distributed tracing backend and environment profiles remain. |
 | Phase 5 | Integration confidence | Testcontainers PostGIS/Redis foundation, auth flow, booking-to-matching-to-pickup/dropoff-routing flow, trip completion, tracking fallback, cash payment confirmation, notification inbox/FCM token flow, admin flow and backend CI workflow are implemented; provider sandbox E2E validation remains. |
-| Phase 6 | Product expansion | Local upload foundation and Cloudflare R2 provider are implemented; R2 deployment UAT, messaging, scheduled rides, surge pricing, multi-city and analytics remain. |
+| Phase 6 | Product expansion | Local upload foundation, Cloudflare R2 provider and in-trip messaging are implemented; R2 deployment UAT, scheduled rides, surge pricing, multi-city and analytics remain. |
 
 ## Risks
 

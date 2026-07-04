@@ -3,6 +3,7 @@ package com.example.goride;
 import com.example.goride.booking.repository.PricingConfigRepository;
 import com.example.goride.booking.repository.TripRepository;
 import com.example.goride.booking.repository.TripStatusHistoryRepository;
+import com.example.goride.chat.repository.TripMessageRepository;
 import com.example.goride.driver.repository.DriverProfileRepository;
 import com.example.goride.notification.repository.NotificationRepository;
 import com.example.goride.payment.repository.PaymentRepository;
@@ -41,6 +42,9 @@ class GorideApplicationTests {
 
 	@MockitoBean
 	private NotificationRepository notificationRepository;
+
+	@MockitoBean
+	private TripMessageRepository tripMessageRepository;
 
 	@Test
 	void contextLoads() {
