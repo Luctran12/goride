@@ -35,6 +35,7 @@ public enum ErrorCode {
     FILE_UPLOAD_INVALID(HttpStatus.BAD_REQUEST, "Uploaded file is invalid"),
     FILE_STORAGE_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "File storage failed"),
     TRIP_ROUTE_NOT_AVAILABLE(HttpStatus.UNPROCESSABLE_ENTITY, "Routing is not available for this trip status"),
+    TRIP_MESSAGE_NOT_AVAILABLE(HttpStatus.UNPROCESSABLE_ENTITY, "Messaging is not available for this trip status"),
     PAYMENT_INVALID_STATUS(HttpStatus.UNPROCESSABLE_ENTITY, "Payment status is invalid"),
     NO_DRIVER_AVAILABLE(HttpStatus.UNPROCESSABLE_ENTITY, "No driver is available nearby"),
     MATCHING_OFFER_NOT_FOUND(HttpStatus.NOT_FOUND, "Matching offer not found"),

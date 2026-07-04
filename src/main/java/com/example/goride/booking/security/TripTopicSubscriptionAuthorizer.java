@@ -13,7 +13,8 @@ import java.util.regex.Pattern;
 
 @Component
 public class TripTopicSubscriptionAuthorizer implements StompSubscriptionAuthorizer {
-    private static final Pattern TRIP_TOPIC_PATTERN = Pattern.compile("^/topic/trip/(\\d+)/(status|location)$");
+    private static final Pattern TRIP_TOPIC_PATTERN =
+            Pattern.compile("^/topic/trip/(\\d+)/(status|location|messages)$");
 
     private final TripRepository tripRepository;
 

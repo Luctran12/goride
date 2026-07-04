@@ -5,6 +5,59 @@
 > Tu commit `feat: add matching driver search` tro di, moi commit backend can cap nhat file nay trong cung commit.
 
 ---
+## Commit: `feat: add in-trip messaging`
+
+Branch: `feature/in-trip-messaging`
+
+Phase: Phase 6 - Product expansion, in-trip messaging
+
+### Muc tieu
+
+Them passenger-driver chat theo tung trip de FE co the hien thi hop thoai trong active trip, vua co realtime WebSocket vua co REST fallback/lich su.
+
+### Noi dung da trien khai
+
+- Them entity `TripMessage` va enum `TripMessageSenderRole` de luu message theo `trip_id`, `sender_id`, role nguoi gui, body va `sent_at`.
+- Them SQL release `db/releases/20260701-trip-messages` gom manifest, precheck, apply, verify va rollback.
+- Them `TripMessageService`:
+  - Chi cho passenger cua trip hoac assigned driver gui message.
+  - Chi cho gui khi trip da `ACCEPTED`, `ARRIVED` hoac `IN_PROGRESS`.
+  - Admin duoc xem history de ho tro van hanh nhung khong gui thay participant.
+  - Broadcast message sau khi transaction commit.
+- Them REST API:
+  - `GET /api/v1/trips/{tripId}/messages?page=1&size=50` lay lich su message.
+  - `POST /api/v1/trips/{tripId}/messages` gui message qua REST fallback.
+- Them STOMP API `SEND /app/trip.message` va realtime topic `/topic/trip/{tripId}/messages`.
+- Mo rong `TripTopicSubscriptionAuthorizer` de topic messages dung chung rule subscribe voi status/location.
+- Them error code `TRIP_MESSAGE_NOT_AVAILABLE` cho FE disable input khi status khong cho chat.
+- Cap nhat `plan.md`, `integrate-plan.md`, `docs/backend-implementation.md` va `docs/pland.xlsx`.
+
+### Review truoc commit
+
+- Targeted `./mvnw.cmd "-Dtest=TripMessage*Tests,WebSocketTripMessageRealtimeNotifierTests,TripTopicSubscriptionAuthorizerTests" test`: pass 18 tests.
+- Full `./mvnw.cmd test`: pass 379 tests, 0 failure, 0 error.
+- `git diff --check`: pass; chi co warning LF/CRLF tren Windows.
+- CodeRabbit CLI: blocked vi `coderabbit` khong co trong PATH; installer chinh thuc chi ho tro Linux/macOS va WSL tren may nay khong khoi chay duoc `/bin/bash`.
+
+### Files chinh
+
+- `src/main/java/com/example/goride/chat/**`
+- `src/main/java/com/example/goride/booking/security/TripTopicSubscriptionAuthorizer.java`
+- `src/main/java/com/example/goride/common/error/ErrorCode.java`
+- `db/releases/20260701-trip-messages/**`
+- `src/test/java/com/example/goride/chat/**`
+- `src/test/java/com/example/goride/booking/security/TripTopicSubscriptionAuthorizerTests.java`
+- `plan.md`
+- `integrate-plan.md`
+- `docs/backend-implementation.md`
+- `docs/implementation-log.md`
+- `docs/pland.xlsx`
+
+### Viec tiep theo
+
+- FE them chat panel trong active trip, load history qua REST, subscribe `/topic/trip/{tripId}/messages` va gui qua REST hoac STOMP.
+- Neu can attachment/read receipt/typing indicator, tach commit rieng sau MVP text chat.
+
 ## Commit: `feat: add cloudflare r2 storage provider`
 
 Branch: `feature/upload-storage`

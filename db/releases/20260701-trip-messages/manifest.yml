@@ -1,0 +1,25 @@
+release_id: 20260701-trip-messages
+title: Add trip-scoped message history
+author: Codex
+created_at: 2026-07-01
+risk: low
+transactional: true
+requires_downtime: false
+applies_after:
+  - 20260630-driver-document-urls
+related_commit: pending
+environments:
+  - staging
+  - production
+objects:
+  - trip_messages
+pre_deploy_checks:
+  - Run precheck.sql and confirm trip_messages does not already exist.
+deploy_steps:
+  - Run apply.sql inside the normal database release window.
+post_deploy_checks:
+  - Run verify.sql and confirm table, foreign keys and indexes exist.
+rollback_plan:
+  - Run rollback.sql only if the application release is rolled back and chat history can be discarded.
+notes:
+  - Messages are scoped to accepted/active trips and are retained for trip support/history.

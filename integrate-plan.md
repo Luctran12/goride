@@ -1,6 +1,6 @@
 # GoRide Front-end Integration Plan
 
-Branch da kiem tra: `feature/upload-storage`
+Branch da kiem tra: `feature/in-trip-messaging`
 
 Muc tieu file nay:
 - Checklist chuc nang backend da co code va co the tich hop FE.
@@ -217,7 +217,7 @@ type PaymentStatus = "PENDING" | "COMPLETED" | "FAILED" | "REFUNDED";
 - [x] Backend tra public URL va object key cho FE; FE dua URL vao driver profile request.
 - [x] Admin pending-driver response co cac field document URL neu driver da submit.
 - [x] Local `/uploads/**` public resource serving da co cho dev/test.
-- [ ] Production S3-compatible/persistent volume storage chua trien khai.
+- [x] Cloudflare R2/S3-compatible storage provider da co; staging can cau hinh bucket/domain/API token va UAT real upload.
 
 ### Booking va trip
 
@@ -261,6 +261,15 @@ type PaymentStatus = "PENDING" | "COMPLETED" | "FAILED" | "REFUNDED";
 - [x] Fare estimate va booking creation co the dung OSRM-compatible route distance/duration khi `app.routing.enabled=true`.
 - [x] Routing timeout/HTTP error/NoRoute co Haversine fallback cau hinh duoc.
 - [x] Assigned driver co API route tu GPS hien tai den pickup/dropoff, tra GeoJSON `LineString` va maneuver steps.
+
+### In-trip messaging
+
+- [x] Passenger va assigned driver gui message text trong active trip qua REST hoac STOMP.
+- [x] Backend luu message history vao `trip_messages`.
+- [x] FE lay lich su qua `GET /api/v1/trips/{tripId}/messages`.
+- [x] Backend broadcast message realtime qua `/topic/trip/{tripId}/messages`.
+- [x] Subscribe topic messages dung cung authorization voi trip status/location: passenger cua trip, driver cua trip hoac admin.
+- [x] Chi cho gui khi trip status la `ACCEPTED`, `ARRIVED` hoac `IN_PROGRESS`; status khac tra `TRIP_MESSAGE_NOT_AVAILABLE`.
 
 ### Payment cash
 
@@ -1097,6 +1106,105 @@ FE action:
 - Chi bat dau subscribe/polling vi tri khi trip da co driver va status la `ACCEPTED`, `ARRIVED` hoac `IN_PROGRESS`; khong polling khi status con `SEARCHING` hoac da la `NO_DRIVER`.
 - Backend nhan vi tri driver tu luc `ACCEPTED` de passenger thay tai xe dang den diem don. Vi tri truoc `IN_PROGRESS` chi duoc cache/broadcast realtime, khong luu vao trip location history dung de tinh quang duong/final fare.
 - Khi status con `SEARCHING`, hien man hinh dang tim tai xe va cho offer/status qua WebSocket; khong coi `DRIVER_LOCATION_NOT_FOUND` la loi.
+
+---
+
+### 4.6.1 In-trip messaging
+
+Dung cho hop thoai passenger-driver trong active trip. FE nen load history qua REST khi mo trip detail, sau do subscribe WebSocket topic de nhan message moi.
+
+#### Lay lich su message
+
+```http
+GET /api/v1/trips/{tripId}/messages?page=1&size=50
+Authorization: Bearer <accessToken>
+```
+
+Response `data`: `PageResponse<TripMessageResponse>`.
+
+```json
+{
+  "items": [
+    {
+      "id": 1,
+      "tripId": 99,
+      "senderId": 10,
+      "senderRole": "PASSENGER",
+      "body": "Toi dang dung o cong A",
+      "sentAt": "2026-07-01T10:00:00Z"
+    }
+  ],
+  "pagination": {
+    "page": 1,
+    "size": 50,
+    "totalItems": 1,
+    "totalPages": 1
+  }
+}
+```
+
+FE action:
+- Goi khi mo trip detail/chat panel hoac reconnect app.
+- `page` la 1-based; backend clamp `size` tu 1 den 100.
+- Response sap xep message moi nhat truoc; FE co the dao nguoc list de render timeline cu -> moi.
+- Passenger/driver chi xem duoc trip cua minh; admin co the xem de support.
+
+#### Gui message qua REST fallback
+
+```http
+POST /api/v1/trips/{tripId}/messages
+Authorization: Bearer <accessToken>
+Content-Type: application/json
+```
+
+Request:
+
+```json
+{
+  "body": "Toi dang den trong 2 phut"
+}
+```
+
+Response `201 Created`, `data`: `TripMessageResponse`.
+
+FE action:
+- Disable input neu trip chua co driver hoac status khong nam trong `ACCEPTED`, `ARRIVED`, `IN_PROGRESS`.
+- Body khong rong sau trim va toi da 1000 ky tu.
+- Neu response `TRIP_MESSAGE_NOT_AVAILABLE`, refresh trip status va khoa input.
+- Neu response `FORBIDDEN`, user khong phai passenger/assigned driver cua trip hien tai; roi khoi chat panel.
+
+#### Gui message qua STOMP
+
+```text
+SEND /app/trip.message
+```
+
+Payload:
+
+```json
+{
+  "tripId": 99,
+  "body": "Toi dang den trong 2 phut"
+}
+```
+
+FE action:
+- Chi gui STOMP sau khi `CONNECT` thanh cong voi bearer token.
+- Neu app can delivery confirmation ro rang, uu tien REST `POST` va de WebSocket chi lam realtime fan-out.
+- Backend van save DB va broadcast message da luu, nen FE nen de-dupe theo `id` neu vua POST vua nhan lai qua topic.
+
+#### Subscribe message realtime
+
+```text
+/topic/trip/{tripId}/messages
+```
+
+Payload topic: `TripMessageResponse`.
+
+FE action:
+- Subscribe cung luc voi trip status/location trong active trip screen.
+- Topic nay chi cho passenger cua trip, assigned driver hoac admin subscribe; subscribe nham trip se bi backend reject.
+- Khi nhan message moi, append vao chat panel neu `id` chua ton tai.
 
 ---
 
@@ -2150,7 +2258,7 @@ connectHeaders: {
 
 Luu y: `/ws` la SockJS endpoint nen request `GET /ws/info` phai tra `200`. `/ws-native` la endpoint cho native WebSocket. Backend authenticate o STOMP `CONNECT`; neu thieu hoac sai `Authorization: Bearer <accessToken>`, connection frame bi tu choi. Sau khi connect thanh cong, backend gan `Principal`/roles tu JWT cho message mapping nhu `/app/driver.location`.
 
-Subscribe vao `/topic/trip/{tripId}/status` va `/topic/trip/{tripId}/location` chi thanh cong neu JWT user la passenger cua trip, driver cua trip, hoac admin. Neu FE subscribe nham trip, backend reject frame voi `FORBIDDEN`/access denied o WebSocket layer.
+Subscribe vao `/topic/trip/{tripId}/status`, `/topic/trip/{tripId}/location` va `/topic/trip/{tripId}/messages` chi thanh cong neu JWT user la passenger cua trip, driver cua trip, hoac admin. Neu FE subscribe nham trip, backend reject frame voi `FORBIDDEN`/access denied o WebSocket layer.
 
 ### Destinations can subscribe
 
@@ -2160,12 +2268,14 @@ Subscribe vao `/topic/trip/{tripId}/status` va `/topic/trip/{tripId}/location` c
 | Passenger/driver app shell | `/user/queue/notifications` | `UserNotification` |
 | Trip detail | `/topic/trip/{tripId}/status` | `TripStatusNotification` |
 | Passenger tracking | `/topic/trip/{tripId}/location` | `DriverLocationResponse` |
+| Passenger/driver chat | `/topic/trip/{tripId}/messages` | `TripMessageResponse` |
 
 ### Messages FE gui len backend
 
 | Flow | Destination | Body |
 |---|---|---|
 | Driver location tracking | `/app/driver.location` | `DriverLocationUpdateRequest` |
+| Passenger/driver chat | `/app/trip.message` | `TripMessageSendRequest` |
 
 ---
 
@@ -2219,6 +2329,7 @@ Devops/backend action:
   - `ARRIVED`: hien driver da den.
   - `IN_PROGRESS`: hien map tracking, subscribe location.
   - `COMPLETED`: hien final fare.
+- [ ] Chat panel: load `GET /api/v1/trips/{tripId}/messages`, subscribe `/topic/trip/{tripId}/messages`, gui message khi trip active.
 - [ ] Payment done screen: doi `PAYMENT_COMPLETED`.
 - [ ] Rating screen: post rating.
 - [ ] Trip history: list bookings.
@@ -2232,6 +2343,7 @@ Devops/backend action:
 - [ ] Online toggle with current GPS.
 - [ ] Offer modal from `/user/queue/trip-requests`, including `TRIP_CANCELLED`/`DISMISS` payload to close stale offers.
 - [ ] Driver navigation: goi `POST /api/v1/drivers/trips/{tripId}/route`, ve GeoJSON route den pickup/dropoff va debounce re-route.
+- [ ] Chat panel: load/send/subscribe trip messages nhu passenger app.
 - [ ] Trip workflow buttons: arrived/start/complete.
 - [ ] Location sender while `IN_PROGRESS`.
 - [ ] Cash confirmation screen.
@@ -2273,6 +2385,7 @@ Devops/backend action:
 | `PAYMENT_PROVIDER_ERROR` | Hien loi tam thoi cua cong thanh toan, cho retry checkout; khong danh dau payment da thanh cong. |
 | `ROUTING_PROVIDER_ERROR` | Hien khong the tinh lo trinh, giu du lieu pickup/dropoff va cho retry. |
 | `TRIP_ROUTE_NOT_AVAILABLE` | Dung navigation va refresh trip; status hien tai khong cho route pickup/dropoff. |
+| `TRIP_MESSAGE_NOT_AVAILABLE` | Khoa chat input, refresh trip status; chi cho gui message trong `ACCEPTED`, `ARRIVED`, `IN_PROGRESS`. |
 | `RATE_LIMIT_EXCEEDED` | Dung retry tuc thi, doc `Retry-After`, disable action tam thoi va thu lai sau backoff. |
 | `TRIP_ALREADY_RATED` | An rating form, coi trip da danh gia. |
 | `DRIVER_LOCATION_NOT_FOUND` | Hien "Dang cho vi tri tai xe". |
@@ -2293,6 +2406,7 @@ Devops/backend action:
 9. Driver accept/reject offer.
 10. Trip status buttons.
 11. Tracking realtime.
-12. Cash payment confirm.
-13. Rating create + public rating list.
-14. WebSocket auth production: gui token trong STOMP `CONNECT`, test reconnect khi access token het han.
+12. In-trip messaging history + realtime topic.
+13. Cash payment confirm.
+14. Rating create + public rating list.
+15. WebSocket auth production: gui token trong STOMP `CONNECT`, test reconnect khi access token het han.

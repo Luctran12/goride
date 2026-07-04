@@ -3,6 +3,7 @@ package com.example.goride.common.observability;
 import com.example.goride.booking.repository.PricingConfigRepository;
 import com.example.goride.booking.repository.TripRepository;
 import com.example.goride.booking.repository.TripStatusHistoryRepository;
+import com.example.goride.chat.repository.TripMessageRepository;
 import com.example.goride.driver.repository.DriverProfileRepository;
 import com.example.goride.notification.repository.NotificationRepository;
 import com.example.goride.payment.repository.PaymentRepository;
@@ -59,6 +60,9 @@ class ObservabilityMetricsIntegrationTests {
 
     @MockitoBean
     private NotificationRepository notificationRepository;
+
+    @MockitoBean
+    private TripMessageRepository tripMessageRepository;
 
     @Resource
     private MockMvc mockMvc;
