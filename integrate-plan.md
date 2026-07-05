@@ -1,6 +1,6 @@
 # GoRide Front-end Integration Plan
 
-Branch da kiem tra: `feature/scheduled-rides`
+Branch da kiem tra: `feature/payment-sandbox-e2e`
 
 Muc tieu file nay:
 - Checklist chuc nang backend da co code va co the tich hop FE.
@@ -175,6 +175,7 @@ type TripStatus =
 type DriverOfferDecision = "ACCEPT" | "REJECT";
 type ApprovalStatus = "PENDING" | "APPROVED" | "REJECTED";
 type PaymentStatus = "PENDING" | "COMPLETED" | "FAILED" | "REFUNDED";
+type PaymentSandboxUatStatus = "NOT_RUN" | "BLOCKED" | "FAILED" | "PASSED";
 ```
 
 ---
@@ -283,6 +284,7 @@ type PaymentStatus = "PENDING" | "COMPLETED" | "FAILED" | "REFUNDED";
 - [x] FE co the lay danh sach payment method/provider metadata tu backend.
 - [x] Admin/devops co the kiem tra readiness MoMo/VNPAY sandbox truoc khi enable checkout that.
 - [x] Admin/devops co payment sandbox UAT plan de xem callback endpoint, missing config va kich ban test truoc khi expose online payment.
+- [x] Admin/devops co endpoint luu ket qua sandbox UAT evidence, tinh `readyForFrontendExposure` de FE biet provider nao da du dieu kien hien thi.
 - [x] Backend reject booking neu `paymentMethod` chua duoc enable.
 - [x] Co checkout foundation endpoint cho payment `PENDING`.
 - [x] Co webhook foundation endpoint cho payment provider external callback.
@@ -349,7 +351,7 @@ type PaymentStatus = "PENDING" | "COMPLETED" | "FAILED" | "REFUNDED";
 ### Payment/rating/statistics
 
 - [x] Payment method metadata da expose `CASH`, `MOMO`, `VNPAY`; hien chi `CASH` enabled mac dinh.
-- [ ] MoMo va VNPAY da co signed checkout/webhook, readiness diagnostics, sandbox UAT plan, freshness policy va service-level sandbox callback contract tests; ca hai van can sandbox account/E2E callback test that.
+- [ ] MoMo va VNPAY da co signed checkout/webhook, readiness diagnostics, sandbox UAT plan, persisted UAT evidence, freshness policy va service-level sandbox callback contract tests; ca hai van can sandbox account/E2E callback test that va admin phai mark `PASSED` day du truoc khi expose FE.
 
 ### Routing/maps
 
@@ -1320,7 +1322,8 @@ Response `data`:
 ```
 
 Admin/devops action:
-- Goi endpoint nay sau khi set env sandbox de xac nhan `sandboxReady=true` truoc khi expose MoMo/VNPAY tren app.
+- Goi endpoint nay sau khi set env sandbox de xac nhan `sandboxReady=true` truoc khi chay UAT sandbox.
+- De expose MoMo/VNPAY cho user that, FE/admin nen kiem tra them sandbox UAT result co `readyForFrontendExposure=true`.
 - Khong log/commit secret; response chi tra ten requirement bi thieu, khong tra gia tri config.
 - Neu `checkoutReady=false`, checkout URL chua nen duoc test tren FE.
 - Neu `webhookReady=false`, chua nen chay callback sandbox vi backend se reject callback hoac khong reconcile duoc payment.
@@ -1376,8 +1379,69 @@ Response `data` gom prerequisites, danh sach provider va cac scenario can test t
 Admin/devops action:
 - Dung endpoint nay cung voi readiness de chot checklist truoc UAT sandbox that.
 - `status=DISABLED`, `NOT_REGISTERED`, `SANDBOX_DISABLED` hoac `BLOCKED_BY_CONFIG` thi FE khong expose online payment cho user that.
+- `readyForFrontendExposure=false` nghia la backend/readiness co the da san sang, nhung admin chua record du evidence sandbox pass.
 - `returnUrl` va `ipnUrl` chi la URL callback da cau hinh; response khong tra merchant secret/access key.
 - Endpoint nay khong thay the real sandbox callback tu MoMo/VNPAY; no chi giup FE/admin biet can test gi va callback endpoint nao can dang ky voi provider.
+
+#### Admin xem/ghi ket qua sandbox UAT evidence
+
+```http
+GET /api/v1/payments/providers/sandbox-uat-results
+Authorization: Bearer <adminToken>
+```
+
+Response `data` la danh sach provider online kem ket qua UAT moi nhat:
+
+```json
+[
+  {
+    "method": "MOMO",
+    "provider": "momo",
+    "displayName": "MoMo",
+    "sandboxReady": true,
+    "readyForFrontendExposure": false,
+    "status": "NOT_RUN",
+    "checkoutUrlTested": false,
+    "successCallbackTested": false,
+    "failureCallbackTested": false,
+    "idempotentReplayTested": false,
+    "freshnessRejectionTested": false,
+    "missingChecks": ["checkout-url", "success-callback", "failure-callback", "idempotent-replay", "freshness-rejection"],
+    "notes": null,
+    "testedAt": null,
+    "testedByUserId": null,
+    "updatedAt": null
+  }
+]
+```
+
+```http
+PUT /api/v1/payments/providers/{providerName}/sandbox-uat-result
+Authorization: Bearer <adminToken>
+Content-Type: application/json
+```
+
+Request:
+
+```json
+{
+  "status": "PASSED",
+  "checkoutUrlTested": true,
+  "successCallbackTested": true,
+  "failureCallbackTested": true,
+  "idempotentReplayTested": true,
+  "freshnessRejectionTested": true,
+  "notes": "MoMo sandbox passed with public callback URL on staging.",
+  "testedAt": "2026-07-05T14:00:00Z"
+}
+```
+
+Admin/devops action:
+- Chi mark `PASSED` sau khi test checkout URL, success callback, failure callback, duplicate terminal callback va callback freshness rejection tren sandbox that.
+- Backend reject `PASSED` neu provider chua `sandboxReady=true` hoac con thieu bat ky check nao; response loi `VALIDATION_ERROR` co `details.missingRequirements` hoac `details.missingChecks`.
+- FE/admin dashboard co the dung `readyForFrontendExposure=true` lam gate cuoi cung de hien MoMo/VNPAY cho user that tren moi truong UAT/production.
+- Endpoint chi luu evidence va notes ngan; khong luu raw callback payload, card/wallet data, access key hay secret.
+
 #### Runtime config cho provider online
 
 Backend da co config foundation cho MoMo/VNPay, mac dinh disabled.

@@ -3,9 +3,12 @@ package com.example.goride.payment.controller;
 import com.example.goride.common.error.BusinessException;
 import com.example.goride.common.error.ErrorCode;
 import com.example.goride.common.security.CurrentUser;
+import com.example.goride.payment.domain.PaymentSandboxUatStatus;
 import com.example.goride.payment.domain.PaymentStatus;
 import com.example.goride.payment.dto.PaymentProviderReadinessResponse;
 import com.example.goride.payment.dto.PaymentSandboxUatPlanResponse;
+import com.example.goride.payment.dto.PaymentSandboxUatResultRequest;
+import com.example.goride.payment.dto.PaymentSandboxUatResultResponse;
 import com.example.goride.payment.dto.PaymentWebhookResponse;
 import com.example.goride.payment.dto.VnPayIpnResponse;
 import com.example.goride.payment.service.PaymentCheckoutService;
@@ -13,12 +16,15 @@ import com.example.goride.payment.service.PaymentMethodService;
 import com.example.goride.payment.service.PaymentProviderReadinessService;
 import com.example.goride.payment.service.PaymentQueryService;
 import com.example.goride.payment.service.PaymentSandboxUatPlanService;
+import com.example.goride.payment.service.PaymentSandboxUatResultService;
 import com.example.goride.payment.service.PaymentWebhookService;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 
@@ -55,12 +61,64 @@ class PaymentControllerTests {
         PaymentController controller = controller(
                 mock(PaymentWebhookService.class),
                 mock(PaymentProviderReadinessService.class),
-                uatPlanService
+                uatPlanService,
+                mock(PaymentSandboxUatResultService.class),
+                mock(CurrentUser.class)
         );
 
         var response = controller.getPaymentSandboxUatPlan();
 
         assertThat(response.data()).isSameAs(plan);
+    }
+
+    @Test
+    void returnsSandboxUatResultsForAdminDiagnostics() {
+        PaymentSandboxUatResultService resultService = mock(PaymentSandboxUatResultService.class);
+        PaymentSandboxUatResultResponse result = mock(PaymentSandboxUatResultResponse.class);
+        when(resultService.listResults()).thenReturn(List.of(result));
+        PaymentController controller = controller(
+                mock(PaymentWebhookService.class),
+                mock(PaymentProviderReadinessService.class),
+                mock(PaymentSandboxUatPlanService.class),
+                resultService,
+                mock(CurrentUser.class)
+        );
+
+        var response = controller.listPaymentSandboxUatResults();
+
+        assertThat(response.data()).containsExactly(result);
+    }
+
+    @Test
+    void updatesSandboxUatResultWithCurrentAdminUser() {
+        PaymentSandboxUatResultService resultService = mock(PaymentSandboxUatResultService.class);
+        PaymentSandboxUatResultRequest request = new PaymentSandboxUatResultRequest(
+                PaymentSandboxUatStatus.PASSED,
+                true,
+                true,
+                true,
+                true,
+                true,
+                "Passed sandbox UAT",
+                Instant.parse("2026-07-05T10:00:00Z")
+        );
+        PaymentSandboxUatResultResponse result = mock(PaymentSandboxUatResultResponse.class);
+        when(resultService.upsertResult("momo", request, 42L)).thenReturn(result);
+        CurrentUser currentUser = mock(CurrentUser.class);
+        Authentication authentication = mock(Authentication.class);
+        when(currentUser.requireUserId(authentication)).thenReturn(42L);
+        PaymentController controller = controller(
+                mock(PaymentWebhookService.class),
+                mock(PaymentProviderReadinessService.class),
+                mock(PaymentSandboxUatPlanService.class),
+                resultService,
+                currentUser
+        );
+
+        var response = controller.updatePaymentSandboxUatResult(authentication, "momo", request);
+
+        assertThat(response.data()).isSameAs(result);
+        verify(resultService).upsertResult("momo", request, 42L);
     }
 
     @Test
@@ -143,7 +201,9 @@ class PaymentControllerTests {
         return controller(
                 paymentWebhookService,
                 mock(PaymentProviderReadinessService.class),
-                mock(PaymentSandboxUatPlanService.class)
+                mock(PaymentSandboxUatPlanService.class),
+                mock(PaymentSandboxUatResultService.class),
+                mock(CurrentUser.class)
         );
     }
 
@@ -151,13 +211,21 @@ class PaymentControllerTests {
             PaymentWebhookService paymentWebhookService,
             PaymentProviderReadinessService readinessService
     ) {
-        return controller(paymentWebhookService, readinessService, mock(PaymentSandboxUatPlanService.class));
+        return controller(
+                paymentWebhookService,
+                readinessService,
+                mock(PaymentSandboxUatPlanService.class),
+                mock(PaymentSandboxUatResultService.class),
+                mock(CurrentUser.class)
+        );
     }
 
     private PaymentController controller(
             PaymentWebhookService paymentWebhookService,
             PaymentProviderReadinessService readinessService,
-            PaymentSandboxUatPlanService uatPlanService
+            PaymentSandboxUatPlanService uatPlanService,
+            PaymentSandboxUatResultService resultService,
+            CurrentUser currentUser
     ) {
         return new PaymentController(
                 mock(PaymentQueryService.class),
@@ -165,8 +233,9 @@ class PaymentControllerTests {
                 mock(PaymentMethodService.class),
                 readinessService,
                 uatPlanService,
+                resultService,
                 paymentWebhookService,
-                mock(CurrentUser.class)
+                currentUser
         );
     }
 }

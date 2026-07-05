@@ -1,0 +1,26 @@
+release_id: 20260705-payment-sandbox-uat-results
+title: Add payment sandbox UAT evidence tracking
+author: Codex
+created_at: 2026-07-05
+risk: low
+transactional: true
+requires_downtime: false
+applies_after:
+  - 20260704-scheduled-rides
+related_commit: pending
+environments:
+  - staging
+  - production
+objects:
+  - payment_sandbox_uat_results
+pre_deploy_checks:
+  - Run precheck.sql and confirm payment_sandbox_uat_results does not already exist.
+deploy_steps:
+  - Run apply.sql before enabling admin UAT evidence capture.
+post_deploy_checks:
+  - Run verify.sql and confirm table, unique provider index and required columns exist.
+rollback_plan:
+  - Run rollback.sql only if the application release is rolled back and sandbox UAT evidence can be discarded.
+notes:
+  - Stores admin-entered evidence from real MoMo/VNPAY sandbox tests.
+  - Does not store provider secrets or raw webhook payloads.

@@ -3,6 +3,8 @@ package com.example.goride.payment.service;
 import com.example.goride.payment.config.PaymentProviderProperties;
 import com.example.goride.payment.dto.PaymentProviderReadinessResponse;
 import com.example.goride.payment.dto.PaymentSandboxUatPlanResponse;
+import com.example.goride.payment.dto.PaymentSandboxUatResultResponse;
+import com.example.goride.payment.repository.PaymentSandboxUatResultRepository;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -15,13 +17,16 @@ public class PaymentSandboxUatPlanService {
 
     private final PaymentProviderReadinessService paymentProviderReadinessService;
     private final PaymentProviderProperties paymentProviderProperties;
+    private final PaymentSandboxUatResultRepository paymentSandboxUatResultRepository;
 
     public PaymentSandboxUatPlanService(
             PaymentProviderReadinessService paymentProviderReadinessService,
-            PaymentProviderProperties paymentProviderProperties
+            PaymentProviderProperties paymentProviderProperties,
+            PaymentSandboxUatResultRepository paymentSandboxUatResultRepository
     ) {
         this.paymentProviderReadinessService = paymentProviderReadinessService;
         this.paymentProviderProperties = paymentProviderProperties;
+        this.paymentSandboxUatResultRepository = paymentSandboxUatResultRepository;
     }
 
     public PaymentSandboxUatPlanResponse getSandboxUatPlan() {
@@ -39,6 +44,10 @@ public class PaymentSandboxUatPlanService {
     ) {
         PaymentProviderProperties.ProviderSettings settings =
                 paymentProviderProperties.settingsFor(readiness.provider());
+        PaymentSandboxUatResultResponse latestUatResult = PaymentSandboxUatResultResponse.from(
+                readiness,
+                paymentSandboxUatResultRepository.findByProviderName(readiness.provider()).orElse(null)
+        );
         return new PaymentSandboxUatPlanResponse.PaymentProviderSandboxUatResponse(
                 readiness.method(),
                 readiness.provider(),
@@ -49,6 +58,8 @@ public class PaymentSandboxUatPlanService {
                 readiness.checkoutReady(),
                 readiness.webhookReady(),
                 readiness.sandboxReady(),
+                latestUatResult.readyForFrontendExposure(),
+                latestUatResult,
                 PAYMENT_CHECKOUT_ENDPOINT,
                 webhookEndpoint(readiness.provider()),
                 settings.normalizedReturnUrl(),
