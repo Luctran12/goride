@@ -1,6 +1,6 @@
 # GoRide Front-end Integration Plan
 
-Branch da kiem tra: `feature/in-trip-messaging`
+Branch da kiem tra: `feature/scheduled-rides`
 
 Muc tieu file nay:
 - Checklist chuc nang backend da co code va co the tich hop FE.
@@ -164,6 +164,7 @@ type UserRole = "PASSENGER" | "DRIVER" | "ADMIN";
 type VehicleType = "MOTORBIKE" | "CAR_4_SEAT" | "CAR_7_SEAT";
 type PaymentMethod = "CASH" | "MOMO" | "VNPAY";
 type TripStatus =
+  | "SCHEDULED"
   | "SEARCHING"
   | "ACCEPTED"
   | "ARRIVED"
@@ -226,6 +227,7 @@ type PaymentStatus = "PENDING" | "COMPLETED" | "FAILED" | "REFUNDED";
 - [x] Admin API deactivate pricing config cu.
 - [x] Passenger tinh gia uoc luong.
 - [x] Passenger tao booking.
+- [x] Passenger tao scheduled booking bang `scheduledPickupTime`; backend giu `SCHEDULED` va tu dispatch sang matching gan gio don.
 - [x] Passenger/driver xem chi tiet trip neu co quyen.
 - [x] Passenger/driver xem danh sach trip cua minh.
 - [x] Passenger/driver/admin huy trip neu status con cancel duoc.
@@ -233,7 +235,8 @@ type PaymentStatus = "PENDING" | "COMPLETED" | "FAILED" | "REFUNDED";
 
 ### Matching
 
-- [x] Sau khi booking created, backend tu dong tim driver gan nhat trong Redis.
+- [x] Sau khi booking tuc thi created, backend tu dong tim driver gan nhat trong Redis.
+- [x] Scheduled booking khong gui offer ngay; scheduler chuyen `SCHEDULED -> SEARCHING` truoc gio don theo config roi kich hoat matching.
 - [x] Gui offer toi driver qua WebSocket user queue.
 - [x] Khi passenger huy booking dang co offer active, backend clear matching state/driver lock va gui dismiss payload toi driver qua WebSocket user queue.
 - [x] Driver accept/reject offer.
@@ -780,16 +783,23 @@ Request:
     "address": "Tan Son Nhat Airport"
   },
   "vehicleType": "MOTORBIKE",
-  "paymentMethod": "CASH"
+  "paymentMethod": "CASH",
+  "scheduledPickupTime": null
 }
 ```
 
-Response `data`: `TripResponse`, status ban dau `SEARCHING`.
+Response `data`: `TripResponse`, status ban dau `SEARCHING` neu dat ngay, hoac `SCHEDULED` neu co `scheduledPickupTime` hop le.
+
+Field optional cho dat lich:
+- `scheduledPickupTime`: ISO-8601 instant UTC, vi du `2026-07-04T10:30:00Z`.
+- Bo field nay hoac gui `null` de dat xe ngay nhu cu.
+- Backend mac dinh yeu cau thoi gian don toi thieu 15 phut trong tuong lai va tra `SCHEDULED_PICKUP_TIME_INVALID` neu qua gan.
 
 FE action:
-- Sau create thanh cong, chuyen sang man tim driver.
-- Subscribe `/topic/trip/{tripId}/status` va `/user/queue/notifications`.
-- Neu `PASSENGER_HAS_ACTIVE_TRIP`, mo trip dang active thay vi tao trip moi.
+- Neu response `status=SEARCHING`, chuyen sang man tim driver.
+- Neu response `status=SCHEDULED`, chuyen sang man dat lich/cho den gio, cho phep huy va hydrate bang `GET /api/v1/bookings/{tripId}`.
+- Subscribe `/topic/trip/{tripId}/status` va `/user/queue/notifications` khi man trip dang mo; backend se tu dispatch matching gan gio don theo config va broadcast status `SEARCHING`.
+- Neu `PASSENGER_HAS_ACTIVE_TRIP`, mo trip dang active/scheduled thay vi tao trip moi.
 
 #### Xem chi tiet trip
 
@@ -827,14 +837,15 @@ Request:
 ```
 
 FE action:
-- Chi hien nut huy khi status `SEARCHING`, `ACCEPTED`, `ARRIVED`.
+- Chi hien nut huy khi status `SCHEDULED`, `SEARCHING`, `ACCEPTED`, `ARRIVED`.
 - Neu backend tra `TRIP_CANNOT_BE_CANCELLED`, refresh trip detail.
 
 ---
 
 ### 4.4 Matching va driver offer
 
-Matching chay tu dong sau khi passenger tao booking. FE khong co endpoint "start matching" rieng.
+Matching chay tu dong sau khi passenger tao booking tuc thi, hoac sau khi scheduler mo scheduled booking gan gio don. FE khong co endpoint "start matching" rieng.
+Neu trip dang `SCHEDULED`, backend chua gui offer cho driver. Khi den cua dispatch, backend chuyen `SCHEDULED -> SEARCHING`, broadcast status topic va kich hoat matching nhu booking tuc thi.
 Neu chua co driver online/phu hop ngay lan matching dau, backend giu trip o `SEARCHING`. Khi driver online hoac gui heartbeat thanh cong, backend tu thu match lai cac trip dang `SEARCHING` chua co offer active.
 
 Driver can:
@@ -2322,7 +2333,7 @@ Devops/backend action:
 - [ ] Auth screen: register/login/refresh/logout.
 - [ ] FCM token registration sau login/refresh token.
 - [ ] Home map: chon pickup/dropoff/vehicleType, goi estimate.
-- [ ] Booking confirm: goi create booking.
+- [ ] Booking confirm: goi create booking; neu dat lich gui `scheduledPickupTime` ISO-8601 UTC, neu dat ngay gui `null`/bo field.
 - [ ] Finding driver: subscribe trip status + notifications.
 - [ ] Active trip:
   - `ACCEPTED`: hien driver dang den.

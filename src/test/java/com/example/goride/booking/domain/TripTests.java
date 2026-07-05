@@ -30,6 +30,31 @@ class TripTests {
     }
 
     @Test
+    void createScheduledStartsScheduledAndDispatchesToSearching() {
+        Instant scheduledPickupTime = Instant.parse("2026-07-04T10:30:00Z");
+        Trip trip = Trip.createScheduled(
+                samplePassenger(),
+                VehicleType.MOTORBIKE,
+                PaymentMethod.CASH,
+                "Pickup",
+                point(106.7000, 10.7700),
+                "Dropoff",
+                point(106.7100, 10.7800),
+                BigDecimal.valueOf(3.2),
+                12,
+                BigDecimal.valueOf(25000),
+                samplePricingConfig(VehicleType.MOTORBIKE),
+                scheduledPickupTime
+        );
+
+        assertThat(trip.getStatus()).isEqualTo(TripStatus.SCHEDULED);
+        assertThat(trip.getScheduledPickupTime()).isEqualTo(scheduledPickupTime);
+
+        trip.dispatchScheduled();
+
+        assertThat(trip.getStatus()).isEqualTo(TripStatus.SEARCHING);
+    }
+    @Test
     void createRequiresPassengerRole() {
         User driverOnly = User.create("Driver", "0900000001", null, "hash", Set.of(UserRole.DRIVER));
 

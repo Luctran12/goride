@@ -23,6 +23,7 @@ public enum ErrorCode {
     DRIVER_NOT_APPROVED(HttpStatus.UNPROCESSABLE_ENTITY, "Driver has not been approved"),
     DRIVER_NOT_AVAILABLE(HttpStatus.UNPROCESSABLE_ENTITY, "Driver is not available"),
     PASSENGER_HAS_ACTIVE_TRIP(HttpStatus.UNPROCESSABLE_ENTITY, "Passenger already has an active trip"),
+    SCHEDULED_PICKUP_TIME_INVALID(HttpStatus.UNPROCESSABLE_ENTITY, "Scheduled pickup time is invalid"),
     TRIP_CANNOT_BE_CANCELLED(HttpStatus.UNPROCESSABLE_ENTITY, "Trip cannot be cancelled in its current status"),
     TRIP_STATUS_INVALID_TRANSITION(HttpStatus.UNPROCESSABLE_ENTITY, "Trip status transition is invalid"),
     LOCATION_OUT_OF_SERVICE_AREA(HttpStatus.UNPROCESSABLE_ENTITY, "Location is outside the service area"),

@@ -5,6 +5,8 @@ import com.example.goride.driver.domain.VehicleType;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 
+import java.time.Instant;
+
 public record BookingCreateRequest(
         @Valid
         @NotNull
@@ -18,8 +20,19 @@ public record BookingCreateRequest(
         VehicleType vehicleType,
 
         @NotNull
-        PaymentMethod paymentMethod
+        PaymentMethod paymentMethod,
+
+        Instant scheduledPickupTime
 ) {
+    public BookingCreateRequest(
+            BookingLocationRequest pickup,
+            BookingLocationRequest dropoff,
+            VehicleType vehicleType,
+            PaymentMethod paymentMethod
+    ) {
+        this(pickup, dropoff, vehicleType, paymentMethod, null);
+    }
+
     public BookingEstimateRequest toEstimateRequest() {
         return new BookingEstimateRequest(pickup, dropoff, vehicleType);
     }

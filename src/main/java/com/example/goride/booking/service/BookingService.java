@@ -34,6 +34,7 @@ import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.math.BigDecimal;
+import java.time.Clock;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -53,6 +54,8 @@ public class BookingService {
     private final DistanceService distanceService;
     private final PaymentMethodService paymentMethodService;
     private final ApplicationEventPublisher eventPublisher;
+    private final ScheduledRideProperties scheduledRideProperties;
+    private final Clock clock;
 
     public BookingService(
             UserRepository userRepository,
@@ -61,7 +64,9 @@ public class BookingService {
             TripStatusHistoryRepository tripStatusHistoryRepository,
             DistanceService distanceService,
             PaymentMethodService paymentMethodService,
-            ApplicationEventPublisher eventPublisher
+            ApplicationEventPublisher eventPublisher,
+            ScheduledRideProperties scheduledRideProperties,
+            Clock clock
     ) {
         this.userRepository = userRepository;
         this.pricingConfigRepository = pricingConfigRepository;
@@ -70,6 +75,8 @@ public class BookingService {
         this.distanceService = distanceService;
         this.paymentMethodService = paymentMethodService;
         this.eventPublisher = eventPublisher;
+        this.scheduledRideProperties = scheduledRideProperties;
+        this.clock = clock;
     }
 
     @Transactional(readOnly = true)
@@ -99,31 +106,23 @@ public class BookingService {
                     "Payment method is not available: " + request.paymentMethod()
             );
         }
+        validateScheduledPickupTime(request.scheduledPickupTime());
 
         FareCalculation calculation = calculateFare(request.toEstimateRequest());
-        Trip trip = Trip.create(
-                passenger,
-                request.vehicleType(),
-                request.paymentMethod(),
-                request.pickup().address(),
-                toPoint(request.pickup()),
-                request.dropoff().address(),
-                toPoint(request.dropoff()),
-                calculation.distanceEstimate().distanceKm(),
-                calculation.distanceEstimate().durationMinutes(),
-                calculation.estimatedFare(),
-                calculation.pricingConfig()
-        );
+        Trip trip = createTrip(passenger, request, calculation);
 
         Trip savedTrip = tripRepository.save(trip);
+        TripStatus initialStatus = savedTrip.getStatus();
         tripStatusHistoryRepository.save(TripStatusHistory.record(
                 savedTrip,
                 null,
-                TripStatus.SEARCHING,
+                initialStatus,
                 passenger,
-                "Booking created"
+                initialStatus == TripStatus.SCHEDULED ? "Scheduled booking created" : "Booking created"
         ));
-        publishAfterCommit(BookingCreatedEvent.from(savedTrip));
+        if (initialStatus == TripStatus.SEARCHING) {
+            publishAfterCommit(BookingCreatedEvent.from(savedTrip));
+        }
         return TripResponse.from(savedTrip);
     }
 
@@ -178,6 +177,65 @@ public class BookingService {
         ));
         publishAfterCommit(BookingCancelledEvent.from(savedTrip));
         return TripResponse.from(savedTrip);
+    }
+
+    private Trip createTrip(User passenger, BookingCreateRequest request, FareCalculation calculation) {
+        if (request.scheduledPickupTime() != null) {
+            return Trip.createScheduled(
+                    passenger,
+                    request.vehicleType(),
+                    request.paymentMethod(),
+                    request.pickup().address(),
+                    toPoint(request.pickup()),
+                    request.dropoff().address(),
+                    toPoint(request.dropoff()),
+                    calculation.distanceEstimate().distanceKm(),
+                    calculation.distanceEstimate().durationMinutes(),
+                    calculation.estimatedFare(),
+                    calculation.pricingConfig(),
+                    request.scheduledPickupTime()
+            );
+        }
+
+        return Trip.create(
+                passenger,
+                request.vehicleType(),
+                request.paymentMethod(),
+                request.pickup().address(),
+                toPoint(request.pickup()),
+                request.dropoff().address(),
+                toPoint(request.dropoff()),
+                calculation.distanceEstimate().distanceKm(),
+                calculation.distanceEstimate().durationMinutes(),
+                calculation.estimatedFare(),
+                calculation.pricingConfig()
+        );
+    }
+
+    private void validateScheduledPickupTime(Instant scheduledPickupTime) {
+        if (scheduledPickupTime == null) {
+            return;
+        }
+        if (!scheduledRideProperties.isEnabled()) {
+            throw new BusinessException(
+                    ErrorCode.SCHEDULED_PICKUP_TIME_INVALID,
+                    "Scheduled rides are not enabled"
+            );
+        }
+
+        Instant earliestPickupTime = Instant.now(clock).plus(scheduledRideProperties.minLeadTime());
+        if (scheduledPickupTime.isBefore(earliestPickupTime)) {
+            throw new BusinessException(
+                    ErrorCode.SCHEDULED_PICKUP_TIME_INVALID,
+                    "Scheduled pickup time must be at least "
+                            + scheduledRideProperties.getMinLeadTimeMinutes()
+                            + " minutes in the future",
+                    Map.of(
+                            "earliestPickupTime", earliestPickupTime,
+                            "minLeadTimeMinutes", scheduledRideProperties.getMinLeadTimeMinutes()
+                    )
+            );
+        }
     }
 
     private FareCalculation calculateFare(BookingEstimateRequest request) {
