@@ -1,0 +1,27 @@
+release_id: 20260704-scheduled-rides
+title: Add scheduled ride dispatch fields
+author: Codex
+created_at: 2026-07-04
+risk: low
+transactional: true
+requires_downtime: false
+applies_after:
+  - 20260701-trip-messages
+related_commit: pending
+environments:
+  - staging
+  - production
+objects:
+  - trips.scheduled_pickup_time
+  - idx_trips_scheduled_pickup_time
+pre_deploy_checks:
+  - Run precheck.sql and confirm scheduled_pickup_time is absent or compatible.
+deploy_steps:
+  - Run apply.sql inside the normal database release window before enabling scheduled ride traffic.
+post_deploy_checks:
+  - Run verify.sql and confirm the column and index exist.
+rollback_plan:
+  - Run rollback.sql only if the application release is rolled back and scheduled ride data can be discarded.
+notes:
+  - Immediate bookings keep scheduled_pickup_time null.
+  - Scheduled bookings remain SCHEDULED until the scheduler opens them for matching.

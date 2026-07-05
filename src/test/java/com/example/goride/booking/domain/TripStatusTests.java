@@ -9,6 +9,7 @@ class TripStatusTests {
     void activeStatusesExcludeTerminalStates() {
         assertThat(TripStatus.activeStatuses())
                 .containsExactlyInAnyOrder(
+                        TripStatus.SCHEDULED,
                         TripStatus.SEARCHING,
                         TripStatus.ACCEPTED,
                         TripStatus.ARRIVED,
@@ -18,6 +19,7 @@ class TripStatusTests {
 
     @Test
     void onlyEarlyTripStatesCanBeCancelled() {
+        assertThat(TripStatus.SCHEDULED.canBeCancelled()).isTrue();
         assertThat(TripStatus.SEARCHING.canBeCancelled()).isTrue();
         assertThat(TripStatus.ACCEPTED.canBeCancelled()).isTrue();
         assertThat(TripStatus.ARRIVED.canBeCancelled()).isTrue();

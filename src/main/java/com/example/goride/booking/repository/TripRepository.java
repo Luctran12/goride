@@ -3,12 +3,14 @@ package com.example.goride.booking.repository;
 import com.example.goride.booking.domain.Trip;
 import com.example.goride.booking.domain.TripStatus;
 import jakarta.persistence.LockModeType;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -25,6 +27,21 @@ public interface TripRepository extends JpaRepository<Trip, Long>, JpaSpecificat
     List<Trip> findByDriverIdAndDeletedAtIsNullOrderByRequestedAtDesc(Long driverId);
 
     List<Trip> findByStatusAndDeletedAtIsNullOrderByRequestedAtAsc(TripStatus status);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+            select trip
+            from Trip trip
+            where trip.status = :status
+              and trip.scheduledPickupTime <= :dispatchBefore
+              and trip.deletedAt is null
+            order by trip.scheduledPickupTime asc, trip.requestedAt asc
+            """)
+    List<Trip> findReadyScheduledTripsForUpdate(
+            @Param("status") TripStatus status,
+            @Param("dispatchBefore") Instant dispatchBefore,
+            Pageable pageable
+    );
 
     Optional<Trip> findFirstByDriverIdAndStatusAndDeletedAtIsNullOrderByStartedAtDesc(
             Long driverId,

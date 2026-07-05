@@ -4,6 +4,7 @@ import java.util.EnumSet;
 import java.util.Set;
 
 public enum TripStatus {
+    SCHEDULED,
     SEARCHING,
     ACCEPTED,
     ARRIVED,
@@ -17,10 +18,10 @@ public enum TripStatus {
     }
 
     public boolean canBeCancelled() {
-        return this == SEARCHING || this == ACCEPTED || this == ARRIVED;
+        return this == SCHEDULED || this == SEARCHING || this == ACCEPTED || this == ARRIVED;
     }
 
     public static Set<TripStatus> activeStatuses() {
-        return EnumSet.of(SEARCHING, ACCEPTED, ARRIVED, IN_PROGRESS);
+        return EnumSet.of(SCHEDULED, SEARCHING, ACCEPTED, ARRIVED, IN_PROGRESS);
     }
 }

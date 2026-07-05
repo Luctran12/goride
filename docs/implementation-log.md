@@ -5,6 +5,63 @@
 > Tu commit `feat: add matching driver search` tro di, moi commit backend can cap nhat file nay trong cung commit.
 
 ---
+## Commit: `feat: add scheduled ride dispatch`
+
+Branch: `feature/scheduled-rides`
+
+Phase: Phase 6 - Product expansion, scheduled rides
+
+### Muc tieu
+
+Cho phep passenger dat xe trong tuong lai ma khong gui offer cho driver ngay lap tuc. Backend giu trip o `SCHEDULED`, sau do scheduler tu mo matching gan gio don de tai su dung flow booking -> matching -> driver offer hien co.
+
+### Noi dung da trien khai
+
+- Them `TripStatus.SCHEDULED` vao active statuses va cancelable statuses.
+- Them `scheduledPickupTime` vao `BookingCreateRequest` va `TripResponse`.
+- Them state machine tren `Trip`:
+  - `createScheduled(...)` tao trip status `SCHEDULED`.
+  - `dispatchScheduled()` chuyen `SCHEDULED -> SEARCHING`.
+- Cap nhat `BookingService`:
+  - Booking dat ngay van tao `SEARCHING` va publish `BookingCreatedEvent` de matching ngay.
+  - Booking dat lich validate min lead time theo config, tao `SCHEDULED`, ghi history va khong publish matching event ngay.
+- Them `ScheduledRideProperties` va config `app.booking.scheduled-rides.*`.
+- Them `ScheduledRideDispatchService` va `ScheduledRideDispatchScheduler`:
+  - Quet batch trip `SCHEDULED` co `scheduledPickupTime <= now + dispatchLeadTime`.
+  - Lock trip, ghi history `SCHEDULED -> SEARCHING`, publish `BookingCreatedEvent` va broadcast trip status `SEARCHING` sau transaction commit.
+- Them SQL release `db/releases/20260704-scheduled-rides` de them cot `trips.scheduled_pickup_time` va index dispatch.
+- Cap nhat `plan.md`, `integrate-plan.md`, `docs/implementation-log.md` va `docs/pland.xlsx`.
+
+### Review truoc commit
+
+- Targeted `./mvnw.cmd "-Dtest=TripTests,TripStatusTests,BookingServiceTests,ScheduledRideDispatchServiceTests" test`: pass 24 tests.
+- `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/validate-db-release.ps1 -ReleasePath db/releases/20260704-scheduled-rides`: pass.
+- Full `./mvnw.cmd test`: pass 383 tests, 0 failure, 0 error.
+- `git diff --check`: pass; chi co warning LF/CRLF tren Windows.
+- CodeRabbit CLI: blocked vi `coderabbit` khong co trong PATH; installer chinh thuc chi ho tro Linux/macOS va WSL tren may nay khong khoi chay duoc `/bin/bash`.
+
+### Files chinh
+
+- `src/main/java/com/example/goride/booking/domain/Trip.java`
+- `src/main/java/com/example/goride/booking/domain/TripStatus.java`
+- `src/main/java/com/example/goride/booking/dto/BookingCreateRequest.java`
+- `src/main/java/com/example/goride/booking/dto/TripResponse.java`
+- `src/main/java/com/example/goride/booking/service/ScheduledRideDispatchService.java`
+- `src/main/java/com/example/goride/booking/service/ScheduledRideDispatchScheduler.java`
+- `src/main/java/com/example/goride/booking/service/ScheduledRideProperties.java`
+- `db/releases/20260704-scheduled-rides/**`
+- `src/test/java/com/example/goride/booking/service/ScheduledRideDispatchServiceTests.java`
+- `plan.md`
+- `integrate-plan.md`
+- `docs/implementation-log.md`
+- `docs/pland.xlsx`
+
+### Viec tiep theo
+
+- FE them option dat lich tren man booking confirm, gui `scheduledPickupTime` ISO-8601 UTC khi dat lich.
+- FE hien trang thai `SCHEDULED`, cho phep huy, subscribe trip status topic va chuyen sang finding-driver khi backend broadcast `SEARCHING` gan gio don.
+- UAT can tune `SCHEDULED_RIDES_MIN_LEAD_TIME_MINUTES`, `SCHEDULED_RIDES_DISPATCH_LEAD_TIME_MINUTES` va scheduler delay theo thuc te van hanh.
+---
 ## Commit: `feat: add in-trip messaging`
 
 Branch: `feature/in-trip-messaging`

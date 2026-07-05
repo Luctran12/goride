@@ -27,6 +27,7 @@ import java.time.Instant;
         name = "trips",
         indexes = {
                 @Index(name = "idx_trips_status", columnList = "status"),
+                @Index(name = "idx_trips_scheduled_pickup_time", columnList = "status, scheduled_pickup_time"),
                 @Index(name = "idx_trips_passenger_requested_at", columnList = "passenger_id, requested_at"),
                 @Index(name = "idx_trips_driver_requested_at", columnList = "driver_id, requested_at")
         }
@@ -92,6 +93,9 @@ public class Trip {
 
     @Column(name = "requested_at", nullable = false)
     private Instant requestedAt;
+
+    @Column(name = "scheduled_pickup_time")
+    private Instant scheduledPickupTime;
 
     @Column(name = "accepted_at")
     private Instant acceptedAt;
@@ -166,6 +170,46 @@ public class Trip {
         trip.pricingConfig = normalizedPricingConfig;
         trip.requestedAt = Instant.now();
         return trip;
+    }
+
+    public static Trip createScheduled(
+            User passenger,
+            VehicleType vehicleType,
+            PaymentMethod paymentMethod,
+            String pickupAddress,
+            Point pickupLocation,
+            String dropoffAddress,
+            Point dropoffLocation,
+            BigDecimal estimatedDistanceKm,
+            int estimatedDurationMin,
+            BigDecimal estimatedFare,
+            PricingConfig pricingConfig,
+            Instant scheduledPickupTime
+    ) {
+        Trip trip = create(
+                passenger,
+                vehicleType,
+                paymentMethod,
+                pickupAddress,
+                pickupLocation,
+                dropoffAddress,
+                dropoffLocation,
+                estimatedDistanceKm,
+                estimatedDurationMin,
+                estimatedFare,
+                pricingConfig
+        );
+        trip.status = TripStatus.SCHEDULED;
+        trip.scheduledPickupTime = requireNonNull(scheduledPickupTime, "scheduledPickupTime");
+        return trip;
+    }
+
+    public void dispatchScheduled() {
+        if (status != TripStatus.SCHEDULED) {
+            throw new IllegalStateException("Only scheduled trips can be dispatched");
+        }
+
+        this.status = TripStatus.SEARCHING;
     }
 
     public void accept(User driver) {
@@ -327,6 +371,10 @@ public class Trip {
 
     public Instant getRequestedAt() {
         return requestedAt;
+    }
+
+    public Instant getScheduledPickupTime() {
+        return scheduledPickupTime;
     }
 
     public Instant getAcceptedAt() {
