@@ -7,6 +7,7 @@ import com.example.goride.chat.repository.TripMessageRepository;
 import com.example.goride.driver.repository.DriverProfileRepository;
 import com.example.goride.notification.repository.NotificationRepository;
 import com.example.goride.payment.repository.PaymentRepository;
+import com.example.goride.payment.repository.PaymentSandboxUatResultRepository;
 import com.example.goride.rating.repository.RatingRepository;
 import com.example.goride.tracking.repository.TripLocationHistoryRepository;
 import com.example.goride.user.repository.UserRepository;
@@ -48,6 +49,9 @@ class SecurityCorsIntegrationTests {
 
     @MockitoBean
     private PaymentRepository paymentRepository;
+
+    @MockitoBean
+    private PaymentSandboxUatResultRepository paymentSandboxUatResultRepository;
 
     @MockitoBean
     private RatingRepository ratingRepository;

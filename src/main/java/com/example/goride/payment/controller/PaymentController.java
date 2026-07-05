@@ -8,6 +8,8 @@ import com.example.goride.payment.dto.PaymentDetailResponse;
 import com.example.goride.payment.dto.PaymentMethodResponse;
 import com.example.goride.payment.dto.PaymentProviderReadinessResponse;
 import com.example.goride.payment.dto.PaymentSandboxUatPlanResponse;
+import com.example.goride.payment.dto.PaymentSandboxUatResultRequest;
+import com.example.goride.payment.dto.PaymentSandboxUatResultResponse;
 import com.example.goride.payment.dto.PaymentWebhookResponse;
 import com.example.goride.payment.dto.VnPayIpnResponse;
 import com.example.goride.payment.service.PaymentCheckoutService;
@@ -15,7 +17,9 @@ import com.example.goride.payment.service.PaymentMethodService;
 import com.example.goride.payment.service.PaymentProviderReadinessService;
 import com.example.goride.payment.service.PaymentQueryService;
 import com.example.goride.payment.service.PaymentSandboxUatPlanService;
+import com.example.goride.payment.service.PaymentSandboxUatResultService;
 import com.example.goride.payment.service.PaymentWebhookService;
+import jakarta.validation.Valid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
@@ -24,6 +28,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -44,6 +49,7 @@ public class PaymentController {
     private final PaymentMethodService paymentMethodService;
     private final PaymentProviderReadinessService paymentProviderReadinessService;
     private final PaymentSandboxUatPlanService paymentSandboxUatPlanService;
+    private final PaymentSandboxUatResultService paymentSandboxUatResultService;
     private final PaymentWebhookService paymentWebhookService;
     private final CurrentUser currentUser;
 
@@ -53,6 +59,7 @@ public class PaymentController {
             PaymentMethodService paymentMethodService,
             PaymentProviderReadinessService paymentProviderReadinessService,
             PaymentSandboxUatPlanService paymentSandboxUatPlanService,
+            PaymentSandboxUatResultService paymentSandboxUatResultService,
             PaymentWebhookService paymentWebhookService,
             CurrentUser currentUser
     ) {
@@ -61,6 +68,7 @@ public class PaymentController {
         this.paymentMethodService = paymentMethodService;
         this.paymentProviderReadinessService = paymentProviderReadinessService;
         this.paymentSandboxUatPlanService = paymentSandboxUatPlanService;
+        this.paymentSandboxUatResultService = paymentSandboxUatResultService;
         this.paymentWebhookService = paymentWebhookService;
         this.currentUser = currentUser;
     }
@@ -80,6 +88,26 @@ public class PaymentController {
     @PreAuthorize("hasRole('ADMIN')")
     public ApiResponse<PaymentSandboxUatPlanResponse> getPaymentSandboxUatPlan() {
         return ApiResponse.ok(paymentSandboxUatPlanService.getSandboxUatPlan());
+    }
+
+    @GetMapping("/providers/sandbox-uat-results")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ApiResponse<List<PaymentSandboxUatResultResponse>> listPaymentSandboxUatResults() {
+        return ApiResponse.ok(paymentSandboxUatResultService.listResults());
+    }
+
+    @PutMapping("/providers/{providerName}/sandbox-uat-result")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ApiResponse<PaymentSandboxUatResultResponse> updatePaymentSandboxUatResult(
+            Authentication authentication,
+            @PathVariable String providerName,
+            @Valid @RequestBody PaymentSandboxUatResultRequest request
+    ) {
+        return ApiResponse.ok(paymentSandboxUatResultService.upsertResult(
+                providerName,
+                request,
+                currentUser.requireUserId(authentication)
+        ));
     }
 
     @GetMapping("/trips/{tripId}")

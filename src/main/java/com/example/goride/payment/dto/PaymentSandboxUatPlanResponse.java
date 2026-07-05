@@ -19,6 +19,8 @@ public record PaymentSandboxUatPlanResponse(
             boolean checkoutReady,
             boolean webhookReady,
             boolean sandboxReady,
+            boolean readyForFrontendExposure,
+            PaymentSandboxUatResultResponse latestUatResult,
             String checkoutEndpoint,
             String webhookEndpoint,
             String returnUrl,

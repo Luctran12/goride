@@ -5,6 +5,62 @@
 > Tu commit `feat: add matching driver search` tro di, moi commit backend can cap nhat file nay trong cung commit.
 
 ---
+## Commit: `feat: add payment sandbox uat evidence`
+
+Branch: `feature/payment-sandbox-e2e`
+
+Phase: Phase 1 - Payment provider completion, sandbox UAT evidence gate
+
+### Muc tieu
+
+Them noi luu ket qua UAT sandbox cho MoMo/VNPAY de admin/devops co the record provider nao da test that va FE co gate ro rang truoc khi hien online payment cho user.
+
+### Noi dung da trien khai
+
+- Them entity `PaymentSandboxUatResult` va enum `PaymentSandboxUatStatus` cho bang `payment_sandbox_uat_results`.
+- Them SQL release `db/releases/20260705-payment-sandbox-uat-results` gom manifest, precheck, apply, verify va rollback.
+- Them `PaymentSandboxUatResultService`:
+  - List ket qua UAT theo tung provider readiness hien co.
+  - Upsert evidence theo provider, ghi `testedByUserId` cua admin hien tai.
+  - Chi cho mark `PASSED` khi provider `sandboxReady=true` va du 5 check: checkout URL, success callback, failure callback, idempotent replay, freshness rejection.
+  - Tra `readyForFrontendExposure=true` chi khi readiness sandbox pass va evidence pass day du.
+- Mo rong `PaymentSandboxUatPlanResponse` de tra `latestUatResult` va `readyForFrontendExposure` trong provider checklist.
+- Them admin endpoints:
+  - `GET /api/v1/payments/providers/sandbox-uat-results`.
+  - `PUT /api/v1/payments/providers/{providerName}/sandbox-uat-result`.
+- Cap nhat `plan.md`, `integrate-plan.md`, `docs/implementation-log.md` va `docs/pland.xlsx` de FE/admin dung UAT evidence gate truoc khi expose MoMo/VNPAY.
+
+### Review truoc commit
+
+- Targeted `./mvnw.cmd "-Dtest=PaymentSandboxUatResultServiceTests,PaymentSandboxUatPlanServiceTests,PaymentControllerTests" test`: pass 15 tests.
+- SQL release validator, full `./mvnw.cmd test`, `git diff --check` va CodeRabbit status se duoc cap nhat truoc khi commit sau review.
+
+### Files chinh
+
+- `src/main/java/com/example/goride/payment/domain/PaymentSandboxUatResult.java`
+- `src/main/java/com/example/goride/payment/domain/PaymentSandboxUatStatus.java`
+- `src/main/java/com/example/goride/payment/repository/PaymentSandboxUatResultRepository.java`
+- `src/main/java/com/example/goride/payment/dto/PaymentSandboxUatResultRequest.java`
+- `src/main/java/com/example/goride/payment/dto/PaymentSandboxUatResultResponse.java`
+- `src/main/java/com/example/goride/payment/service/PaymentSandboxUatResultService.java`
+- `src/main/java/com/example/goride/payment/controller/PaymentController.java`
+- `src/main/java/com/example/goride/payment/service/PaymentSandboxUatPlanService.java`
+- `db/releases/20260705-payment-sandbox-uat-results/**`
+- `src/test/java/com/example/goride/payment/service/PaymentSandboxUatResultServiceTests.java`
+- `src/test/java/com/example/goride/payment/service/PaymentSandboxUatPlanServiceTests.java`
+- `src/test/java/com/example/goride/payment/controller/PaymentControllerTests.java`
+- `plan.md`
+- `integrate-plan.md`
+- `docs/implementation-log.md`
+- `docs/pland.xlsx`
+
+### Viec tiep theo
+
+- Lay merchant sandbox account va public HTTPS callback URL cho MoMo/VNPAY.
+- Chay checkout success/failure, duplicate callback va freshness rejection bang provider sandbox that.
+- Admin mark evidence `PASSED` khi du dieu kien, sau do FE moi expose MoMo/VNPAY theo `readyForFrontendExposure=true`.
+
+---
 ## Commit: `feat: add scheduled ride dispatch`
 
 Branch: `feature/scheduled-rides`
