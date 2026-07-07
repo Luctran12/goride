@@ -21,6 +21,10 @@ import java.util.regex.Pattern;
 public class RequestCorrelationFilter extends OncePerRequestFilter {
     public static final String REQUEST_ID_HEADER = "X-Request-Id";
     public static final String REQUEST_ID_MDC_KEY = "requestId";
+    public static final String HTTP_METHOD_MDC_KEY = "http.request.method";
+    public static final String URL_PATH_MDC_KEY = "url.path";
+    public static final String HTTP_STATUS_MDC_KEY = "http.response.status_code";
+    public static final String EVENT_DURATION_MS_MDC_KEY = "event.duration_ms";
 
     private static final Logger log = LoggerFactory.getLogger(RequestCorrelationFilter.class);
     private static final Pattern SAFE_REQUEST_ID = Pattern.compile("[A-Za-z0-9._:-]{1,64}");
@@ -54,22 +58,41 @@ public class RequestCorrelationFilter extends OncePerRequestFilter {
 
     private void logCompletion(HttpServletRequest request, HttpServletResponse response, long durationMs) {
         int status = response.getStatus();
-        if (status >= 400) {
-            log.warn(
+        putCompletionMdc(request, status, durationMs);
+        try {
+            if (status >= 400) {
+                log.warn(
+                        "HTTP request completed method={} path={} status={} durationMs={}",
+                        request.getMethod(),
+                        request.getRequestURI(),
+                        status,
+                        durationMs
+                );
+                return;
+            }
+            log.info(
                     "HTTP request completed method={} path={} status={} durationMs={}",
                     request.getMethod(),
                     request.getRequestURI(),
                     status,
                     durationMs
             );
-            return;
+        } finally {
+            removeCompletionMdc();
         }
-        log.info(
-                "HTTP request completed method={} path={} status={} durationMs={}",
-                request.getMethod(),
-                request.getRequestURI(),
-                status,
-                durationMs
-        );
+    }
+
+    private void putCompletionMdc(HttpServletRequest request, int status, long durationMs) {
+        MDC.put(HTTP_METHOD_MDC_KEY, request.getMethod());
+        MDC.put(URL_PATH_MDC_KEY, request.getRequestURI());
+        MDC.put(HTTP_STATUS_MDC_KEY, String.valueOf(status));
+        MDC.put(EVENT_DURATION_MS_MDC_KEY, String.valueOf(durationMs));
+    }
+
+    private void removeCompletionMdc() {
+        MDC.remove(HTTP_METHOD_MDC_KEY);
+        MDC.remove(URL_PATH_MDC_KEY);
+        MDC.remove(HTTP_STATUS_MDC_KEY);
+        MDC.remove(EVENT_DURATION_MS_MDC_KEY);
     }
 }
