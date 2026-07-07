@@ -5,6 +5,57 @@
 > Tu commit `feat: add matching driver search` tro di, moi commit backend can cap nhat file nay trong cung commit.
 
 ---
+## Commit: `feat: add structured logging context`
+
+Branch: `feature/structured-logging`
+
+Phase: Phase 4 - Production readiness, log shipping foundation
+
+### Muc tieu
+
+Them nen tang structured logging de deployment co the ship stdout logs vao log collector va search theo request ID/method/path/status/duration ma khong can them third-party logback encoder.
+
+### Noi dung da trien khai
+
+- Dung structured logging built-in cua Spring Boot 3.5:
+  - `LOGGING_STRUCTURED_FORMAT_CONSOLE` bat JSON stdout format (`logstash`, `ecs` hoac `gelf`).
+  - Default rong giu console pattern dev hien tai.
+  - Them context fields `service.name`, `service.environment`, `service.version` tu `APP_NAME`, `APP_ENV`, `APP_VERSION`.
+- Mo rong `RequestCorrelationFilter` de dua completion metadata vao MDC khi ghi log:
+  - `requestId`.
+  - `http.request.method`.
+  - `url.path`.
+  - `http.response.status_code`.
+  - `event.duration_ms`.
+- Giu nguyen nguyen tac khong log request body, password, token, payment secret hoac query string nhay cam.
+- Cap nhat `plan.md`, `integrate-plan.md`, `docs/implementation-log.md` va `docs/pland.xlsx` de devops biet cach bat structured logs.
+
+### Review truoc commit
+
+- Targeted `./mvnw.cmd "-Dtest=RequestCorrelationFilterTests" test`: pass 4 tests.
+- Full `./mvnw.cmd test`: pass 391 tests, 0 failures, 0 errors.
+- Smoke `LOGGING_STRUCTURED_FORMAT_CONSOLE=logstash ./mvnw.cmd "-Dtest=SecurityCorsIntegrationTests" test`: pass 3 tests va output JSON co MDC fields.
+- `git diff --check`: pass; chi co warning LF/CRLF tren Windows.
+- CodeRabbit CLI: blocked vi `coderabbit` khong co trong PATH tren may nay.
+- User review: completed 2026-07-07; commit duoc tao sau review.
+
+### Files chinh
+
+- `src/main/resources/application.properties`
+- `src/main/java/com/example/goride/common/logging/RequestCorrelationFilter.java`
+- `src/test/java/com/example/goride/common/logging/RequestCorrelationFilterTests.java`
+- `plan.md`
+- `integrate-plan.md`
+- `docs/implementation-log.md`
+- `docs/pland.xlsx`
+
+### Viec tiep theo
+
+- Cau hinh log collector cua deployment platform de thu stdout JSON.
+- Them dashboards/alerts theo `requestId`, status, latency va error code.
+- Distributed tracing backend/OTLP van de rieng neu can bat sau.
+
+---
 ## Commit: `feat: add payment sandbox uat evidence`
 
 Branch: `feature/payment-sandbox-e2e`

@@ -64,6 +64,7 @@ FE nen map `error.code` thay vi chi doc text message.
 - FE co the gui header `X-Request-Id` tren moi REST request. Gia tri nen la UUID hoac ID duy nhat gom toi da 64 ky tu chu, so, `.`, `_`, `:`, `-`.
 - Backend luon tra `X-Request-Id` trong response header; neu FE khong gui hoac gui gia tri khong an toan, backend tu sinh UUID.
 - Error response cung co field `requestId`. Khi hien man loi/support, FE nen luu `requestId`, endpoint, thoi gian va `error.code` de backend tim dung log.
+- Log request completion co MDC fields `requestId`, `http.request.method`, `url.path`, `http.response.status_code`, `event.duration_ms` de log collector search/correlation tot hon khi bat structured logging.
 - Khong dua access token, refresh token, password hoac thong tin nhay cam vao `X-Request-Id`.
 
 
@@ -2269,6 +2270,11 @@ Runtime config:
 ```properties
 PROMETHEUS_METRICS_ENABLED=true
 HTTP_SERVER_REQUESTS_HISTOGRAM=true
+APP_NAME=goride
+APP_GROUP=goride-backend
+APP_ENV=staging
+APP_VERSION=2026.07.05
+LOGGING_STRUCTURED_FORMAT_CONSOLE=logstash
 ```
 
 FE/devops action:
@@ -2277,6 +2283,8 @@ FE/devops action:
 - Dung `/actuator/health/readiness` cho readiness probe; endpoint nay phu thuoc DB va Redis nen co the tra non-2xx khi dependency chua san sang.
 - Dung `/actuator/info` de xac nhan app identity (`app.name=goride`) trong smoke test.
 - Dung `/actuator/prometheus` cho Prometheus/platform scraper; canh bao khi 5xx tang, latency tang, hoac `goride_rate_limit_requests_total{outcome="rejected"}` tang bat thuong.
+- Neu deployment co log collector, dat `LOGGING_STRUCTURED_FORMAT_CONSOLE=logstash` hoac format Spring Boot ho tro (`ecs`, `gelf`) de stdout chuyen sang JSON structured logs. Mac dinh rong giu console pattern dev hien tai.
+- Structured logs co cac field tu MDC: `requestId`, `http.request.method`, `url.path`, `http.response.status_code`, `event.duration_ms`, kem context `service.name`, `service.environment`, `service.version`. Khong log request body, password, token hoac secret.
 - Khong hien thi cac endpoint nay nhu chuc nang nguoi dung; chi dung cho diagnostics/deployment.
 
 ---
