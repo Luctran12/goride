@@ -80,7 +80,7 @@ public class PricingConfig {
         return pricingConfig;
     }
 
-    public BigDecimal estimateFare(BigDecimal distanceKm, int durationMinutes) {
+    public BigDecimal baseFareAmount(BigDecimal distanceKm, int durationMinutes) {
         if (durationMinutes < 0) {
             throw new IllegalArgumentException("durationMinutes must not be negative");
         }
@@ -91,10 +91,21 @@ public class PricingConfig {
                 .add(BigDecimal.valueOf(durationMinutes).multiply(perMinuteRate));
 
         if (fare.compareTo(minimumFare) < 0) {
-            fare = minimumFare;
+            return minimumFare;
         }
 
-        return fare.multiply(surgeMultiplier).setScale(0, RoundingMode.HALF_UP);
+        return fare;
+    }
+
+    public BigDecimal estimateFare(BigDecimal distanceKm, int durationMinutes) {
+        return estimateFare(distanceKm, durationMinutes, surgeMultiplier);
+    }
+
+    public BigDecimal estimateFare(BigDecimal distanceKm, int durationMinutes, BigDecimal fareSurgeMultiplier) {
+        BigDecimal normalizedMultiplier = requirePositive(fareSurgeMultiplier, "fareSurgeMultiplier");
+        return baseFareAmount(distanceKm, durationMinutes)
+                .multiply(normalizedMultiplier)
+                .setScale(0, RoundingMode.HALF_UP);
     }
 
     public void deactivate() {

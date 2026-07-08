@@ -2,6 +2,7 @@ package com.example.goride.driver.repository;
 
 import com.example.goride.driver.domain.ApprovalStatus;
 import com.example.goride.driver.domain.DriverProfile;
+import com.example.goride.driver.domain.VehicleType;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -60,6 +61,15 @@ public interface DriverProfileRepository extends JpaRepository<DriverProfile, Lo
     long countByUserDeletedAtIsNull();
 
     long countByApprovalStatusAndUserDeletedAtIsNull(ApprovalStatus approvalStatus);
+    @Query("""
+            select count(profile)
+            from DriverProfile profile
+            where profile.vehicleType = :vehicleType
+              and profile.approvalStatus = com.example.goride.driver.domain.ApprovalStatus.APPROVED
+              and profile.online = true
+              and profile.user.deletedAt is null
+            """)
+    long countOnlineApprovedByVehicleType(@Param("vehicleType") VehicleType vehicleType);
 
     @Query("""
             select coalesce(avg(profile.averageRating), 0)

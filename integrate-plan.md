@@ -1,6 +1,6 @@
 # GoRide Front-end Integration Plan
 
-Branch da kiem tra: `feature/payment-sandbox-e2e`
+Branch dang cap nhat: `feature/surge-pricing-rules`
 
 Muc tieu file nay:
 - Checklist chuc nang backend da co code va co the tich hop FE.
@@ -227,7 +227,8 @@ type PaymentSandboxUatStatus = "NOT_RUN" | "BLOCKED" | "FAILED" | "PASSED";
 - [x] Public API xem pricing config active.
 - [x] Admin API xem/tao pricing config version moi.
 - [x] Admin API deactivate pricing config cu.
-- [x] Passenger tinh gia uoc luong.
+- [x] Admin API quan ly dynamic surge pricing rules.
+- [x] Passenger tinh gia uoc luong voi breakdown base fare, surge amount va multiplier.
 - [x] Passenger tao booking.
 - [x] Passenger tao scheduled booking bang `scheduledPickupTime`; backend giu `SCHEDULED` va tu dispatch sang matching gan gio don.
 - [x] Passenger/driver xem chi tiet trip neu co quyen.
@@ -349,6 +350,11 @@ type PaymentSandboxUatStatus = "NOT_RUN" | "BLOCKED" | "FAILED" | "PASSED";
 
 ## 3. Checklist chuc nang chua hoan thien / can lam tiep
 
+### Pricing/surge
+
+- [x] Dynamic surge pricing rules foundation da co: admin list/create/update/deactivate rule, xem current surge status theo `vehicleType`, estimate tra base fare/surge breakdown va trip snapshot `fareSurgeMultiplier`.
+- [ ] Can UAT threshold surge tren staging de tranh gia nhay qua manh; neu can chi tiet hon thi them policy theo khu vuc/gio cao diem o commit sau.
+
 ### Payment/rating/statistics
 
 - [x] Payment method metadata da expose `CASH`, `MOMO`, `VNPAY`; hien chi `CASH` enabled mac dinh.
@@ -411,7 +417,48 @@ app:
 - Provider distance meter duoc tra ve FE thanh km; duration giay duoc lam tron len thanh phut.
 - Neu fallback enabled, timeout/HTTP error/`NoRoute` tu provider se dung Haversine estimate de booking flow khong bi dung.
 - Neu fallback disabled, estimate/create booking tra `ROUTING_PROVIDER_ERROR` HTTP 502; FE hien thong bao khong the tinh lo trinh va cho retry.
-- Distance/duration nay chi la estimate truoc chuyen. Khi trip completed, final fare dung tracking history va actual duration.
+- Distance/duration nay chi la estimate truoc chuyen. Khi trip completed, final fare dung tracking history va actual duration, nhung giu `fareSurgeMultiplier` da snapshot luc booking.
+
+#### Fare estimate response voi surge breakdown
+
+```http
+POST /api/v1/bookings/estimate
+Authorization: Bearer <passengerToken>
+```
+
+Response `data` co them cac field pricing minh bach:
+
+```json
+{
+  "vehicleType": "MOTORBIKE",
+  "distanceKm": 5.5,
+  "durationMinutes": 20,
+  "baseFare": 38000,
+  "estimatedFare": 47500,
+  "currency": "VND",
+  "pricingSurgeMultiplier": 1.0,
+  "dynamicSurgeMultiplier": 1.25,
+  "effectiveSurgeMultiplier": 1.25,
+  "surgeAmount": 9500,
+  "surge": {
+    "vehicleType": "MOTORBIKE",
+    "demandTrips": 3,
+    "onlineDrivers": 1,
+    "demandSupplyRatio": 3.0,
+    "pricingSurgeMultiplier": 1.0,
+    "dynamicSurgeMultiplier": 1.25,
+    "effectiveSurgeMultiplier": 1.25,
+    "surgeApplied": true,
+    "ruleId": 10,
+    "ruleName": "Peak demand"
+  }
+}
+```
+
+FE action:
+- Hien `baseFare`, `surgeAmount` va badge surge khi `surge.surgeApplied=true` hoac `dynamicSurgeMultiplier > 1`.
+- Khong tu tinh lai fare tren FE; khi tao booking backend snapshot `effectiveSurgeMultiplier` vao trip.
+- Neu user quay lai man confirm sau thoi gian dai, goi estimate lai de lay surge hien tai truoc khi tao booking.
 
 ### 4.1 Auth
 
@@ -1974,6 +2021,48 @@ FE action:
 - Dung khi can tat mot pricing config.
 - Can dam bao moi `vehicleType` co it nhat mot active config neu FE/backend van cho booking loai xe do.
 
+#### Admin surge pricing rules
+
+```http
+GET /api/v1/admin/pricing/surge-rules
+GET /api/v1/admin/pricing/surge-status?vehicleType=MOTORBIKE
+POST /api/v1/admin/pricing/surge-rules
+PATCH /api/v1/admin/pricing/surge-rules/{ruleId}
+PATCH /api/v1/admin/pricing/surge-rules/{ruleId}/deactivate
+Authorization: Bearer <adminToken>
+```
+
+Create request:
+
+```json
+{
+  "vehicleType": "MOTORBIKE",
+  "name": "Peak demand",
+  "minDemandTrips": 3,
+  "minDemandSupplyRatio": 2.0,
+  "multiplier": 1.25,
+  "active": true,
+  "startsAt": null,
+  "endsAt": null
+}
+```
+
+Update request chi can gui field muon doi:
+
+```json
+{
+  "name": "Peak demand - evening",
+  "minDemandSupplyRatio": 2.5,
+  "multiplier": 1.3,
+  "active": true
+}
+```
+
+FE action:
+- Dung `surge-status` de hien demand/supply/matched rule hien tai theo `vehicleType`.
+- Rule hop le khi `minDemandTrips >= 1`, `minDemandSupplyRatio > 0`, `multiplier` tu `1.0` den `3.0`; backend validate va tra `VALIDATION_ERROR` neu sai.
+- `deactivate` la thao tac an toan de tat rule nhanh trong UAT; pricing config static van con nguyen.
+
 ---
 
 ### 4.12 Admin trip monitoring
@@ -2442,6 +2531,7 @@ Devops/backend action:
 - [ ] User management: list/create/update/delete users qua `/api/users`.
 - [ ] User status management: set `ACTIVE`/`SUSPENDED` qua `/api/users/{id}`.
 - [ ] Pricing management: list/create/deactivate pricing qua `/api/v1/admin/pricing`.
+- [ ] Surge pricing management: list/create/update/deactivate rules va xem current status qua `/api/v1/admin/pricing/surge-*`.
 - [ ] Pending driver list: `GET /api/v1/admin/drivers/pending`.
 - [ ] Driver approval action: `PATCH /api/v1/admin/drivers/{driverId}/approval`.
 - [ ] Trip monitoring: list/filter trips qua `GET /api/v1/admin/trips`.
@@ -2467,6 +2557,7 @@ Devops/backend action:
 | `PAYMENT_PROVIDER_UNSUPPORTED` | Provider payment chua duoc backend enable; refresh/cau hinh lai payment method. |
 | `PAYMENT_PROVIDER_ERROR` | Hien loi tam thoi cua cong thanh toan, cho retry checkout; khong danh dau payment da thanh cong. |
 | `ROUTING_PROVIDER_ERROR` | Hien khong the tinh lo trinh, giu du lieu pickup/dropoff va cho retry. |
+| `SURGE_PRICING_RULE_NOT_FOUND` | Admin refresh danh sach rule; rule da bi xoa/khong ton tai. |
 | `TRIP_ROUTE_NOT_AVAILABLE` | Dung navigation va refresh trip; status hien tai khong cho route pickup/dropoff. |
 | `TRIP_MESSAGE_NOT_AVAILABLE` | Khoa chat input, refresh trip status; chi cho gui message trong `ACCEPTED`, `ARRIVED`, `IN_PROGRESS`. |
 | `RATE_LIMIT_EXCEEDED` | Dung retry tuc thi, doc `Retry-After`, disable action tam thoi va thu lai sau backoff. |

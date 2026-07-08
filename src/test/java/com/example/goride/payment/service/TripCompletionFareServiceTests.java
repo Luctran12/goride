@@ -63,6 +63,22 @@ class TripCompletionFareServiceTests {
     }
 
     @Test
+    void appliesTripSurgeSnapshotWhenCompletingFare() {
+        Trip trip = inProgressTrip(BigDecimal.valueOf(1.25));
+        when(tripLocationHistoryRepository.findByTripIdAndTripDeletedAtIsNullOrderByRecordedAtAsc(99L))
+                .thenReturn(List.of(
+                        location(trip, 106.7000, 10.7700),
+                        location(trip, 106.7000, 10.7790)
+                ));
+
+        TripCompletionFare fare = service.calculate(trip);
+
+        assertThat(fare.actualDistanceKm()).isEqualByComparingTo("1.00");
+        assertThat(fare.actualDurationMin()).isEqualTo(20);
+        assertThat(fare.finalFare()).isEqualByComparingTo("25000");
+    }
+
+    @Test
     void fallsBackToEstimatedDistanceWhenTrackingHistoryIsInsufficient() {
         Trip trip = inProgressTrip();
         ReflectionTestUtils.setField(trip, "startedAt", Instant.parse("2026-05-21T08:02:00Z"));
@@ -93,7 +109,11 @@ class TripCompletionFareServiceTests {
     }
 
     private Trip inProgressTrip() {
-        Trip trip = sampleTrip();
+        return inProgressTrip(BigDecimal.ONE);
+    }
+
+    private Trip inProgressTrip(BigDecimal fareSurgeMultiplier) {
+        Trip trip = sampleTrip(fareSurgeMultiplier);
         trip.accept(driver(20L));
         trip.markArrived();
         trip.startTrip();
@@ -102,6 +122,10 @@ class TripCompletionFareServiceTests {
     }
 
     private Trip sampleTrip() {
+        return sampleTrip(BigDecimal.ONE);
+    }
+
+    private Trip sampleTrip(BigDecimal fareSurgeMultiplier) {
         PricingConfig pricingConfig = PricingConfig.create(
                 VehicleType.MOTORBIKE,
                 BigDecimal.valueOf(10000),
@@ -122,7 +146,8 @@ class TripCompletionFareServiceTests {
                 BigDecimal.valueOf(4.2),
                 18,
                 BigDecimal.valueOf(32200),
-                pricingConfig
+                pricingConfig,
+                fareSurgeMultiplier
         );
         ReflectionTestUtils.setField(trip, "id", 99L);
         return trip;

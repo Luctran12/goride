@@ -5,6 +5,60 @@
 > Tu commit `feat: add matching driver search` tro di, moi commit backend can cap nhat file nay trong cung commit.
 
 ---
+## Commit: `feat: add surge pricing rules`
+
+Branch: `feature/surge-pricing-rules`
+
+Phase: Phase 6 - Product expansion, dynamic surge pricing foundation
+
+### Muc tieu
+
+Them nen tang surge pricing dong de fare estimate phan anh tinh trang cau/cung theo `vehicleType`, admin quan ly rule va trip luu snapshot multiplier tai thoi diem dat xe.
+
+### Noi dung da trien khai
+
+- Them entity `SurgePricingRule` va repository cho bang `surge_pricing_rules`.
+- Them admin API list/create/update/deactivate surge rule va API xem current surge status theo `vehicleType`.
+- Them `SurgePricingService` tinh demand tu trip `SEARCHING`, supply tu driver approved+online, chon rule active phu hop va tra pricing/dynamic/effective multiplier.
+- Mo rong `FareEstimateResponse` voi `baseFare`, `surgeAmount`, static/dynamic/effective multiplier va object `surge` de FE hien thi minh bach.
+- Mo rong `Trip` voi `fareSurgeMultiplier` de snapshot multiplier khi booking; khi complete trip, final fare dung actual distance/duration nhung giu multiplier da snapshot.
+- Them SQL release `db/releases/20260707-surge-pricing-rules` de them cot `trips.fare_surge_multiplier` va bang rule.
+- Cap nhat `plan.md`, `integrate-plan.md`, `docs/implementation-log.md` va `docs/pland.xlsx`.
+
+### Review truoc commit
+
+- Targeted `./mvnw.cmd "-Dtest=BookingServiceTests,SurgePricingServiceTests,TripCompletionFareServiceTests,PricingConfigTests" test`: pass 23 tests.
+- `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/validate-db-release.ps1 -ReleasePath db/releases/20260707-surge-pricing-rules`: pass.
+- `git diff --check`: pass; chi co warning LF/CRLF tren Windows.
+- Full `./mvnw.cmd test` chua chay cho commit nay; targeted suite va SQL release validator da pass.
+- CodeRabbit CLI: blocked vi `coderabbit` khong co trong PATH tren may nay.
+- User review: completed 2026-07-08; commit created after review.
+
+### Files chinh
+
+- `src/main/java/com/example/goride/booking/domain/SurgePricingRule.java`
+- `src/main/java/com/example/goride/booking/service/SurgePricingService.java`
+- `src/main/java/com/example/goride/booking/controller/AdminPricingController.java`
+- `src/main/java/com/example/goride/booking/dto/FareEstimateResponse.java`
+- `src/main/java/com/example/goride/booking/dto/FareSurgeResponse.java`
+- `src/main/java/com/example/goride/booking/domain/Trip.java`
+- `src/main/java/com/example/goride/payment/service/TripCompletionFareService.java`
+- `db/releases/20260707-surge-pricing-rules/**`
+- `src/test/java/com/example/goride/booking/service/SurgePricingServiceTests.java`
+- `src/test/java/com/example/goride/booking/service/BookingServiceTests.java`
+- `src/test/java/com/example/goride/payment/service/TripCompletionFareServiceTests.java`
+- `plan.md`
+- `integrate-plan.md`
+- `docs/implementation-log.md`
+- `docs/pland.xlsx`
+
+### Viec tiep theo
+
+- FE hien thi surge breakdown trong man estimate/confirm booking va khong tu tinh lai fare.
+- Admin tao rule bao thu, theo doi current surge status va deactivate nhanh neu UAT thay threshold qua manh.
+- Sau UAT, can bo sung policy theo khu vuc/gio cao diem neu san pham can chi tiet hon.
+
+---
 ## Commit: `feat: add structured logging context`
 
 Branch: `feature/structured-logging`
@@ -37,6 +91,7 @@ Them nen tang structured logging de deployment co the ship stdout logs vao log c
 - Smoke `LOGGING_STRUCTURED_FORMAT_CONSOLE=logstash ./mvnw.cmd "-Dtest=SecurityCorsIntegrationTests" test`: pass 3 tests va output JSON co MDC fields.
 - `git diff --check`: pass; chi co warning LF/CRLF tren Windows.
 - CodeRabbit CLI: blocked vi `coderabbit` khong co trong PATH tren may nay.
+- User review: completed 2026-07-08; commit created after review.
 - User review: completed 2026-07-07; commit duoc tao sau review.
 
 ### Files chinh

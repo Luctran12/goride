@@ -9,7 +9,13 @@ public record FareEstimateResponse(
         BigDecimal distanceKm,
         int durationMinutes,
         BigDecimal estimatedFare,
-        String currency
+        String currency,
+        BigDecimal baseFare,
+        BigDecimal pricingSurgeMultiplier,
+        BigDecimal dynamicSurgeMultiplier,
+        BigDecimal effectiveSurgeMultiplier,
+        BigDecimal surgeAmount,
+        FareSurgeResponse surge
 ) {
     public static FareEstimateResponse of(
             VehicleType vehicleType,
@@ -17,6 +23,43 @@ public record FareEstimateResponse(
             int durationMinutes,
             BigDecimal estimatedFare
     ) {
-        return new FareEstimateResponse(vehicleType, distanceKm, durationMinutes, estimatedFare, "VND");
+        return of(
+                vehicleType,
+                distanceKm,
+                durationMinutes,
+                estimatedFare,
+                estimatedFare,
+                BigDecimal.ONE,
+                BigDecimal.ONE,
+                BigDecimal.ONE,
+                null
+        );
+    }
+
+    public static FareEstimateResponse of(
+            VehicleType vehicleType,
+            BigDecimal distanceKm,
+            int durationMinutes,
+            BigDecimal estimatedFare,
+            BigDecimal baseFare,
+            BigDecimal pricingSurgeMultiplier,
+            BigDecimal dynamicSurgeMultiplier,
+            BigDecimal effectiveSurgeMultiplier,
+            FareSurgeResponse surge
+    ) {
+        BigDecimal surgeAmount = estimatedFare.subtract(baseFare);
+        return new FareEstimateResponse(
+                vehicleType,
+                distanceKm,
+                durationMinutes,
+                estimatedFare,
+                "VND",
+                baseFare,
+                pricingSurgeMultiplier,
+                dynamicSurgeMultiplier,
+                effectiveSurgeMultiplier,
+                surgeAmount,
+                surge
+        );
     }
 }

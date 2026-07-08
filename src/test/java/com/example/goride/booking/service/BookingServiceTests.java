@@ -17,6 +17,7 @@ import com.example.goride.booking.repository.TripStatusHistoryRepository;
 import com.example.goride.booking.service.distance.DistanceEstimate;
 import com.example.goride.booking.service.distance.DistanceService;
 import com.example.goride.booking.service.distance.Location;
+import com.example.goride.booking.service.SurgePricingService.SurgePricingQuote;
 import com.example.goride.common.error.BusinessException;
 import com.example.goride.common.error.ErrorCode;
 import com.example.goride.driver.domain.VehicleType;
@@ -46,6 +47,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -69,6 +71,9 @@ class BookingServiceTests {
     private PaymentMethodService paymentMethodService;
 
     @Mock
+    private SurgePricingService surgePricingService;
+
+    @Mock
     private ApplicationEventPublisher eventPublisher;
 
     @Spy
@@ -90,6 +95,8 @@ class BookingServiceTests {
                 .thenReturn(Optional.of(pricingConfig()));
         when(distanceService.estimate(any(Location.class), any(Location.class)))
                 .thenReturn(new DistanceEstimate(BigDecimal.valueOf(5.5), 20));
+        when(surgePricingService.quote(any(PricingConfig.class), eq(true)))
+                .thenReturn(surgeQuote(BigDecimal.ONE, BigDecimal.ONE));
 
         var response = bookingService.estimateFare(estimateRequest());
 
@@ -97,7 +104,34 @@ class BookingServiceTests {
         assertThat(response.distanceKm()).isEqualByComparingTo(BigDecimal.valueOf(5.5));
         assertThat(response.durationMinutes()).isEqualTo(20);
         assertThat(response.estimatedFare()).isEqualByComparingTo(BigDecimal.valueOf(38000));
+        assertThat(response.baseFare()).isEqualByComparingTo(BigDecimal.valueOf(38000));
+        assertThat(response.dynamicSurgeMultiplier()).isEqualByComparingTo(BigDecimal.ONE);
+        assertThat(response.effectiveSurgeMultiplier()).isEqualByComparingTo(BigDecimal.ONE);
+        assertThat(response.surgeAmount()).isEqualByComparingTo(BigDecimal.ZERO);
         assertThat(response.currency()).isEqualTo("VND");
+    }
+
+    @Test
+    void estimateFareAppliesDynamicSurgeQuote() {
+        when(pricingConfigRepository
+                .findFirstByVehicleTypeAndActiveTrueAndEffectiveFromLessThanEqualOrderByEffectiveFromDesc(
+                        any(),
+                        any()
+                ))
+                .thenReturn(Optional.of(pricingConfig()));
+        when(distanceService.estimate(any(Location.class), any(Location.class)))
+                .thenReturn(new DistanceEstimate(BigDecimal.valueOf(5.5), 20));
+        when(surgePricingService.quote(any(PricingConfig.class), eq(true)))
+                .thenReturn(surgeQuote(BigDecimal.ONE, BigDecimal.valueOf(1.25)));
+
+        var response = bookingService.estimateFare(estimateRequest());
+
+        assertThat(response.baseFare()).isEqualByComparingTo(BigDecimal.valueOf(38000));
+        assertThat(response.dynamicSurgeMultiplier()).isEqualByComparingTo(BigDecimal.valueOf(1.25));
+        assertThat(response.effectiveSurgeMultiplier()).isEqualByComparingTo(BigDecimal.valueOf(1.25));
+        assertThat(response.estimatedFare()).isEqualByComparingTo(BigDecimal.valueOf(47500));
+        assertThat(response.surgeAmount()).isEqualByComparingTo(BigDecimal.valueOf(9500));
+        assertThat(response.surge().ruleName()).isEqualTo("Peak demand");
     }
 
     @Test
@@ -115,6 +149,8 @@ class BookingServiceTests {
                 .thenReturn(Optional.of(pricingConfig()));
         when(distanceService.estimate(any(Location.class), any(Location.class)))
                 .thenReturn(new DistanceEstimate(BigDecimal.valueOf(5.5), 20));
+        when(surgePricingService.quote(any(PricingConfig.class), eq(true)))
+                .thenReturn(surgeQuote(BigDecimal.ONE, BigDecimal.valueOf(1.25)));
         when(paymentMethodService.isPaymentMethodEnabled(PaymentMethod.CASH)).thenReturn(true);
         when(tripRepository.save(any(Trip.class))).thenAnswer(invocation -> withTripId(invocation.getArgument(0), 99L));
 
@@ -130,8 +166,9 @@ class BookingServiceTests {
         assertThat(response.id()).isEqualTo(99L);
         assertThat(response.passengerId()).isEqualTo(10L);
         assertThat(response.status()).isEqualTo(TripStatus.SEARCHING);
-        assertThat(response.estimatedFare()).isEqualByComparingTo(BigDecimal.valueOf(38000));
+        assertThat(response.estimatedFare()).isEqualByComparingTo(BigDecimal.valueOf(47500));
         assertThat(tripCaptor.getValue().getPassenger()).isSameAs(passenger);
+        assertThat(tripCaptor.getValue().getFareSurgeMultiplier()).isEqualByComparingTo(BigDecimal.valueOf(1.25));
         assertThat(historyCaptor.getValue().getToStatus()).isEqualTo(TripStatus.SEARCHING);
         assertThat(historyCaptor.getValue().getChangedBy()).isSameAs(passenger);
         assertThat(eventCaptor.getValue().tripId()).isEqualTo(99L);
@@ -352,6 +389,21 @@ class BookingServiceTests {
         );
     }
 
+
+    private SurgePricingQuote surgeQuote(BigDecimal pricingMultiplier, BigDecimal dynamicMultiplier) {
+        BigDecimal effectiveMultiplier = pricingMultiplier.multiply(dynamicMultiplier);
+        return new SurgePricingQuote(
+                VehicleType.MOTORBIKE,
+                3,
+                1,
+                BigDecimal.valueOf(3.00),
+                pricingMultiplier,
+                dynamicMultiplier,
+                effectiveMultiplier,
+                dynamicMultiplier.compareTo(BigDecimal.ONE) > 0 ? 10L : null,
+                dynamicMultiplier.compareTo(BigDecimal.ONE) > 0 ? "Peak demand" : null
+        );
+    }
     private PricingConfig pricingConfig() {
         return PricingConfig.create(
                 VehicleType.MOTORBIKE,

@@ -91,6 +91,9 @@ public class Trip {
     @JoinColumn(name = "pricing_config_id", nullable = false)
     private PricingConfig pricingConfig;
 
+    @Column(name = "fare_surge_multiplier", nullable = false, precision = 4, scale = 2)
+    private BigDecimal fareSurgeMultiplier = BigDecimal.ONE;
+
     @Column(name = "requested_at", nullable = false)
     private Instant requestedAt;
 
@@ -140,6 +143,37 @@ public class Trip {
             BigDecimal estimatedFare,
             PricingConfig pricingConfig
     ) {
+        PricingConfig normalizedPricingConfig = requireNonNull(pricingConfig, "pricingConfig");
+        return create(
+                passenger,
+                vehicleType,
+                paymentMethod,
+                pickupAddress,
+                pickupLocation,
+                dropoffAddress,
+                dropoffLocation,
+                estimatedDistanceKm,
+                estimatedDurationMin,
+                estimatedFare,
+                normalizedPricingConfig,
+                normalizedPricingConfig.getSurgeMultiplier()
+        );
+    }
+
+    public static Trip create(
+            User passenger,
+            VehicleType vehicleType,
+            PaymentMethod paymentMethod,
+            String pickupAddress,
+            Point pickupLocation,
+            String dropoffAddress,
+            Point dropoffLocation,
+            BigDecimal estimatedDistanceKm,
+            int estimatedDurationMin,
+            BigDecimal estimatedFare,
+            PricingConfig pricingConfig,
+            BigDecimal fareSurgeMultiplier
+    ) {
         if (estimatedDurationMin <= 0) {
             throw new IllegalArgumentException("estimatedDurationMin must be positive");
         }
@@ -168,6 +202,7 @@ public class Trip {
         trip.estimatedDurationMin = estimatedDurationMin;
         trip.estimatedFare = requirePositiveOrZero(estimatedFare, "estimatedFare");
         trip.pricingConfig = normalizedPricingConfig;
+        trip.fareSurgeMultiplier = requirePositive(fareSurgeMultiplier, "fareSurgeMultiplier");
         trip.requestedAt = Instant.now();
         return trip;
     }
@@ -186,6 +221,39 @@ public class Trip {
             PricingConfig pricingConfig,
             Instant scheduledPickupTime
     ) {
+        PricingConfig normalizedPricingConfig = requireNonNull(pricingConfig, "pricingConfig");
+        return createScheduled(
+                passenger,
+                vehicleType,
+                paymentMethod,
+                pickupAddress,
+                pickupLocation,
+                dropoffAddress,
+                dropoffLocation,
+                estimatedDistanceKm,
+                estimatedDurationMin,
+                estimatedFare,
+                normalizedPricingConfig,
+                normalizedPricingConfig.getSurgeMultiplier(),
+                scheduledPickupTime
+        );
+    }
+
+    public static Trip createScheduled(
+            User passenger,
+            VehicleType vehicleType,
+            PaymentMethod paymentMethod,
+            String pickupAddress,
+            Point pickupLocation,
+            String dropoffAddress,
+            Point dropoffLocation,
+            BigDecimal estimatedDistanceKm,
+            int estimatedDurationMin,
+            BigDecimal estimatedFare,
+            PricingConfig pricingConfig,
+            BigDecimal fareSurgeMultiplier,
+            Instant scheduledPickupTime
+    ) {
         Trip trip = create(
                 passenger,
                 vehicleType,
@@ -197,7 +265,8 @@ public class Trip {
                 estimatedDistanceKm,
                 estimatedDurationMin,
                 estimatedFare,
-                pricingConfig
+                pricingConfig,
+                fareSurgeMultiplier
         );
         trip.status = TripStatus.SCHEDULED;
         trip.scheduledPickupTime = requireNonNull(scheduledPickupTime, "scheduledPickupTime");
@@ -292,6 +361,9 @@ public class Trip {
         if (requestedAt == null) {
             requestedAt = now;
         }
+        if (fareSurgeMultiplier == null) {
+            fareSurgeMultiplier = pricingConfig == null ? BigDecimal.ONE : pricingConfig.getSurgeMultiplier();
+        }
         createdAt = now;
         updatedAt = now;
     }
@@ -367,6 +439,10 @@ public class Trip {
 
     public PricingConfig getPricingConfig() {
         return pricingConfig;
+    }
+
+    public BigDecimal getFareSurgeMultiplier() {
+        return fareSurgeMultiplier;
     }
 
     public Instant getRequestedAt() {

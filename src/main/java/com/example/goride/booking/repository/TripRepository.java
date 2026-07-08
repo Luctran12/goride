@@ -2,6 +2,7 @@ package com.example.goride.booking.repository;
 
 import com.example.goride.booking.domain.Trip;
 import com.example.goride.booking.domain.TripStatus;
+import com.example.goride.driver.domain.VehicleType;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -58,6 +59,8 @@ public interface TripRepository extends JpaRepository<Trip, Long>, JpaSpecificat
     boolean existsByDriverIdAndStatusInAndDeletedAtIsNull(Long driverId, Collection<TripStatus> statuses);
 
     long countByDeletedAtIsNull();
+
+    long countByVehicleTypeAndStatusAndDeletedAtIsNull(VehicleType vehicleType, TripStatus status);
 
     @Query("""
             select trip.status as status, count(trip) as total

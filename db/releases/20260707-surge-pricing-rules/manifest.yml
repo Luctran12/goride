@@ -1,0 +1,30 @@
+release_id: 20260707-surge-pricing-rules
+title: Add dynamic surge pricing rules
+author: Codex
+created_at: 2026-07-07
+risk: medium
+transactional: true
+requires_downtime: false
+applies_after:
+  - 20260705-payment-sandbox-uat-results
+related_commit: pending
+environments:
+  - staging
+  - production
+objects:
+  - trips.fare_surge_multiplier
+  - surge_pricing_rules
+  - idx_surge_pricing_rules_vehicle_active
+  - idx_surge_pricing_rules_window
+pre_deploy_checks:
+  - Run precheck.sql and confirm surge_pricing_rules is absent or compatible.
+  - Confirm trips table exists and pricing_config has surge_multiplier.
+deploy_steps:
+  - Run apply.sql inside the normal database release window before enabling admin surge rules.
+post_deploy_checks:
+  - Run verify.sql and confirm the new trip column, table and indexes exist.
+rollback_plan:
+  - Run rollback.sql only if the application release is rolled back; this removes configured surge rules and the fare multiplier snapshot column.
+notes:
+  - Existing trips are backfilled from their pricing_config.surge_multiplier.
+  - New trips snapshot the effective pricing multiplier used at booking time.

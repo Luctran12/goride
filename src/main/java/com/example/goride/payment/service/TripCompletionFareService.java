@@ -33,7 +33,11 @@ public class TripCompletionFareService {
                 .filter(distance -> distance.signum() > 0)
                 .orElse(trip.getEstimatedDistanceKm());
         int actualDurationMin = actualDurationMin(trip);
-        BigDecimal finalFare = trip.getPricingConfig().estimateFare(actualDistanceKm, actualDurationMin);
+        BigDecimal finalFare = trip.getPricingConfig().estimateFare(
+                actualDistanceKm,
+                actualDurationMin,
+                trip.getFareSurgeMultiplier()
+        );
         return new TripCompletionFare(finalFare, actualDistanceKm, actualDurationMin);
     }
 
