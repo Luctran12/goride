@@ -17,6 +17,7 @@ import com.example.goride.booking.repository.TripRepository;
 import com.example.goride.booking.repository.TripStatusHistoryRepository;
 import com.example.goride.booking.service.distance.DistanceEstimate;
 import com.example.goride.booking.service.distance.DistanceService;
+import com.example.goride.booking.service.SurgePricingService.SurgePricingQuote;
 import com.example.goride.common.error.BusinessException;
 import com.example.goride.common.error.ErrorCode;
 import com.example.goride.payment.service.PaymentMethodService;
@@ -53,6 +54,7 @@ public class BookingService {
     private final TripStatusHistoryRepository tripStatusHistoryRepository;
     private final DistanceService distanceService;
     private final PaymentMethodService paymentMethodService;
+    private final SurgePricingService surgePricingService;
     private final ApplicationEventPublisher eventPublisher;
     private final ScheduledRideProperties scheduledRideProperties;
     private final Clock clock;
@@ -64,6 +66,7 @@ public class BookingService {
             TripStatusHistoryRepository tripStatusHistoryRepository,
             DistanceService distanceService,
             PaymentMethodService paymentMethodService,
+            SurgePricingService surgePricingService,
             ApplicationEventPublisher eventPublisher,
             ScheduledRideProperties scheduledRideProperties,
             Clock clock
@@ -74,6 +77,7 @@ public class BookingService {
         this.tripStatusHistoryRepository = tripStatusHistoryRepository;
         this.distanceService = distanceService;
         this.paymentMethodService = paymentMethodService;
+        this.surgePricingService = surgePricingService;
         this.eventPublisher = eventPublisher;
         this.scheduledRideProperties = scheduledRideProperties;
         this.clock = clock;
@@ -86,7 +90,12 @@ public class BookingService {
                 request.vehicleType(),
                 calculation.distanceEstimate().distanceKm(),
                 calculation.distanceEstimate().durationMinutes(),
-                calculation.estimatedFare()
+                calculation.estimatedFare(),
+                calculation.baseFare(),
+                calculation.surgeQuote().pricingSurgeMultiplier(),
+                calculation.surgeQuote().dynamicSurgeMultiplier(),
+                calculation.surgeQuote().effectiveSurgeMultiplier(),
+                calculation.surgeQuote().toResponse()
         );
     }
 
@@ -193,6 +202,7 @@ public class BookingService {
                     calculation.distanceEstimate().durationMinutes(),
                     calculation.estimatedFare(),
                     calculation.pricingConfig(),
+                    calculation.surgeQuote().effectiveSurgeMultiplier(),
                     request.scheduledPickupTime()
             );
         }
@@ -208,7 +218,8 @@ public class BookingService {
                 calculation.distanceEstimate().distanceKm(),
                 calculation.distanceEstimate().durationMinutes(),
                 calculation.estimatedFare(),
-                calculation.pricingConfig()
+                calculation.pricingConfig(),
+                calculation.surgeQuote().effectiveSurgeMultiplier()
         );
     }
 
@@ -249,11 +260,17 @@ public class BookingService {
                 request.pickup().toLocation(),
                 request.dropoff().toLocation()
         );
-        BigDecimal estimatedFare = pricingConfig.estimateFare(
+        SurgePricingQuote surgeQuote = surgePricingService.quote(pricingConfig, true);
+        BigDecimal baseFare = pricingConfig.baseFareAmount(
                 distanceEstimate.distanceKm(),
                 distanceEstimate.durationMinutes()
         );
-        return new FareCalculation(pricingConfig, distanceEstimate, estimatedFare);
+        BigDecimal estimatedFare = pricingConfig.estimateFare(
+                distanceEstimate.distanceKm(),
+                distanceEstimate.durationMinutes(),
+                surgeQuote.effectiveSurgeMultiplier()
+        );
+        return new FareCalculation(pricingConfig, distanceEstimate, baseFare, estimatedFare, surgeQuote);
     }
 
     private User getActiveUser(Long userId) {
@@ -296,7 +313,9 @@ public class BookingService {
     private record FareCalculation(
             PricingConfig pricingConfig,
             DistanceEstimate distanceEstimate,
-            BigDecimal estimatedFare
+            BigDecimal baseFare,
+            BigDecimal estimatedFare,
+            SurgePricingQuote surgeQuote
     ) {
     }
 }
