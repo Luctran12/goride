@@ -1,18 +1,18 @@
 # GoRide Project Completion Plan
 
-Last updated: 2026-07-07, Asia/Bangkok
+Last updated: 2026-07-09, Asia/Bangkok
 
 ## Project Snapshot
 
 | Item | Status |
 | --- | --- |
-| Working branch | `feature/surge-pricing-rules` |
-| Latest merged feature on develop | `feature/structured-logging` |
-| Develop merge commit | `merge: structured logging context` |
-| Test status | Surge pricing targeted `./mvnw.cmd "-Dtest=BookingServiceTests,SurgePricingServiceTests,TripCompletionFareServiceTests,PricingConfigTests" test` passed: 23 tests; database release validator passed; full regression still pending before merge |
+| Working branch | `hardening/product-readiness-guardrails` |
+| Latest merged feature on develop | `feature/surge-pricing-rules` |
+| Develop merge commit | `merge: surge pricing rules` |
+| Test status | Full `./mvnw.cmd test` passed: 403 tests; targeted `ProductionReadinessValidatorTests` passed: 6 tests |
 | Diff hygiene | `git diff --check` passed; only LF/CRLF normalization warnings on Windows |
 | CodeRabbit CLI | Blocked: `coderabbit` is not in PATH; installer script is Linux/macOS-only and WSL on this machine cannot launch `/bin/bash` |
-| Publish status | Structured logging merged into local `develop`; surge pricing rules reviewed and ready to commit on feature branch; not merged/pushed yet |
+| Publish status | `develop` contains backend implementation through surge pricing; current branch is product-readiness hardening for review and is not merged/pushed yet |
 | Local config | `src/main/resources/application.yml` is environment-specific and must stay uncommitted |
 
 ## Completed Backend Modules
@@ -37,6 +37,7 @@ Last updated: 2026-07-07, Asia/Bangkok
 | Admin trip operations | Admin trip list/filter/detail-like views and dashboard metrics | `/api/v1/admin/trips`, `/api/v1/admin/dashboard` | Supports basic operations dashboard and trip monitoring. |
 | Integration test foundation | Docker-backed PostGIS/Redis base, full auth HTTP flow, booking-to-driver-routing flow, trip completion/payment flow, notification inbox/FCM token flow, admin dashboard/pricing/driver approval flow, and GitHub Actions backend CI wiring | `AuthFlowIntegrationTests`, `BookingMatchingRoutingIntegrationTests`, `NotificationFlowIntegrationTests`, `AdminFlowIntegrationTests`, `.github/workflows/backend-ci.yml` | Covers auth, booking/matching/routing, tracking/payment, Redis FCM token CRUD, notification inbox, admin RBAC, driver approval, pricing management, trip list and dashboard through the real Spring stack; CI now runs `./mvnw test` on Docker-enabled GitHub runners. |
 | Request tracing, structured logging, CORS, rate limiting, metrics and health checks | HTTP correlation ID, response trace header/body, request completion logs with MDC fields, optional JSON structured stdout logs, centralized exception/security logs, configurable CORS allowlist, in-memory token-bucket API rate limiting, Prometheus metrics export, Actuator health/liveness/readiness/info/metrics endpoints | `X-Request-Id`, `LOGGING_STRUCTURED_FORMAT_CONSOLE`, `APP_ENV`, `APP_VERSION`, `Retry-After`, `X-RateLimit-*`, all REST endpoints, CORS preflight, `/actuator/health`, `/actuator/metrics`, `/actuator/prometheus` | Logs method/path/status/duration/requestId without request bodies or secrets; `LOGGING_STRUCTURED_FORMAT_CONSOLE=logstash|ecs|gelf` enables collector-ready JSON logs; Prometheus exposes HTTP/server metrics plus custom rate-limit metrics; readiness checks DB/Redis while liveness only reflects app state. |
+| Production startup guardrails | APP_ENV production/prod fail-fast checks for dev JWT secret, Hibernate mutating ddl-auto, local upload storage, unsafe CORS origins/patterns and incomplete R2 config | Application startup/config | Prevents accidental production boot with local defaults; covered by focused unit tests. |
 | Database release strategy | Versioned SQL release folders, manifest/precheck/apply/verify/rollback template, PowerShell validator and manual deployment process without Flyway | `db/releases`, `scripts/validate-db-release.ps1`, `docs/database-release-process.md` | Staging/production schema changes now have a reproducible reviewable SQL workflow; Hibernate `ddl-auto=update` remains local-only. |
 | Documentation | Implementation log and frontend integration plan | `docs/implementation-log.md`, `integrate-plan.md` | Living docs describe commit history and integration contracts. |
 
@@ -47,7 +48,7 @@ Last updated: 2026-07-07, Asia/Bangkok
 | P0 | Payment providers | Run and record MoMo/VNPAY sandbox E2E validation against real merchant flows; backend now exposes readiness, UAT plan and persisted UAT evidence with `readyForFrontendExposure` gating | Sandbox merchant accounts, callback URLs, provider test apps | Both online providers report `sandboxReady=true`, return usable checkout URLs, real sandbox success/failure callbacks reconcile payment/trip state, and admin evidence status is `PASSED` with all required checks. |
 | P0 | Webhook sandbox handling | Run real sandbox callback tests for MoMo and VNPAY and persist evidence through admin UAT result endpoints; service-level success/failure/stale callback coverage is implemented | Sandbox callback payloads and merchant test accounts | Sandbox success/failure statuses map to internal payment states, provider acknowledgements meet real gateway expectations, and replay/freshness checks are marked passed. |
 | P1 | E2E/integration tests | Auth, booking/matching/pickup-dropoff routing, trip completion, tracking fallback, cash payment confirmation, notification inbox/FCM token flow, admin flow and GitHub Actions backend CI wiring are covered; add provider sandbox E2E flow | Existing Testcontainers base, sandbox merchant accounts | Remaining provider sandbox happy paths run in CI/staging against database/Redis-compatible services and real provider sandbox callbacks. |
-| P1 | Production hardening | Request correlation, structured stdout logging, centralized error logging, configurable CORS, rate limiting, Actuator health/readiness and Prometheus metrics are implemented; add deployment collector dashboards and distributed tracing backend | Deployment platform requirements, log collector, tracing backend | API has safe production defaults and per-instance operational visibility; deployment can ship JSON stdout logs, scrape metrics, use probes, throttle abusive bursts and correlate request IDs across logs/metrics/traces. |
+| P1 | Production hardening | Request correlation, structured stdout logging, centralized error logging, configurable CORS, rate limiting, Actuator probes/metrics and startup guardrails are implemented; add deployment collector dashboards and distributed tracing backend | Deployment platform requirements, log collector, tracing backend | API has safe production defaults, refuses unsafe local config in production, ships JSON stdout logs, exposes probes/metrics, throttles abusive bursts and correlates request IDs across logs/metrics/traces. |
 | P2 | Upload storage production UAT | Cloudflare R2/S3-compatible provider is implemented; provision bucket/API token/public base URL, verify real upload/read access and decide private document access policy | Cloudflare account, R2 bucket, custom/public domain or signed URL policy, deployment secrets | Uploaded files survive redeploys and scale-out; avatar/document URLs are stable; credentials stay outside Git; failed R2 writes return structured `FILE_STORAGE_ERROR`. |
 | P2 | Surge pricing tuning | Dynamic surge rules foundation is implemented; tune thresholds, city/time policies and monitoring in staging | Staging demand/supply data, admin operations policy | Fare estimate exposes transparent surge breakdown, trips snapshot the effective multiplier, and admin can adjust rules safely during UAT. |
 | P2 | Multi-city/service area | Add city/service zone configuration | Geofence data and admin controls | Bookings outside active service zones are rejected or handled according to policy. |
@@ -86,7 +87,7 @@ Last updated: 2026-07-07, Asia/Bangkok
 | Phase 1 | Payment provider completion | MoMo/VNPAY sandbox E2E validation, persisted admin UAT evidence, `readyForFrontendExposure` gating, provider-specific freshness-window tuning, service-level callback contract coverage and real merchant callback tests. |
 | Phase 2 | Real-world routing | Fare estimation and assigned-driver pickup/dropoff GeoJSON routing implemented; production endpoint UAT, route request rate control, monitoring and timeout tuning remain. |
 | Phase 3 | Driver availability reliability | Heartbeat API, Redis TTL refresh and automatic database offline timeout implemented; production interval tuning and Redis/database soak testing remain. |
-| Phase 4 | Production readiness | Firebase secure credential loading, HTTP request correlation, structured stdout logging, centralized application error logging, configurable CORS allowlist, basic API rate limiting, Prometheus metrics, Actuator health/readiness endpoints and SQL release workflow are implemented; collector dashboards, distributed tracing backend and environment profiles remain. |
+| Phase 4 | Production readiness | Firebase secure credential loading, HTTP request correlation, structured stdout logging, centralized application error logging, configurable CORS allowlist, basic API rate limiting, Prometheus metrics, Actuator health/readiness endpoints, SQL release workflow and production startup guardrails are implemented; collector dashboards, distributed tracing backend and final environment UAT remain. |
 | Phase 5 | Integration confidence | Testcontainers PostGIS/Redis foundation, auth flow, booking-to-matching-to-pickup/dropoff-routing flow, trip completion, tracking fallback, cash payment confirmation, notification inbox/FCM token flow, admin flow and backend CI workflow are implemented; provider sandbox E2E validation remains. |
 | Phase 6 | Product expansion | Local upload foundation, Cloudflare R2 provider, in-trip messaging, scheduled rides and surge pricing rules are implemented; R2 deployment UAT, surge tuning, multi-city and analytics remain. |
 
@@ -94,6 +95,7 @@ Last updated: 2026-07-07, Asia/Bangkok
 
 | Risk | Impact | Mitigation |
 | --- | --- | --- |
+| Unsafe production environment variables can block startup | The app now fails fast when `APP_ENV=production/prod` still uses local JWT secret, mutating Hibernate DDL, local upload storage, localhost/wildcard CORS or incomplete R2 config | Prepare deployment secrets/env vars before switching `APP_ENV` to production; keep local/dev using `APP_ENV=local`. |
 | Online payment providers are still not production-complete | Frontend should not expose MoMo/VNPAY in production without real sandbox/UAT validation evidence | Keep CASH as MVP; use readiness, sandbox UAT plan, service-level signed callback tests and admin UAT result records, then expose online methods only when `readyForFrontendExposure=true`. |
 | Webhook freshness defaults need sandbox validation | The 24-hour age and 5-minute future-skew defaults are configurable but not yet calibrated against real merchant retries | Validate both gateways in sandbox, record freshness replay evidence through UAT result endpoints, then tune provider-specific windows without weakening signature or transaction-reference checks. |
 | Routing endpoint is not production-calibrated | Fare estimates and driver navigation geometry are implemented, but endpoint capacity, route request rate and Vietnamese road quality are not validated | Use a controlled OSRM-compatible endpoint, debounce/re-route on FE, add rate/latency metrics, and tune timeout/profile during UAT. |

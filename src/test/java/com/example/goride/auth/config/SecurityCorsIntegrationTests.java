@@ -1,6 +1,7 @@
 package com.example.goride.auth.config;
 
 import com.example.goride.booking.repository.PricingConfigRepository;
+import com.example.goride.booking.repository.SurgePricingRuleRepository;
 import com.example.goride.booking.repository.TripRepository;
 import com.example.goride.booking.repository.TripStatusHistoryRepository;
 import com.example.goride.chat.repository.TripMessageRepository;
@@ -37,6 +38,9 @@ class SecurityCorsIntegrationTests {
 
     @MockitoBean
     private PricingConfigRepository pricingConfigRepository;
+
+    @MockitoBean
+    private SurgePricingRuleRepository surgePricingRuleRepository;
 
     @MockitoBean
     private TripRepository tripRepository;

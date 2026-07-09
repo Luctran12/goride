@@ -1,6 +1,6 @@
 # GoRide Front-end Integration Plan
 
-Branch dang cap nhat: `feature/surge-pricing-rules`
+Branch dang cap nhat: `hardening/product-readiness-guardrails`
 
 Muc tieu file nay:
 - Checklist chuc nang backend da co code va co the tich hop FE.
@@ -89,6 +89,7 @@ FE action:
 - FE co the doc response header `X-Request-Id`, `Retry-After` va `X-RateLimit-*` vi backend expose cac header nay qua CORS.
 - Neu browser bao CORS/preflight failed, kiem tra origin frontend thuc te va bien moi truong `CORS_ALLOWED_ORIGINS` cua backend.
 - Native mobile app thuong khong bi browser CORS, nhung web build va admin dashboard se can allowlist nay.
+- Production readiness guardrail: khi `APP_ENV=production` hoac `APP_ENV=prod`, backend se fail startup neu `CORS_ALLOWED_ORIGINS`/`CORS_ALLOWED_ORIGIN_PATTERNS` con chua `localhost`, `127.*`, `0.0.0.0`, IPv6 loopback `::1` hoac wildcard `*`. FE web/admin production phai dung origin HTTPS that trong allowlist.
 
 ### Rate limit cho REST API
 
@@ -2376,8 +2377,44 @@ FE/devops action:
 - Structured logs co cac field tu MDC: `requestId`, `http.request.method`, `url.path`, `http.response.status_code`, `event.duration_ms`, kem context `service.name`, `service.environment`, `service.version`. Khong log request body, password, token hoac secret.
 - Khong hien thi cac endpoint nay nhu chuc nang nguoi dung; chi dung cho diagnostics/deployment.
 
----
-## 5. WebSocket integration
+### 4.17 Production startup guardrails
+
+Day la guardrail backend/devops, khong phai API cho man hinh nguoi dung. Khi `APP_ENV=production` hoac `APP_ENV=prod`, backend se fail-fast luc startup neu con cau hinh local/unsafe.
+
+Runtime production toi thieu:
+
+```properties
+APP_ENV=production
+JWT_SECRET=<secret-random-it-nhat-32-bytes-khong-dung-default-dev>
+spring.jpa.hibernate.ddl-auto=validate
+STORAGE_PROVIDER=r2
+CORS_ALLOWED_ORIGINS=https://app.goride.example,https://admin.goride.example
+CORS_ALLOWED_ORIGIN_PATTERNS=
+CLOUDFLARE_R2_ENDPOINT=https://<account-id>.r2.cloudflarestorage.com
+CLOUDFLARE_R2_BUCKET=goride-prod
+CLOUDFLARE_R2_ACCESS_KEY=<r2-access-key>
+CLOUDFLARE_R2_SECRET_KEY=<r2-secret-key>
+CLOUDFLARE_R2_PUBLIC_BASE_URL=https://cdn.goride.example
+```
+
+Backend se chan cac loi cau hinh sau trong production:
+- `JWT_SECRET` van la default dev hoac chua chuoi `change-me`/`local-dev`.
+- `spring.jpa.hibernate.ddl-auto=update`, `create` hoac `create-drop`.
+- `STORAGE_PROVIDER=local`.
+- CORS allowed origins/patterns chua localhost, loopback hoac wildcard `*`.
+- `STORAGE_PROVIDER=r2` nhung thieu endpoint, bucket, access key, secret key hoac public base URL.
+
+Devops action:
+- Dung `APP_ENV=local` cho may dev de tiep tuc dung local storage/CORS localhost.
+- Truoc staging/production, set day du env vars tren platform, khong commit secret vao Git.
+- Neu app fail voi message `Production readiness check failed`, doc tung property trong message va sua env/deployment config truoc khi restart.
+
+FE action:
+- FE khong can doi request body/header cho guardrail nay.
+- Web/admin production phai chay dung domain nam trong backend CORS allowlist; khong dung `localhost` khi smoke production.
+- Khi backend production khong start, day la loi deploy config chua san sang, khong phai loi FE.
+
+---## 5. WebSocket integration
 
 ### Ket noi
 
