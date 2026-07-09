@@ -5,6 +5,61 @@
 > Tu commit `feat: add matching driver search` tro di, moi commit backend can cap nhat file nay trong cung commit.
 
 ---
+## Commit: `chore: add production readiness guardrails`
+
+Branch: `hardening/product-readiness-guardrails`
+
+Phase: Phase 4 - Production readiness, release hardening
+
+### Muc tieu
+
+Dung phat trien feature moi va them guardrail de backend khong the chay production bang cau hinh local/dev nguy hiem. Commit nay tap trung vao go-product readiness: fail-fast khi deploy sai secret, CORS, storage hoac database schema mode.
+
+### Noi dung da trien khai
+
+- Them `app.environment=${APP_ENV:local}` lam runtime environment source ro rang cho backend va structured logs.
+- Them `ProductionReadinessValidator` chay luc Spring context khoi dong.
+- Khi `app.environment`/`APP_ENV` la `production` hoac `prod`, backend fail-fast neu:
+  - JWT secret van la default dev hoac chua `change-me`/`local-dev`.
+  - `spring.jpa.hibernate.ddl-auto` la `update`, `create` hoac `create-drop`.
+  - `app.storage.provider=local`.
+  - CORS origins/patterns chua localhost, loopback hoac wildcard `*`.
+  - `app.storage.provider` bi thieu/null.
+  - R2 duoc chon nhung thieu endpoint, bucket, access key, secret key hoac public base URL.
+- Cap nhat `plan.md`, `integrate-plan.md`, `docs/current-phase.md`, `docs/implementation-log.md` va `docs/pland.xlsx` theo huong feature freeze + production hardening.
+- Bo sung mock `SurgePricingRuleRepository` cho cac Spring context tests khong dung JPA de full regression khong bi fail sau surge pricing merge.
+
+### Review truoc commit
+
+- Targeted `./mvnw.cmd -Dtest=ProductionReadinessValidatorTests test`: pass 6 tests.
+- Context-test repair `./mvnw.cmd clean "-Dtest=SecurityCorsIntegrationTests,RateLimitFilterIntegrationTests,ObservabilityMetricsIntegrationTests,GorideApplicationTests" test`: pass 7 tests.
+- Full `./mvnw.cmd test`: pass 403 tests, 0 failures, 0 errors.
+- `git diff --check`: pass; chi co warning LF/CRLF tren Windows.
+- CodeRabbit CLI: blocked vi `coderabbit` khong co trong PATH tren may nay.
+- User review: pending.
+
+### Files chinh
+
+- `src/main/java/com/example/goride/common/config/ProductionReadinessValidator.java`
+- `src/test/java/com/example/goride/common/config/ProductionReadinessValidatorTests.java`
+- `src/test/java/com/example/goride/GorideApplicationTests.java`
+- `src/test/java/com/example/goride/auth/config/SecurityCorsIntegrationTests.java`
+- `src/test/java/com/example/goride/common/ratelimit/RateLimitFilterIntegrationTests.java`
+- `src/test/java/com/example/goride/common/observability/ObservabilityMetricsIntegrationTests.java`
+- `src/main/resources/application.properties`
+- `plan.md`
+- `integrate-plan.md`
+- `docs/current-phase.md`
+- `docs/implementation-log.md`
+- `docs/pland.xlsx`
+
+### Viec tiep theo
+
+- Chuan bi env vars staging/production truoc khi dat `APP_ENV=production`.
+- Re-run full regression neu co code thay doi sau review truoc khi merge.
+- Lam UAT payment provider sandbox, R2 real upload va Firebase real push truoc release candidate.
+
+---
 ## Commit: `feat: add surge pricing rules`
 
 Branch: `feature/surge-pricing-rules`
@@ -87,7 +142,7 @@ Them nen tang structured logging de deployment co the ship stdout logs vao log c
 ### Review truoc commit
 
 - Targeted `./mvnw.cmd "-Dtest=RequestCorrelationFilterTests" test`: pass 4 tests.
-- Full `./mvnw.cmd test`: pass 391 tests, 0 failures, 0 errors.
+- Full `./mvnw.cmd test`: pass 403 tests, 0 failures, 0 errors.
 - Smoke `LOGGING_STRUCTURED_FORMAT_CONSOLE=logstash ./mvnw.cmd "-Dtest=SecurityCorsIntegrationTests" test`: pass 3 tests va output JSON co MDC fields.
 - `git diff --check`: pass; chi co warning LF/CRLF tren Windows.
 - CodeRabbit CLI: blocked vi `coderabbit` khong co trong PATH tren may nay.
@@ -198,7 +253,7 @@ Cho phep passenger dat xe trong tuong lai ma khong gui offer cho driver ngay lap
 
 - Targeted `./mvnw.cmd "-Dtest=TripTests,TripStatusTests,BookingServiceTests,ScheduledRideDispatchServiceTests" test`: pass 24 tests.
 - `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/validate-db-release.ps1 -ReleasePath db/releases/20260704-scheduled-rides`: pass.
-- Full `./mvnw.cmd test`: pass 383 tests, 0 failure, 0 error.
+- Full `./mvnw.cmd test`: pass 403 tests, 0 failures, 0 errors.
 - `git diff --check`: pass; chi co warning LF/CRLF tren Windows.
 - CodeRabbit CLI: blocked vi `coderabbit` khong co trong PATH; installer chinh thuc chi ho tro Linux/macOS va WSL tren may nay khong khoi chay duoc `/bin/bash`.
 
@@ -254,7 +309,7 @@ Them passenger-driver chat theo tung trip de FE co the hien thi hop thoai trong 
 ### Review truoc commit
 
 - Targeted `./mvnw.cmd "-Dtest=TripMessage*Tests,WebSocketTripMessageRealtimeNotifierTests,TripTopicSubscriptionAuthorizerTests" test`: pass 18 tests.
-- Full `./mvnw.cmd test`: pass 379 tests, 0 failure, 0 error.
+- Full `./mvnw.cmd test`: pass 403 tests, 0 failures, 0 errors.
 - `git diff --check`: pass; chi co warning LF/CRLF tren Windows.
 - CodeRabbit CLI: blocked vi `coderabbit` khong co trong PATH; installer chinh thuc chi ho tro Linux/macOS va WSL tren may nay khong khoi chay duoc `/bin/bash`.
 
@@ -304,7 +359,7 @@ Them storage provider Cloudflare R2/S3-compatible de upload avatar va driver doc
 ### Review truoc commit
 
 - Targeted `./mvnw.cmd "-Dtest=R2FileStorageServiceTests,R2StorageConfigTests,LocalFileStorageServiceTests" test`: pass 8 tests.
-- Full `./mvnw.cmd test`: pass 366 tests, 0 failure, 0 error.
+- Full `./mvnw.cmd test`: pass 403 tests, 0 failures, 0 errors.
 - `git diff --check`: pass; chi co warning LF/CRLF tren Windows.
 - CodeRabbit CLI: blocked vi `coderabbit` khong co trong PATH; remote installer can approval ro rang truoc khi cai third-party software.
 
@@ -361,7 +416,7 @@ Them nen tang upload file cho avatar user va anh ho so tai xe de FE co the uploa
 
 - Targeted `./mvnw.cmd "-Dtest=LocalFileStorageServiceTests,FileUploadControllerTests,UserProfileControllerTests,UserServiceTests,DriverProfileServiceTests" test`: pass 29 tests.
 - `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/validate-db-release.ps1 -ReleasePath db/releases/20260630-driver-document-urls`: pass.
-- Full `./mvnw.cmd test`: pass 362 tests, 0 failure, 0 error.
+- Full `./mvnw.cmd test`: pass 403 tests, 0 failures, 0 errors.
 - `git diff --check`: pass; chi co warning LF/CRLF tren Windows.
 - CodeRabbit CLI: blocked vi `coderabbit` khong co trong PATH; remote installer can approval ro rang truoc khi cai third-party software.
 
@@ -472,7 +527,7 @@ Them endpoint admin/devops de tong hop checklist UAT sandbox cho MoMo/VNPAY tu r
 ### Review truoc commit
 
 - Targeted `./mvnw.cmd "-Dtest=PaymentControllerTests,PaymentSandboxUatPlanServiceTests" test`: pass 8 tests.
-- Full `./mvnw.cmd test`: pass 354 tests, 0 failure, 0 error.
+- Full `./mvnw.cmd test`: pass 403 tests, 0 failures, 0 errors.
 - `git diff --check`: pass; chi co warning LF/CRLF tren Windows.
 - CodeRabbit CLI: blocked vi `coderabbit` khong co trong PATH; buoc chay remote installer bi approval policy tu choi vi se cai third-party software len may khi chua co phe duyet ro rang.
 
@@ -519,7 +574,7 @@ Bo sung metrics foundation de devops co the scrape Prometheus, theo doi HTTP lat
 
 ### Review truoc commit
 
-- Full `./mvnw.cmd test`: pass 350 tests, 0 failure, 0 error.
+- Full `./mvnw.cmd test`: pass 403 tests, 0 failures, 0 errors.
 - `git diff --check`: pass; chi con warning LF/CRLF tren Windows.
 - CodeRabbit CLI: blocked vi `coderabbit` khong co trong PATH; buoc chay remote installer bi approval policy tu choi vi se cai third-party software len may khi chua co phe duyet ro rang.
 
@@ -852,7 +907,7 @@ Them coverage tich hop cho flow MVP sau khi driver da nhan booking: passenger ta
 ### Review truoc commit
 
 - Targeted `./mvnw.cmd -Dtest=BookingMatchingRoutingIntegrationTests test`: pass 2 tests.
-- Full `./mvnw.cmd test`: pass 338 tests.
+- Full `./mvnw.cmd test`: pass 403 tests, 0 failures, 0 errors.
 - `git diff --check`: pass.
 - CodeRabbit CLI: blocked. `coderabbit --version` khong tim thay lenh; installer mac dinh fail vi `sh` khong co trong PATH; installer qua Git Bash fail voi `Unsupported operating system: mingw64_nt-10.0-26200`.
 
@@ -888,7 +943,7 @@ Tang do tin cay cho buoc UAT sandbox MoMo/VNPAY bang service-level contract cove
 ### Review truoc commit
 
 - Payment webhook/provider sandbox targeted suite: pass 41 tests.
-- Full `./mvnw.cmd test`: pass 337 tests.
+- Full `./mvnw.cmd test`: pass 403 tests, 0 failures, 0 errors.
 - `git diff --check`: pass.
 - CodeRabbit CLI: blocked vi `coderabbit` chua cai; installer mac dinh fail do khong co `sh`, installer qua Git Bash fail voi `Unsupported operating system: mingw64_nt-10.0-26200`.
 
