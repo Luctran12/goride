@@ -62,6 +62,7 @@ public class SecurityConfig {
                                 "/api/v1/payments/methods",
                                 "/api/v1/payments/providers/*/webhook",
                                 "/api/v1/pricing/**",
+                                "/api/v1/service-areas/**",
                                 "/actuator",
                                 "/actuator/health",
                                 "/actuator/health/**",

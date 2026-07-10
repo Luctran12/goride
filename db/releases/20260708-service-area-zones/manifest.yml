@@ -1,0 +1,29 @@
+release_id: 20260708-service-area-zones
+title: Add service area geofence zones
+author: Codex
+created_at: 2026-07-08
+risk: medium
+transactional: true
+requires_downtime: false
+applies_after:
+  - 20260707-surge-pricing-rules
+related_commit: pending
+environments:
+  - staging
+  - production
+objects:
+  - service_areas
+  - idx_service_areas_city_active
+  - idx_service_areas_boundary_gist
+pre_deploy_checks:
+  - Run precheck.sql and confirm PostGIS is installed.
+  - Confirm service_areas is absent or compatible with this release.
+deploy_steps:
+  - Run apply.sql before creating service area records through the admin API.
+post_deploy_checks:
+  - Run verify.sql and confirm the table, constraints and indexes exist.
+rollback_plan:
+  - Run rollback.sql only if the application release is rolled back and no service area records must be preserved.
+notes:
+  - When no active service areas exist, booking estimate/create continue to allow trips as before.
+  - Once active areas exist, pickup and dropoff must be inside the same active service area.

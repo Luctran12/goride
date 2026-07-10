@@ -21,6 +21,7 @@ import com.example.goride.booking.service.SurgePricingService.SurgePricingQuote;
 import com.example.goride.common.error.BusinessException;
 import com.example.goride.common.error.ErrorCode;
 import com.example.goride.payment.service.PaymentMethodService;
+import com.example.goride.servicearea.service.ServiceAreaService;
 import com.example.goride.user.domain.User;
 import com.example.goride.user.domain.UserRole;
 import com.example.goride.user.repository.UserRepository;
@@ -55,6 +56,7 @@ public class BookingService {
     private final DistanceService distanceService;
     private final PaymentMethodService paymentMethodService;
     private final SurgePricingService surgePricingService;
+    private final ServiceAreaService serviceAreaService;
     private final ApplicationEventPublisher eventPublisher;
     private final ScheduledRideProperties scheduledRideProperties;
     private final Clock clock;
@@ -67,6 +69,7 @@ public class BookingService {
             DistanceService distanceService,
             PaymentMethodService paymentMethodService,
             SurgePricingService surgePricingService,
+            ServiceAreaService serviceAreaService,
             ApplicationEventPublisher eventPublisher,
             ScheduledRideProperties scheduledRideProperties,
             Clock clock
@@ -78,6 +81,7 @@ public class BookingService {
         this.distanceService = distanceService;
         this.paymentMethodService = paymentMethodService;
         this.surgePricingService = surgePricingService;
+        this.serviceAreaService = serviceAreaService;
         this.eventPublisher = eventPublisher;
         this.scheduledRideProperties = scheduledRideProperties;
         this.clock = clock;
@@ -250,6 +254,11 @@ public class BookingService {
     }
 
     private FareCalculation calculateFare(BookingEstimateRequest request) {
+        serviceAreaService.validateTripWithinServiceArea(
+                request.pickup().toLocation(),
+                request.dropoff().toLocation()
+        );
+
         PricingConfig pricingConfig = pricingConfigRepository
                 .findFirstByVehicleTypeAndActiveTrueAndEffectiveFromLessThanEqualOrderByEffectiveFromDesc(
                         request.vehicleType(),
