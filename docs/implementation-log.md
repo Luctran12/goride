@@ -5,6 +5,34 @@
 > Tu commit `feat: add matching driver search` tro di, moi commit backend can cap nhat file nay trong cung commit.
 
 ---
+## Commit: `docs: mark service area merged`
+
+Branch: `develop`
+
+Phase: Project tracking after service-area merge
+
+### Muc tieu
+
+Cap nhat tai lieu tracking sau khi `feature/service-area-zones` da duoc merge vao `develop`, de cac task tiep theo bat dau tu trang thai dung.
+
+### Noi dung da trien khai
+
+- Cap nhat `docs/current-phase.md` sang branch `develop`, merge commit `af2583a` va feature commit `54e8a3e`.
+- Cap nhat `plan.md` de danh dau service area zones da merged vao `develop` va chuyen phan con lai sang UAT/du lieu polygon that.
+- Cap nhat `docs/pland.xlsx` Summary/Completed/Remaining/Roadmap/Frontend tracking theo trang thai merged.
+- Giu `src/main/resources/application.yml` la thay doi local-only, khong commit.
+
+### Review truoc commit
+
+- Docs-only change, khong chay lai Maven suite.
+- `git diff --check`: pass; chi co warning LF/CRLF tren Windows.
+- CodeRabbit CLI: blocked vi `coderabbit` khong co trong PATH tren may nay.
+
+### Viec tiep theo
+
+- Uu tien MoMo/VNPAY sandbox E2E va webhook sandbox UAT.
+- Sau do xu ly R2 staging UAT, surge tuning va service-area polygon UAT.
+---
 ## Commit: `feat: add service area zones`
 
 Branch: `feature/service-area-zones`
