@@ -5,6 +5,64 @@
 > Tu commit `feat: add matching driver search` tro di, moi commit backend can cap nhat file nay trong cung commit.
 
 ---
+## Commit: `feat: add service area zones`
+
+Branch: `feature/service-area-zones`
+
+Phase: Phase 6 - Product expansion, multi-city/service area foundation
+
+### Muc tieu
+
+Them nen tang service area/geofence de backend co the gioi han booking theo vung phuc vu. Rollout an toan: neu chua co active service area nao, estimate/create booking van hoat dong nhu hien tai; khi da co active area, pickup va dropoff phai cung nam trong mot active area.
+
+### Noi dung da trien khai
+
+- Them entity `ServiceArea` map bang `service_areas` voi polygon PostGIS SRID 4326, city/country/status va timestamp.
+- Them repository, DTO request/response va `ServiceAreaService` de create/update/deactivate/list active/all service areas.
+- Them public API `GET /api/v1/service-areas` cho FE lay polygon active de ve/hint tren map.
+- Them admin API `/api/v1/admin/service-areas` cho list/create/update/deactivate service area.
+- Moc `BookingService` validate pickup/dropoff truoc pricing/distance trong `estimateFare` va `createBooking`.
+- Them `LOCATION_OUT_OF_SERVICE_AREA` flow chi tiet: pickup/dropoff ngoai active zone hoac nam trong hai zone khac nhau.
+- Hoan thien edge-case service area overlap: neu pickup/dropoff cung chia se it nhat mot active area, backend chap nhan theo common area thay vi reject theo match dau tien.
+- Them SQL release `db/releases/20260708-service-area-zones` theo manual release process khong dung Flyway.
+- Cap nhat `plan.md`, `integrate-plan.md`, `docs/current-phase.md`, `docs/implementation-log.md` va `docs/pland.xlsx`.
+
+### Review truoc commit
+
+- Targeted `./mvnw.cmd "-Dtest=ServiceAreaServiceTests,BookingServiceTests" test`: pass 25 tests.
+- SQL release validator `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/validate-db-release.ps1 -ReleasePath db/releases/20260708-service-area-zones`: pass.
+- Full `./mvnw.cmd test`: pass 416 tests, 0 failures, 0 errors.
+- Staged `git diff --cached --check`: passed after docs/workbook update.
+- CodeRabbit CLI: blocked vi `coderabbit` khong co trong PATH tren may nay.
+- User review: pending.
+
+### Files chinh
+
+- `src/main/java/com/example/goride/servicearea/domain/ServiceArea.java`
+- `src/main/java/com/example/goride/servicearea/service/ServiceAreaService.java`
+- `src/main/java/com/example/goride/servicearea/controller/ServiceAreaController.java`
+- `src/main/java/com/example/goride/servicearea/controller/AdminServiceAreaController.java`
+- `src/main/java/com/example/goride/servicearea/dto/**`
+- `src/main/java/com/example/goride/servicearea/repository/ServiceAreaRepository.java`
+- `src/main/java/com/example/goride/booking/service/BookingService.java`
+- `src/main/java/com/example/goride/auth/config/SecurityConfig.java`
+- `src/main/java/com/example/goride/common/error/ErrorCode.java`
+- `db/releases/20260708-service-area-zones/**`
+- `src/test/java/com/example/goride/servicearea/service/ServiceAreaServiceTests.java`
+- `src/test/java/com/example/goride/booking/service/BookingServiceTests.java`
+- `plan.md`
+- `integrate-plan.md`
+- `docs/current-phase.md`
+- `docs/implementation-log.md`
+- `docs/pland.xlsx`
+
+### Viec tiep theo
+
+- Apply SQL release tren staging truoc khi admin tao service area.
+- Nhap polygon that cho thanh pho launch, UAT cac cap pickup/dropoff pho bien va xac nhan FE hien thi loi `LOCATION_OUT_OF_SERVICE_AREA` ro rang.
+- Neu can scale multi-city nhanh, them import/seed tooling cho polygon thay vi tao tay qua admin API.
+
+---
 ## Commit: `chore: add production readiness guardrails`
 
 Branch: `hardening/product-readiness-guardrails`

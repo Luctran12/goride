@@ -22,6 +22,7 @@ import com.example.goride.common.error.BusinessException;
 import com.example.goride.common.error.ErrorCode;
 import com.example.goride.driver.domain.VehicleType;
 import com.example.goride.payment.service.PaymentMethodService;
+import com.example.goride.servicearea.service.ServiceAreaService;
 import com.example.goride.user.domain.User;
 import com.example.goride.user.domain.UserRole;
 import com.example.goride.user.repository.UserRepository;
@@ -45,6 +46,7 @@ import java.util.Set;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.ArgumentMatchers.eq;
@@ -72,6 +74,9 @@ class BookingServiceTests {
 
     @Mock
     private SurgePricingService surgePricingService;
+
+    @Mock
+    private ServiceAreaService serviceAreaService;
 
     @Mock
     private ApplicationEventPublisher eventPublisher;
@@ -237,6 +242,22 @@ class BookingServiceTests {
                 .isInstanceOfSatisfying(BusinessException.class, exception ->
                         assertThat(exception.errorCode()).isEqualTo(ErrorCode.PRICING_CONFIG_NOT_FOUND)
                 );
+    }
+
+    @Test
+    void estimateFareRejectsLocationsOutsideServiceAreaBeforeDistancePricing() {
+        doThrow(new BusinessException(ErrorCode.LOCATION_OUT_OF_SERVICE_AREA))
+                .when(serviceAreaService)
+                .validateTripWithinServiceArea(any(Location.class), any(Location.class));
+
+        assertThatThrownBy(() -> bookingService.estimateFare(estimateRequest()))
+                .isInstanceOfSatisfying(BusinessException.class, exception ->
+                        assertThat(exception.errorCode()).isEqualTo(ErrorCode.LOCATION_OUT_OF_SERVICE_AREA)
+                );
+
+        verify(pricingConfigRepository, never())
+                .findFirstByVehicleTypeAndActiveTrueAndEffectiveFromLessThanEqualOrderByEffectiveFromDesc(any(), any());
+        verify(distanceService, never()).estimate(any(Location.class), any(Location.class));
     }
 
     @Test

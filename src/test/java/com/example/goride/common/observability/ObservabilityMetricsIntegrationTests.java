@@ -10,6 +10,7 @@ import com.example.goride.notification.repository.NotificationRepository;
 import com.example.goride.payment.repository.PaymentRepository;
 import com.example.goride.payment.repository.PaymentSandboxUatResultRepository;
 import com.example.goride.rating.repository.RatingRepository;
+import com.example.goride.servicearea.repository.ServiceAreaRepository;
 import com.example.goride.tracking.repository.TripLocationHistoryRepository;
 import com.example.goride.user.repository.UserRepository;
 import jakarta.annotation.Resource;
@@ -65,6 +66,9 @@ class ObservabilityMetricsIntegrationTests {
 
     @MockitoBean
     private RatingRepository ratingRepository;
+
+    @MockitoBean
+    private ServiceAreaRepository serviceAreaRepository;
 
     @MockitoBean
     private NotificationRepository notificationRepository;

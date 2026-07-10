@@ -1,6 +1,6 @@
 # GoRide Front-end Integration Plan
 
-Branch dang cap nhat: `hardening/product-readiness-guardrails`
+Branch dang cap nhat: `feature/service-area-zones`
 
 Muc tieu file nay:
 - Checklist chuc nang backend da co code va co the tich hop FE.
@@ -230,6 +230,7 @@ type PaymentSandboxUatStatus = "NOT_RUN" | "BLOCKED" | "FAILED" | "PASSED";
 - [x] Admin API deactivate pricing config cu.
 - [x] Admin API quan ly dynamic surge pricing rules.
 - [x] Passenger tinh gia uoc luong voi breakdown base fare, surge amount va multiplier.
+- [x] Backend validate pickup/dropoff trong cung active service area truoc khi tinh gia/tao booking; neu chua co active zone nao thi flow hien tai van duoc phep.
 - [x] Passenger tao booking.
 - [x] Passenger tao scheduled booking bang `scheduledPickupTime`; backend giu `SCHEDULED` va tu dispatch sang matching gan gio don.
 - [x] Passenger/driver xem chi tiet trip neu co quyen.
@@ -268,6 +269,14 @@ type PaymentSandboxUatStatus = "NOT_RUN" | "BLOCKED" | "FAILED" | "PASSED";
 - [x] Fare estimate va booking creation co the dung OSRM-compatible route distance/duration khi `app.routing.enabled=true`.
 - [x] Routing timeout/HTTP error/NoRoute co Haversine fallback cau hinh duoc.
 - [x] Assigned driver co API route tu GPS hien tai den pickup/dropoff, tra GeoJSON `LineString` va maneuver steps.
+
+### Service area zones
+
+- [x] Public API `GET /api/v1/service-areas` tra cac active polygon de FE ve/hint vung phuc vu.
+- [x] Admin API `/api/v1/admin/service-areas` list/create/update/deactivate service area polygon.
+- [x] Booking estimate/create reject pickup/dropoff ngoai active service area bang `LOCATION_OUT_OF_SERVICE_AREA`.
+- [x] Rollout an toan: neu chua co active service area nao, backend khong block booking hien tai.
+- [x] Neu service area bi overlap/nested, backend chap nhan booking khi pickup/dropoff co it nhat mot active area chung; FE khong can tu suy luan theo polygon dau tien.
 
 ### In-trip messaging
 
@@ -367,6 +376,11 @@ type PaymentSandboxUatStatus = "NOT_RUN" | "BLOCKED" | "FAILED" | "PASSED";
 - [x] Da co driver trip routing API tu current GPS den pickup/dropoff theo trip status.
 - [ ] Can UAT routing endpoint production/self-hosted va theo doi tan suat fallback truoc khi launch.
 
+### Service area/multi-city
+
+- [x] Da co backend foundation cho service area polygon va geofence validation.
+- [ ] Can apply SQL release `db/releases/20260708-service-area-zones`, nhap polygon that cho thanh pho launch, UAT cac cap pickup/dropoff pho bien va quyet dinh policy hien thi boundary tren FE.
+
 ### Notification/mo rong
 
 - [x] Backend da co ADC/env production config va startup validation cho Firebase.
@@ -461,6 +475,99 @@ FE action:
 - Khong tu tinh lai fare tren FE; khi tao booking backend snapshot `effectiveSurgeMultiplier` vao trip.
 - Neu user quay lai man confirm sau thoi gian dai, goi estimate lai de lay surge hien tai truoc khi tao booking.
 
+### 4.0.1 Service area zones
+
+#### Lay danh sach vung phuc vu active
+
+```http
+GET /api/v1/service-areas
+```
+
+Response `data`:
+
+```json
+[
+  {
+    "id": 10,
+    "name": "Ho Chi Minh Core",
+    "cityName": "Ho Chi Minh",
+    "countryCode": "VN",
+    "active": true,
+    "boundary": [
+      { "lat": 10.70, "lng": 106.60 },
+      { "lat": 10.70, "lng": 106.90 },
+      { "lat": 10.90, "lng": 106.90 },
+      { "lat": 10.90, "lng": 106.60 }
+    ],
+    "createdAt": "2026-07-08T10:00:00Z",
+    "updatedAt": "2026-07-08T10:00:00Z"
+  }
+]
+```
+
+FE action:
+- Goi khi mo map/booking form de ve polygon hoac hint vung phuc vu.
+- Neu response rong, backend dang rollout open va khong chan booking theo service area.
+- Khong tu quyet dinh hop le cuoi cung tren FE; van goi estimate/create de backend validate.
+
+#### Admin quan ly service area
+
+```http
+GET /api/v1/admin/service-areas
+POST /api/v1/admin/service-areas
+PATCH /api/v1/admin/service-areas/{serviceAreaId}
+PATCH /api/v1/admin/service-areas/{serviceAreaId}/deactivate
+Authorization: Bearer <adminToken>
+```
+
+Request tao moi:
+
+```json
+{
+  "name": "Ho Chi Minh Core",
+  "cityName": "Ho Chi Minh",
+  "countryCode": "VN",
+  "active": true,
+  "boundary": [
+    { "lat": 10.70, "lng": 106.60 },
+    { "lat": 10.70, "lng": 106.90 },
+    { "lat": 10.90, "lng": 106.90 },
+    { "lat": 10.90, "lng": 106.60 }
+  ]
+}
+```
+
+FE action:
+- Boundary dung WGS84 `lat/lng`, toi thieu 3 diem; backend tu dong dong polygon bang diem dau.
+- `PATCH` cho phep gui mot phan field can doi; `deactivate` giu record nhung khong con dung de validate booking.
+- Neu admin chua apply SQL release `20260708-service-area-zones`, cac endpoint nay se loi do bang chua ton tai.
+
+#### Loi service area khi estimate/create booking
+
+Khi da co it nhat mot active service area, `POST /api/v1/bookings/estimate` va `POST /api/v1/bookings` yeu cau pickup/dropoff cung nam trong mot active area.
+
+```json
+{
+  "success": false,
+  "error": {
+    "code": "LOCATION_OUT_OF_SERVICE_AREA",
+    "message": "Location is outside active service areas",
+    "details": {
+      "location": "pickup",
+      "latitude": 11.0,
+      "longitude": 106.7009
+    }
+  },
+  "requestId": "fe-booking-550e8400",
+  "timestamp": "2026-07-08T10:00:00Z"
+}
+```
+
+Neu pickup va dropoff nam o hai active area khac nhau, `details` co `pickupServiceAreaId`, `pickupServiceAreaName`, `dropoffServiceAreaId`, `dropoffServiceAreaName`.
+
+FE action:
+- Giu user o booking form, highlight pickup/dropoff bi loi va yeu cau chon diem trong cung vung phuc vu.
+- Co the dung public boundary list de zoom/hint map, nhung khong hardcode polygon trong app.
 ### 4.1 Auth
 
 #### Dang ky
@@ -843,7 +950,8 @@ Response `data`: `TripResponse`, status ban dau `SEARCHING` neu dat ngay, hoac `
 
 Field optional cho dat lich:
 - `scheduledPickupTime`: ISO-8601 instant UTC, vi du `2026-07-04T10:30:00Z`.
-- Bo field nay hoac gui `null` de dat xe ngay nhu cu.
+- Bo field nay hoac gui
+ull` de dat xe ngay nhu cu.
 - Backend mac dinh yeu cau thoi gian don toi thieu 15 phut trong tuong lai va tra `SCHEDULED_PICKUP_TIME_INVALID` neu qua gan.
 
 FE action:
@@ -2414,7 +2522,9 @@ FE action:
 - Web/admin production phai chay dung domain nam trong backend CORS allowlist; khong dung `localhost` khi smoke production.
 - Khi backend production khong start, day la loi deploy config chua san sang, khong phai loi FE.
 
----## 5. WebSocket integration
+---
+
+## 5. WebSocket integration
 
 ### Ket noi
 
@@ -2531,7 +2641,8 @@ Devops/backend action:
 - [ ] Auth screen: register/login/refresh/logout.
 - [ ] FCM token registration sau login/refresh token.
 - [ ] Home map: chon pickup/dropoff/vehicleType, goi estimate.
-- [ ] Booking confirm: goi create booking; neu dat lich gui `scheduledPickupTime` ISO-8601 UTC, neu dat ngay gui `null`/bo field.
+- [ ] Booking confirm: goi create booking; neu dat lich gui `scheduledPickupTime` ISO-8601 UTC, neu dat ngay gui
+ull`/bo field.
 - [ ] Finding driver: subscribe trip status + notifications.
 - [ ] Active trip:
   - `ACCEPTED`: hien driver dang den.

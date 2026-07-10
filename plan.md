@@ -1,18 +1,18 @@
 # GoRide Project Completion Plan
 
-Last updated: 2026-07-09, Asia/Bangkok
+Last updated: 2026-07-10, Asia/Bangkok
 
 ## Project Snapshot
 
 | Item | Status |
 | --- | --- |
-| Working branch | `hardening/product-readiness-guardrails` |
-| Latest merged feature on develop | `feature/surge-pricing-rules` |
-| Develop merge commit | `merge: surge pricing rules` |
-| Test status | Full `./mvnw.cmd test` passed: 403 tests; targeted `ProductionReadinessValidatorTests` passed: 6 tests |
-| Diff hygiene | `git diff --check` passed; only LF/CRLF normalization warnings on Windows |
+| Working branch | `feature/service-area-zones` |
+| Latest merged feature on develop | `hardening/product-readiness-guardrails` |
+| Develop merge commit | `10e5159` (`merge: production readiness guardrails`) |
+| Test status | Service area targeted `./mvnw.cmd "-Dtest=ServiceAreaServiceTests,BookingServiceTests" test` passed: 25 tests; SQL release validator passed; full `./mvnw.cmd test` passed: 416 tests |
+| Diff hygiene | Staged `git diff --cached --check` passed after docs/workbook update |
 | CodeRabbit CLI | Blocked: `coderabbit` is not in PATH; installer script is Linux/macOS-only and WSL on this machine cannot launch `/bin/bash` |
-| Publish status | `develop` contains backend implementation through surge pricing; current branch is product-readiness hardening for review and is not merged/pushed yet |
+| Publish status | `develop` contains backend implementation through production readiness guardrails; service area zones are in progress on feature branch for review; not merged/pushed yet |
 | Local config | `src/main/resources/application.yml` is environment-specific and must stay uncommitted |
 
 ## Completed Backend Modules
@@ -24,6 +24,7 @@ Last updated: 2026-07-09, Asia/Bangkok
 | Upload storage foundation | Local filesystem upload storage for dev, Cloudflare R2/S3-compatible provider for staging/production, image content-type and size validation, driver document upload URLs and user avatar upload | `POST /api/users/me/avatar`, `POST /api/v1/uploads/driver-documents/{documentType}` | Local/dev storage is ready; Cloudflare R2 provider is implemented and production now needs bucket/domain/secret UAT before launch. |
 | Driver profile and availability | Driver profile creation/update, uploaded portrait/license/ID/vehicle-registration URL metadata, admin approval flow, online/offline status, heartbeat refresh and automatic stale-driver timeout | `/api/v1/drivers/me/profile`, `/api/v1/drivers/me/status`, `POST /api/v1/drivers/me/heartbeat`, admin approval endpoints | Admin pending-driver responses include uploaded document URLs when FE submits them during onboarding. |
 | Pricing and routing | Fare estimate with base/static/dynamic surge breakdown, OSRM-compatible route distance/duration, driver navigation GeoJSON/steps, configurable estimate fallback, pricing configuration and admin surge rule management | `/api/v1/bookings/estimate`, `POST /api/v1/drivers/trips/{tripId}/route`, `/api/v1/pricing`, `/api/v1/admin/pricing`, `/api/v1/admin/pricing/surge-rules`, `/api/v1/admin/pricing/surge-status` | Estimate/create booking can use routed distance/time and demand/supply surge; assigned drivers can request pickup/dropoff routes; completed-trip fare uses actual tracking history with the booking-time surge multiplier snapshot. |
+| Service areas | Public active service area list, admin CRUD/deactivate foundation, pickup/dropoff geofence validation before fare calculation and booking creation | `GET /api/v1/service-areas`, `/api/v1/admin/service-areas`, `/api/v1/bookings/estimate`, `/api/v1/bookings` | In review on `feature/service-area-zones`; no active service areas means rollout remains open, once active areas exist pickup/dropoff must share at least one active area or backend returns `LOCATION_OUT_OF_SERVICE_AREA`. |
 | Booking | Create booking, scheduled booking, booking detail, passenger history/listing, cancellation rules/status updates | `/api/v1/bookings` and related detail/cancel/list endpoints | Booking lifecycle is connected to matching and trip creation; scheduled bookings stay `SCHEDULED` until dispatch window opens. |
 | Trip lifecycle | Driver response, arrived/start/complete transitions, passenger/driver trip history, payment confirmation hooks | `/api/v1/drivers/trips/{tripId}/respond`, `/status`, `/payment-confirm` | Trip completion can compute final fare from tracking history. |
 | Matching | Nearby driver lookup, offer dispatch, accept/reject handling, timeout handling, retry/no-driver flow, rematch on driver availability, scheduled ride dispatch into matching | Internal matching services, scheduled ride scheduler and driver availability events | Initial no-candidate booking remains `SEARCHING`; driver reject/offer timeout also keeps the trip searchable when no immediate next driver is available; scheduled rides open matching at the configured dispatch lead time; driver online/heartbeat events retry unmatched searching trips and dispatch offers when a candidate becomes available; passenger cancellation clears active matching state/driver lock and dismisses the stale driver offer. |
@@ -51,7 +52,7 @@ Last updated: 2026-07-09, Asia/Bangkok
 | P1 | Production hardening | Request correlation, structured stdout logging, centralized error logging, configurable CORS, rate limiting, Actuator probes/metrics and startup guardrails are implemented; add deployment collector dashboards and distributed tracing backend | Deployment platform requirements, log collector, tracing backend | API has safe production defaults, refuses unsafe local config in production, ships JSON stdout logs, exposes probes/metrics, throttles abusive bursts and correlates request IDs across logs/metrics/traces. |
 | P2 | Upload storage production UAT | Cloudflare R2/S3-compatible provider is implemented; provision bucket/API token/public base URL, verify real upload/read access and decide private document access policy | Cloudflare account, R2 bucket, custom/public domain or signed URL policy, deployment secrets | Uploaded files survive redeploys and scale-out; avatar/document URLs are stable; credentials stay outside Git; failed R2 writes return structured `FILE_STORAGE_ERROR`. |
 | P2 | Surge pricing tuning | Dynamic surge rules foundation is implemented; tune thresholds, city/time policies and monitoring in staging | Staging demand/supply data, admin operations policy | Fare estimate exposes transparent surge breakdown, trips snapshot the effective multiplier, and admin can adjust rules safely during UAT. |
-| P2 | Multi-city/service area | Add city/service zone configuration | Geofence data and admin controls | Bookings outside active service zones are rejected or handled according to policy. |
+| P2 | Multi-city/service area | Service area backend foundation is in review on `feature/service-area-zones`; add real city polygons, admin UAT and optional seed/import tooling | Geofence data, operations policy and staging validation | Active service zones are configured for launch cities; pickup/dropoff outside zones return `LOCATION_OUT_OF_SERVICE_AREA`; FE can display active boundaries and admin can manage zones safely. |
 | P2 | Analytics | Add richer operational analytics/exporting | Event model and reporting store | Admin can inspect demand, conversion, revenue, cancellation, and driver utilization trends. |
 
 ## Frontend Integration Checklist
@@ -65,6 +66,7 @@ Last updated: 2026-07-09, Asia/Bangkok
 | Admin user management | `/api/users` admin endpoints | Build list, filter/search, create/update, status controls. |
 | Admin driver approval | `/api/v1/admin/drivers/pending`, approval endpoint | Review pending drivers and approve/reject with reason. |
 | Admin surge pricing | `/api/v1/admin/pricing/surge-rules`, `/api/v1/admin/pricing/surge-status` | Build CRUD/status tools for dynamic surge rules; use current status to show demand/supply and matched rule by vehicle type. |
+| Service areas | `GET /api/v1/service-areas`, `/api/v1/admin/service-areas` | Load active polygons for map hints; admin can create/update/deactivate service zones; handle `LOCATION_OUT_OF_SERVICE_AREA` from estimate/create booking by asking user to choose pickup/dropoff inside one active zone. |
 | Fare estimate | `/api/v1/bookings/estimate` | Show fare/distance/time plus `baseFare`, `surgeAmount`, static/dynamic/effective multipliers and a surge badge when `surge.surgeApplied=true`; never recalculate fare on FE. |
 | Passenger booking | `/api/v1/bookings` | Create immediate booking or scheduled booking with optional `scheduledPickupTime`, show matching progress for `SEARCHING`, show scheduled waiting state for `SCHEDULED`, display the `fareSurgeMultiplier` snapshot on trip detail if needed, allow cancel when allowed. |
 | Driver offers | Driver trip offer APIs and user-specific WebSocket notifications | Display incoming offer countdown, accept/reject, handle timeout, and close stale offer modal when `/user/queue/trip-requests` receives `TRIP_CANCELLED`/`DISMISS`. |
@@ -89,7 +91,7 @@ Last updated: 2026-07-09, Asia/Bangkok
 | Phase 3 | Driver availability reliability | Heartbeat API, Redis TTL refresh and automatic database offline timeout implemented; production interval tuning and Redis/database soak testing remain. |
 | Phase 4 | Production readiness | Firebase secure credential loading, HTTP request correlation, structured stdout logging, centralized application error logging, configurable CORS allowlist, basic API rate limiting, Prometheus metrics, Actuator health/readiness endpoints, SQL release workflow and production startup guardrails are implemented; collector dashboards, distributed tracing backend and final environment UAT remain. |
 | Phase 5 | Integration confidence | Testcontainers PostGIS/Redis foundation, auth flow, booking-to-matching-to-pickup/dropoff-routing flow, trip completion, tracking fallback, cash payment confirmation, notification inbox/FCM token flow, admin flow and backend CI workflow are implemented; provider sandbox E2E validation remains. |
-| Phase 6 | Product expansion | Local upload foundation, Cloudflare R2 provider, in-trip messaging, scheduled rides and surge pricing rules are implemented; R2 deployment UAT, surge tuning, multi-city and analytics remain. |
+| Phase 6 | Product expansion | Local upload foundation, Cloudflare R2 provider, in-trip messaging, scheduled rides, surge pricing rules and service area zones are implemented/in review; R2 deployment UAT, surge tuning, real zone data and analytics remain. |
 
 ## Risks
 
@@ -100,6 +102,7 @@ Last updated: 2026-07-09, Asia/Bangkok
 | Webhook freshness defaults need sandbox validation | The 24-hour age and 5-minute future-skew defaults are configurable but not yet calibrated against real merchant retries | Validate both gateways in sandbox, record freshness replay evidence through UAT result endpoints, then tune provider-specific windows without weakening signature or transaction-reference checks. |
 | Routing endpoint is not production-calibrated | Fare estimates and driver navigation geometry are implemented, but endpoint capacity, route request rate and Vietnamese road quality are not validated | Use a controlled OSRM-compatible endpoint, debounce/re-route on FE, add rate/latency metrics, and tune timeout/profile during UAT. |
 | Surge thresholds can affect conversion and driver acceptance | Dynamic multipliers are now code-ready, but poor thresholds may make estimates confusing or too expensive | Start with conservative rules, monitor demand/supply ratio, cancellation and acceptance metrics, and let admin deactivate rules quickly during UAT. |
+| Service area polygons can block valid trips if drawn poorly | Once active zones exist, estimate/create booking reject trips outside a single active polygon | Start with broad launch-city polygons, test common pickup/dropoff pairs on real devices, keep no active zones until admin data is verified, and expose boundaries to FE for clear user guidance. |
 | Heartbeat timing is not production-calibrated | Aggressive intervals may create reconnect churn; loose intervals delay database cleanup | Start with a 20-second client heartbeat and 60-second timeout, then tune from staging disconnect and scheduler metrics. |
 | Scheduled ride dispatch timing needs staging calibration | If scheduler delay or dispatch lead time is too short, drivers may receive offers too late for pickup | Start with 10-minute dispatch lead time, monitor offer acceptance/ETA in UAT, then tune `SCHEDULED_RIDES_*` settings per city/service policy. |
 | Firebase credential path still needs staging UAT | Credential loading is production-ready, but the real deployment identity/secret mount has not been exercised in this repository | Prefer attached workload identity/ADC; otherwise mount the JSON outside the image, set `GOOGLE_APPLICATION_CREDENTIALS`, and verify startup plus one test push in staging. |
