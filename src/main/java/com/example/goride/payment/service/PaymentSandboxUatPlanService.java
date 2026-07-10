@@ -14,6 +14,7 @@ public class PaymentSandboxUatPlanService {
     private static final String PAYMENT_CHECKOUT_ENDPOINT = "GET /api/v1/payments/trips/{tripId}/checkout";
     private static final String PAYMENT_DETAIL_ENDPOINT = "GET /api/v1/payments/trips/{tripId}";
     private static final String PAYMENT_METHODS_ENDPOINT = "GET /api/v1/payments/methods";
+    private static final String PAYMENT_SANDBOX_E2E_SESSION_ENDPOINT = "POST /api/v1/payments/providers/{providerName}/sandbox-e2e-sessions";
 
     private final PaymentProviderReadinessService paymentProviderReadinessService;
     private final PaymentProviderProperties paymentProviderProperties;
@@ -85,7 +86,8 @@ public class PaymentSandboxUatPlanService {
                 "Run a provider-declined or cancelled sandbox payment and verify the backend keeps the trip/payment consistent.",
                 "Replay the same signed provider callback and verify the terminal payment update is idempotent.",
                 "Send stale or future-dated signed callbacks in sandbox/staging and confirm backend rejects them.",
-                "Refresh payment detail after redirect and confirm the FE state matches webhook-driven backend state."
+                "Refresh payment detail after redirect and confirm the FE state matches webhook-driven backend state.",
+                "Record each real sandbox evidence session through " + PAYMENT_SANDBOX_E2E_SESSION_ENDPOINT + "."
         );
     }
 
@@ -115,7 +117,8 @@ public class PaymentSandboxUatPlanService {
         return List.of(
                 "Confirm checkout returns a provider URL without PAYMENT_PROVIDER_ERROR.",
                 "Confirm provider webhook/IPN updates payment status through the shared completion workflow.",
-                "Confirm duplicate terminal callbacks are accepted idempotently with the same transaction reference."
+                "Confirm duplicate terminal callbacks are accepted idempotently with the same transaction reference.",
+                "Record the checkout URL, completed payment reference, failed payment reference, replay reference and freshness rejection evidence in a sandbox E2E session."
         );
     }
 
