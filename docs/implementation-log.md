@@ -5,6 +5,59 @@
 > Tu commit `feat: add matching driver search` tro di, moi commit backend can cap nhat file nay trong cung commit.
 
 ---
+## Commit: `fix: enforce payment sandbox uat actor foreign key`
+
+Branch: `feature/payment-uat-actor-foreign-key`
+
+Phase: P0 payment audit data integrity
+
+### Muc tieu
+
+Hoan thien referential integrity con thieu cua aggregate sandbox UAT evidence: `payment_sandbox_uat_results.tested_by_user_id` phai tham chieu admin user that va khong duoc tro thanh orphan audit reference.
+
+### Noi dung da trien khai
+
+- Merge `feature/payment-sandbox-e2e-uat` vao `develop` tai `d9b2d98`.
+- Tao SQL release `db/releases/20260711-payment-sandbox-uat-actor-fk`, khong sua nguoc release `20260705` da co the duoc deploy.
+- `precheck.sql`:
+  - fail neu thieu `users` hoac `payment_sandbox_uat_results`;
+  - dem `orphaned_tested_by_user_rows` va yeu cau bang zero.
+- `apply.sql`:
+  - validate constraint cung ten neu da ton tai;
+  - chan apply neu co orphan actor reference;
+  - them `fk_payment_sandbox_uat_tested_by_user` voi `ON DELETE RESTRICT`.
+- `verify.sql` doi chieu source column, referenced table/column, delete action va orphan count.
+- `rollback.sql` chi go constraint, khong xoa hoac sua UAT evidence rows.
+- Cap nhat `integrate-plan.md`, `plan.md`, `docs/current-phase.md`, `docs/implementation-log.md` va `docs/pland.xlsx`.
+
+### Review truoc commit
+
+- SQL release validator: pass cho `20260711-payment-sandbox-uat-actor-fk`.
+- Full `./mvnw.cmd test`: pass 424 tests, 0 failures, 0 errors tren merge base `d9b2d98`.
+- `git diff --check`: pass; chi co warning LF/CRLF tren Windows.
+- Manual code review: pass; khong phat hien blocker trong orphan guard, exact FK validation, release order hoac data-safe rollback.
+- CodeRabbit CLI: chua kha dung trong environment nay.
+- User review: completed 2026-07-11; commit created from the reviewed patch.
+
+### Files chinh
+
+- `db/releases/20260711-payment-sandbox-uat-actor-fk/manifest.yml`
+- `db/releases/20260711-payment-sandbox-uat-actor-fk/precheck.sql`
+- `db/releases/20260711-payment-sandbox-uat-actor-fk/apply.sql`
+- `db/releases/20260711-payment-sandbox-uat-actor-fk/verify.sql`
+- `db/releases/20260711-payment-sandbox-uat-actor-fk/rollback.sql`
+- `integrate-plan.md`
+- `plan.md`
+- `docs/current-phase.md`
+- `docs/pland.xlsx`
+
+### Viec tiep theo
+
+- Commit voi message `fix: enforce payment sandbox uat actor foreign key`.
+- Merge feature vao `develop` sau khi commit.
+- Staging chay precheck, xac nhan orphan count zero, apply va verify theo release order.
+
+---
 ## Commit: `fix: clarify sandbox session evidence and enforce foreign keys`
 
 Branch: `feature/payment-sandbox-e2e-uat`

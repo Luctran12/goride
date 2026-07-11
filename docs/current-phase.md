@@ -8,10 +8,10 @@
 
 ## 1. Repository Status
 
-- Current branch: `feature/payment-sandbox-e2e-uat`.
-- Base develop commit: `77f83a4` (`docs: mark service area merged`).
-- Latest feature commit: `84735cc` (`feat: add payment sandbox e2e evidence`).
-- Latest merged feature on develop: `feature/service-area-zones`.
+- Current branch: `feature/payment-uat-actor-foreign-key`.
+- Base develop commit: `d9b2d98` (`merge: payment sandbox e2e evidence`).
+- Latest merged payment feature: `feature/payment-sandbox-e2e-uat`.
+- Latest merged feature on develop: `feature/payment-sandbox-e2e-uat`.
 - Local-only config: `src/main/resources/application.yml` has environment-specific changes and must remain uncommitted.
 - Paused WIP: production API docs hardening is stashed as `wip: pause production api docs guardrails` and can be resumed after higher-priority product readiness tasks.
 - Working direction: stop adding broad new features; finish production readiness/UAT tasks needed to go product.
@@ -20,22 +20,20 @@
 
 ## 2. Feature Commit
 
-Feature commit: `fix: clarify sandbox session evidence and enforce foreign keys`.
+Feature commit: `fix: enforce payment sandbox uat actor foreign key`.
 
-Scope implemented in this follow-up:
-- Replace session-level `readyForFrontendExposure` with stable `sessionEvidencePassed`.
-- Keep aggregate `PaymentSandboxUatResultResponse.readyForFrontendExposure` as the only FE exposure gate.
-- Add regression coverage proving historical session evidence is independent from current provider readiness.
-- Add four named `ON DELETE RESTRICT` foreign keys for checkout/success/failure payment ids and tested-by user id.
-- Add idempotent constraint creation for compatible pre-existing tables.
-- Extend SQL precheck, manifest and verification for the foreign keys.
+Scope implemented in this branch:
+- Add versioned SQL release `20260711-payment-sandbox-uat-actor-fk`.
+- Reject deployment when aggregate UAT evidence contains orphan tested-by user ids.
+- Add `fk_payment_sandbox_uat_tested_by_user` with `ON DELETE RESTRICT`.
+- Verify exact source/target columns, referenced table, delete action and orphan count.
+- Keep rollback data-safe by removing only the constraint.
 
 Validation so far:
-- Targeted payment tests passed: `./mvnw.cmd "-Dtest=PaymentSandboxE2eSessionServiceTests,PaymentSandboxUatResultServiceTests,PaymentSandboxUatPlanServiceTests,PaymentControllerTests" test` (23 tests).
-- SQL release validator passed: `scripts/validate-db-release.ps1 -ReleasePath db/releases/20260710-payment-sandbox-e2e-sessions`.
-- Full `./mvnw.cmd test` passed: 424 tests.
-- `git diff --check` passed; final manual review found no blocker in the response contract, regression coverage or SQL release.
-- User review completed on 2026-07-11; the follow-up is committed on its feature branch but not merged into `develop`.
+- SQL release validator passed: `scripts/validate-db-release.ps1 -ReleasePath db/releases/20260711-payment-sandbox-uat-actor-fk`.
+- Full `./mvnw.cmd test` passed: 424 tests on merge base `d9b2d98`.
+- `git diff --check` passed; final manual review found no blocker in orphan handling, FK verification, release ordering or rollback safety.
+- User review completed 2026-07-11; commit is being created from the reviewed patch.
 - CodeRabbit CLI blocked: `coderabbit` is not in PATH; `sh` is unavailable; WSL `bash` failed with E_ACCESSDENIED and curl could not connect to cli.coderabbit.ai.
 
 

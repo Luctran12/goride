@@ -1601,6 +1601,8 @@ Admin/devops action:
 - FE/admin dashboard co the dung `readyForFrontendExposure=true` lam gate cuoi cung de hien MoMo/VNPAY cho user that tren moi truong UAT/production.
 - Nen uu tien ghi session E2E chi tiet bang endpoint ben duoi; endpoint `PUT` nay van huu ich neu can cap nhat aggregate result thu cong.
 - Endpoint chi luu evidence va notes ngan; khong luu raw callback payload, card/wallet data, access key hay secret.
+- Aggregate evidence `testedByUserId` duoc rang buoc toi `users(id)` boi release `20260711-payment-sandbox-uat-actor-fk`; thay doi nay khong doi JSON contract.
+- Truoc deploy release FK, devops phai chay `precheck.sql` va xac nhan `orphaned_tested_by_user_rows=0`.
 
 #### Admin ghi sandbox E2E session evidence
 
@@ -2724,6 +2726,13 @@ Devops/backend action:
 - `apply.sql` mac dinh phai co `BEGIN;` va `COMMIT;`; neu operation Postgres khong transactional thi set `transactional: false` trong manifest va ghi ly do.
 - Neu co `DROP TABLE`, `TRUNCATE`, `DELETE FROM` hoac drop column, phai them comment `-- destructive-reviewed: true` sau review ro rang.
 - Khong dung Hibernate `ddl-auto=update` cho staging/production; chi dung local dev de di nhanh.
+
+Payment sandbox release order:
+
+1. `20260705-payment-sandbox-uat-results`: tao aggregate UAT evidence table.
+2. `20260710-payment-sandbox-e2e-sessions`: tao session evidence va payment/user FKs.
+3. `20260711-payment-sandbox-uat-actor-fk`: them aggregate `tested_by_user_id -> users(id)` FK; precheck phai tra orphan count bang zero.
+
 
 ---
 ## 6. Man hinh FE goi y theo flow
