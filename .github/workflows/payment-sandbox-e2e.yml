@@ -1,0 +1,119 @@
+name: Payment Sandbox E2E
+
+on:
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: Public staging backend URL
+        required: true
+        type: string
+      provider:
+        description: Sandbox provider to verify
+        required: true
+        type: choice
+        options:
+          - momo
+          - vnpay
+      success_trip_id:
+        description: Completed trip with a pending provider payment for success callback
+        required: true
+        type: number
+      failure_trip_id:
+        description: Different completed trip with a pending provider payment for stale/failure callbacks
+        required: true
+        type: number
+      notes:
+        description: Evidence note stored with the backend session
+        required: false
+        default: GitHub Actions sandbox E2E verification
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: payment-sandbox-e2e-${{ inputs.provider }}
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    name: Verify ${{ inputs.provider }} sandbox callbacks
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: staging
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Materialize protected MoMo callback payloads
+        if: inputs.provider == 'momo'
+        shell: pwsh
+        env:
+          CALLBACK_SUCCESS: ${{ secrets.GORIDE_MOMO_SUCCESS_CALLBACK_BASE64 }}
+          CALLBACK_FAILURE: ${{ secrets.GORIDE_MOMO_FAILURE_CALLBACK_BASE64 }}
+          CALLBACK_STALE: ${{ secrets.GORIDE_MOMO_STALE_CALLBACK_BASE64 }}
+        run: |
+          $payloads = @{
+            success = $env:CALLBACK_SUCCESS
+            failure = $env:CALLBACK_FAILURE
+            stale = $env:CALLBACK_STALE
+          }
+          foreach ($entry in $payloads.GetEnumerator()) {
+            if ([string]::IsNullOrWhiteSpace($entry.Value)) {
+              throw "Missing protected callback payload: $($entry.Key)."
+            }
+            $path = Join-Path $env:RUNNER_TEMP "$($entry.Key)-callback.json"
+            [IO.File]::WriteAllBytes($path, [Convert]::FromBase64String($entry.Value))
+          }
+
+      - name: Materialize protected VNPay callback payloads
+        if: inputs.provider == 'vnpay'
+        shell: pwsh
+        env:
+          CALLBACK_SUCCESS: ${{ secrets.GORIDE_VNPAY_SUCCESS_CALLBACK_BASE64 }}
+          CALLBACK_FAILURE: ${{ secrets.GORIDE_VNPAY_FAILURE_CALLBACK_BASE64 }}
+          CALLBACK_STALE: ${{ secrets.GORIDE_VNPAY_STALE_CALLBACK_BASE64 }}
+        run: |
+          $payloads = @{
+            success = $env:CALLBACK_SUCCESS
+            failure = $env:CALLBACK_FAILURE
+            stale = $env:CALLBACK_STALE
+          }
+          foreach ($entry in $payloads.GetEnumerator()) {
+            if ([string]::IsNullOrWhiteSpace($entry.Value)) {
+              throw "Missing protected callback payload: $($entry.Key)."
+            }
+            $path = Join-Path $env:RUNNER_TEMP "$($entry.Key)-callback.json"
+            [IO.File]::WriteAllBytes($path, [Convert]::FromBase64String($entry.Value))
+          }
+
+      - name: Run payment sandbox E2E verification
+        shell: pwsh
+        env:
+          GORIDE_ADMIN_TOKEN: ${{ secrets.GORIDE_STAGING_ADMIN_TOKEN }}
+          GORIDE_STAGING_BASE_URL: ${{ inputs.base_url }}
+          GORIDE_PAYMENT_PROVIDER: ${{ inputs.provider }}
+          GORIDE_SUCCESS_TRIP_ID: ${{ inputs.success_trip_id }}
+          GORIDE_FAILURE_TRIP_ID: ${{ inputs.failure_trip_id }}
+          GORIDE_E2E_NOTES: ${{ inputs.notes }}
+        run: |
+          ./scripts/test-payment-sandbox-e2e.ps1 `
+            -BaseUrl $env:GORIDE_STAGING_BASE_URL `
+            -Provider $env:GORIDE_PAYMENT_PROVIDER `
+            -SuccessTripId ([long]$env:GORIDE_SUCCESS_TRIP_ID) `
+            -FailureTripId ([long]$env:GORIDE_FAILURE_TRIP_ID) `
+            -SuccessCallbackPayloadPath (Join-Path $env:RUNNER_TEMP 'success-callback.json') `
+            -FailureCallbackPayloadPath (Join-Path $env:RUNNER_TEMP 'failure-callback.json') `
+            -StaleCallbackPayloadPath (Join-Path $env:RUNNER_TEMP 'stale-callback.json') `
+            -Notes $env:GORIDE_E2E_NOTES `
+            -OutputPath 'artifacts/payment-sandbox-e2e-report.json'
+
+      - name: Upload sanitized evidence report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: payment-sandbox-e2e-${{ inputs.provider }}
+          path: artifacts/payment-sandbox-e2e-report.json
+          if-no-files-found: warn
+          retention-days: 30
