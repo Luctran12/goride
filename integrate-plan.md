@@ -387,7 +387,7 @@ type PaymentSandboxUatStatus = "NOT_RUN" | "BLOCKED" | "FAILED" | "PASSED";
 ### Payment/rating/statistics
 
 - [x] Payment method metadata da expose `CASH`, `MOMO`, `VNPAY`; hien chi `CASH` enabled mac dinh.
-- [ ] MoMo va VNPAY da co signed checkout/webhook, readiness diagnostics, sandbox UAT plan, persisted UAT evidence, session-level sandbox E2E evidence API, freshness policy va service-level sandbox callback contract tests; ca hai van can sandbox account/E2E callback test that va admin phai mark `PASSED` day du truoc khi expose FE.
+- [ ] MoMo va VNPAY da co signed checkout/webhook, readiness diagnostics, sandbox UAT evidence APIs, service-level callback tests va protected workflow de replay callback payload sandbox da ky; ca hai van can merchant sandbox checkout tren app that truoc khi expose FE.
 
 ### Routing/maps
 
@@ -1711,6 +1711,30 @@ Admin/FE action:
 - `sandboxReady` trong response phan anh config hien tai, con `sessionEvidencePassed` phan anh evidence cua chinh session.
 - FE consumer payment method khong can goi endpoint session nay; chi dung aggregate `readyForFrontendExposure=true` tu metadata/UAT result de hien MoMo/VNPAY cho nguoi dung.
 - Neu response loi `VALIDATION_ERROR`, dung `details.field`, `details.missingRequirements` hoac payment status hien tai de sua evidence truoc khi record lai.
+#### Tu dong hoa callback sandbox tren staging
+
+Workflow `.github/workflows/payment-sandbox-e2e.yml` goi `scripts/test-payment-sandbox-e2e.ps1` theo thu tu:
+
+1. Xac nhan provider co `sandboxReady=true`.
+2. Goi checkout cho hai trip khac nhau, deu da completed va co payment `PENDING` cung provider.
+3. Gui signed success callback, gui lai cung callback de xac nhan idempotent replay, sau do verify payment `COMPLETED`.
+4. Gui signed stale callback cho failure payment va verify callback bi reject trong khi payment van `PENDING`.
+5. Gui signed failure callback hop le va verify payment `FAILED`.
+6. POST session evidence `PASSED`, sau do verify aggregate `readyForFrontendExposure=true`.
+
+GitHub environment `staging` can co approval rule va secrets:
+
+- `GORIDE_STAGING_ADMIN_TOKEN`
+- `GORIDE_MOMO_SUCCESS_CALLBACK_BASE64`, `GORIDE_MOMO_FAILURE_CALLBACK_BASE64`, `GORIDE_MOMO_STALE_CALLBACK_BASE64`
+- `GORIDE_VNPAY_SUCCESS_CALLBACK_BASE64`, `GORIDE_VNPAY_FAILURE_CALLBACK_BASE64`, `GORIDE_VNPAY_STALE_CALLBACK_BASE64`
+
+Moi callback secret la Base64 cua mot JSON object da ky, phai khop payment id/order id, amount va merchant config cua hai trip nhap khi dispatch workflow. Workflow khong log/upload raw payload; artifact chi co provider, trip/payment/session ids, check status va aggregate gate.
+
+Gioi han quan trong:
+- Workflow nay xac nhan checkout generation, webhook contract, persistence, replay/freshness va evidence pipeline tren staging.
+- Workflow khong tu thao tac app MoMo/VNPAY cua nguoi dung. Truoc production van phai chay it nhat mot merchant sandbox checkout that cho moi provider va review callback payload/acknowledgement do gateway that gui.
+- FE consumer van chi dung aggregate `readyForFrontendExposure`; khong dung artifact workflow hoac `sessionEvidencePassed` rieng le lam gate.
+
 #### Runtime config cho provider online
 
 Backend da co config foundation cho MoMo/VNPay, mac dinh disabled.

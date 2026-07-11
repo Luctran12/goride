@@ -5,6 +5,67 @@
 > Tu commit `feat: add matching driver search` tro di, moi commit backend can cap nhat file nay trong cung commit.
 
 ---
+## Commit: `ci: automate payment sandbox callback verification`
+
+Branch: `feature/payment-sandbox-e2e-automation`
+
+Phase: P0/P1 payment provider sandbox UAT automation
+
+### Muc tieu
+
+Tu dong hoa viec replay signed sandbox callbacks tren staging, verify payment state va chi ghi evidence `PASSED` khi checkout, success/failure, replay va freshness deu duoc backend xac nhan.
+
+### Noi dung da trien khai
+
+- Them `scripts/test-payment-sandbox-e2e.ps1`:
+  - bat buoc HTTPS origin va admin token;
+  - checkout hai trip/payment pending rieng biet;
+  - replay success callback, reject stale callback, accept failure callback;
+  - verify `COMPLETED`/`PENDING`/`FAILED` qua API;
+  - record session `PASSED` va verify aggregate `readyForFrontendExposure=true`;
+  - artifact thanh cong/that bai khong chua admin token, raw payload hoac callback signature.
+- Them `.github/workflows/payment-sandbox-e2e.yml`:
+  - manual dispatch theo provider va hai trip id;
+  - protected `staging` environment;
+  - callback JSON Base64 doc tu secrets va chi materialize trong runner temp;
+  - workflow inputs di qua environment variables, khong noi suy truc tiep vao PowerShell `run`.
+- Giu real merchant wallet/bank-app checkout la launch gate rieng; captured signed callback automation khong tu nhan la real provider UAT.
+
+### Review truoc commit
+
+- PowerShell parser: pass.
+- Controlled connection-failure smoke: pass; tao sanitized `success=false` report va khong leak token/signature marker.
+- Static workflow validation: pass; khong co `${{ inputs.* }}` nam trong PowerShell `run` block.
+- Targeted payment regression: pass 26 tests.
+- Full `./mvnw.cmd test`: 436 tests; 426 pass, 10 integration tests loi khoi tao vi Testcontainers khong tim thay Docker environment; khong co assertion failure.
+- `git diff --check`: pass; chi co warning LF/CRLF tren Windows.
+- Manual review: pass; da tach secrets theo provider, validate HTTPS origin va khong thay blocker trong callback ordering/evidence gate/report sanitization.
+- Actionlint va CodeRabbit CLI: chua kha dung.
+- User review: completed 2026-07-11; commit se duoc tao tu dung patch da review.
+
+### Files chinh
+
+- `.github/workflows/payment-sandbox-e2e.yml`
+- `scripts/test-payment-sandbox-e2e.ps1`
+- `integrate-plan.md`
+- `plan.md`
+- `docs/current-phase.md`
+- `docs/implementation-log.md`
+- `docs/pland.xlsx`
+
+### Cach review
+
+- Xac nhan khong co workflow input nam truc tiep trong PowerShell `run` block.
+- Xac nhan report khong serialize callback payload, signature hoac admin token.
+- Xac nhan stale callback duoc gui truoc fresh failure callback va payment van `PENDING` sau stale rejection.
+- Xac nhan chi POST session `PASSED` sau tat ca checks va aggregate gate deu pass.
+
+### Viec tiep theo
+
+- Chay workflow tren staging voi payload MoMo/VNPAY da ky va hai payment pending moi cho tung provider.
+- Chay merchant sandbox checkout that tren app cua tung provider truoc khi production expose.
+
+---
 ## Commit: `feat: add redis-backed distributed rate limiting`
 
 Branch: `feature/redis-rate-limit-store`
