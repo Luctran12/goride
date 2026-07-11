@@ -1,6 +1,6 @@
 # GoRide Front-end Integration Plan
 
-Branch dang cap nhat: `feature/staging-readiness-smoke`
+Branch dang cap nhat: `feature/production-api-docs-guardrails`
 
 Muc tieu file nay:
 - Checklist chuc nang backend da co code va co the tich hop FE.
@@ -2625,6 +2625,8 @@ CLOUDFLARE_R2_BUCKET=goride-prod
 CLOUDFLARE_R2_ACCESS_KEY=<r2-access-key>
 CLOUDFLARE_R2_SECRET_KEY=<r2-secret-key>
 CLOUDFLARE_R2_PUBLIC_BASE_URL=https://cdn.goride.example
+SPRINGDOC_API_DOCS_ENABLED=false
+SPRINGDOC_SWAGGER_UI_ENABLED=false
 ```
 
 Backend se chan cac loi cau hinh sau trong production:
@@ -2633,9 +2635,11 @@ Backend se chan cac loi cau hinh sau trong production:
 - `STORAGE_PROVIDER=local`.
 - CORS allowed origins/patterns chua localhost, loopback hoac wildcard `*`.
 - `STORAGE_PROVIDER=r2` nhung thieu endpoint, bucket, access key, secret key hoac public base URL.
+- `springdoc.api-docs.enabled` hoac `springdoc.swagger-ui.enabled` van true; production bat buoc tat ca OpenAPI JSON va Swagger UI.
 
 Devops action:
-- Dung `APP_ENV=local` cho may dev de tiep tuc dung local storage/CORS localhost.
+- Dung `APP_ENV=local` cho may dev de tiep tuc dung local storage/CORS localhost va giu API docs/Swagger UI enabled theo default.
+- Staging co the giu docs enabled cho QA/FE; production phai set ca hai `SPRINGDOC_*_ENABLED=false` va `/v3/api-docs`, `/swagger-ui/**` se khong duoc dang ky.
 - Truoc staging/production, set day du env vars tren platform, khong commit secret vao Git.
 - Neu app fail voi message `Production readiness check failed`, doc tung property trong message va sua env/deployment config truoc khi restart.
 

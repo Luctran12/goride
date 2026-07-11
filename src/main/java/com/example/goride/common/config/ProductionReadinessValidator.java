@@ -57,6 +57,7 @@ public class ProductionReadinessValidator implements SmartInitializingSingleton 
         validateDdlAuto(violations);
         validateStorage(violations);
         validateCors(violations);
+        validateApiDocumentation(violations);
         return violations;
     }
 
@@ -116,6 +117,15 @@ public class ProductionReadinessValidator implements SmartInitializingSingleton 
         }
     }
 
+    private void validateApiDocumentation(List<String> violations) {
+        if (booleanProperty("springdoc.api-docs.enabled", true)) {
+            violations.add("springdoc.api-docs.enabled must be false in production");
+        }
+        if (booleanProperty("springdoc.swagger-ui.enabled", true)) {
+            violations.add("springdoc.swagger-ui.enabled must be false in production");
+        }
+    }
+
     private List<String> unsafeCorsValues(List<String> values) {
         return values.stream()
                 .filter(this::isUnsafeCorsValue)
@@ -140,6 +150,10 @@ public class ProductionReadinessValidator implements SmartInitializingSingleton 
 
     private String property(String name, String defaultValue) {
         return environment.getProperty(name, defaultValue);
+    }
+
+    private boolean booleanProperty(String name, boolean defaultValue) {
+        return environment.getProperty(name, Boolean.class, defaultValue);
     }
 
     private String normalize(String value) {

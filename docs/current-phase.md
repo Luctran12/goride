@@ -8,33 +8,31 @@
 
 ## 1. Repository Status
 
-- Current branch: `feature/staging-readiness-smoke`.
-- Base develop commit: `1596826` (`merge: payment sandbox uat actor foreign key`).
+- Current branch: `feature/production-api-docs-guardrails`.
+- Base develop commit: `3ea7317` (`merge: staging readiness smoke gate`).
 - Latest merged payment feature: `feature/payment-uat-actor-foreign-key`.
-- Latest merged feature on develop: `feature/payment-uat-actor-foreign-key`.
+- Latest merged feature on develop: `feature/staging-readiness-smoke`.
 - Local-only config: `src/main/resources/application.yml` has environment-specific changes and must remain uncommitted.
-- Paused WIP: production API docs hardening is stashed as `wip: pause production api docs guardrails` and can be resumed after higher-priority product readiness tasks.
+- Held WIP: OTLP tracing remains on `feature/otlp-tracing-config` and is not part of this commit.
 - Working direction: stop adding broad new features; finish production readiness/UAT tasks needed to go product.
 
 ---
 
 ## 2. Feature Commit
 
-Feature commit: `chore: add staging readiness smoke gate`.
+Feature commit: `chore: enforce production api docs guardrails`.
 
 Scope implemented in this branch:
-- Add a PowerShell smoke command for liveness, readiness, app identity, service-area data and payment metadata.
-- Add optional admin checks for MoMo/VNPAY readiness, aggregate UAT evidence and public exposure consistency.
-- Add strict launch gates for active service areas and online payments with non-zero failure exit codes.
-- Export a secret-free JSON report for deployment evidence.
-- Add a manually triggered GitHub Actions workflow with a 14-day report artifact.
+- Add environment-controlled Springdoc API and Swagger UI flags, enabled by default for local/staging use.
+- Reject production startup while either API documentation surface remains enabled.
+- Keep existing authentication/rate-limit behavior unchanged; disabled Springdoc endpoints are not registered.
+- Add coverage for production-safe config, each independently enabled documentation surface and non-production availability.
+- Update frontend/devops integration guidance and project tracking documents.
 
 Validation so far:
-- PowerShell syntax validation passed.
-- Mock staging happy path passed 13 checks with strict service-area and online-payment gates.
-- Missing admin token failure path returned exit code 1 as expected.
-- Full `./mvnw.cmd test` passed: 424 tests, 0 failures, 0 errors.
-- `git diff --check` and final manual review passed; workflow inputs are isolated through environment variables and no blocker remains.
+- Targeted `ProductionReadinessValidatorTests` passed: 9 tests.
+- Full `./mvnw.cmd test` passed: 427 tests, 0 failures, 0 errors.
+- `git diff --check` and final manual review passed; no blocker remains in environment detection, independent flags or non-production behavior.
 - User review completed 2026-07-11; commit is being created from the reviewed patch.
 - CodeRabbit CLI blocked: `coderabbit` is not in PATH; `sh` is unavailable; WSL `bash` failed with E_ACCESSDENIED and curl could not connect to cli.coderabbit.ai.
 
