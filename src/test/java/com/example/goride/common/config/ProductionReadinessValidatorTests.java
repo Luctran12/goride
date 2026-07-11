@@ -144,6 +144,39 @@ class ProductionReadinessValidatorTests {
                 .hasMessageContaining(expectedViolation);
     }
 
+    @Test
+    void rejectsInMemoryRateLimitStoreInProduction() {
+        MockEnvironment environment = environment("production", "validate")
+                .withProperty("app.security.rate-limit.store", "memory");
+
+        ProductionReadinessValidator validator = new ProductionReadinessValidator(
+                environment,
+                productionJwt(),
+                cors(List.of("https://app.goride.example"), List.of()),
+                r2Storage()
+        );
+
+        assertThatThrownBy(validator::validate)
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("app.security.rate-limit.store must be redis");
+    }
+
+    @Test
+    void allowsInMemoryStoreWhenProductionRateLimitingIsDisabled() {
+        MockEnvironment environment = environment("production", "validate")
+                .withProperty("app.security.rate-limit.enabled", "false")
+                .withProperty("app.security.rate-limit.store", "memory");
+
+        ProductionReadinessValidator validator = new ProductionReadinessValidator(
+                environment,
+                productionJwt(),
+                cors(List.of("https://app.goride.example"), List.of()),
+                r2Storage()
+        );
+
+        assertThatCode(validator::validate).doesNotThrowAnyException();
+    }
+
     private MockEnvironment environment(String appEnvironment, String ddlAuto) {
         return environmentWithApiDocs(appEnvironment, ddlAuto, false, false);
     }
@@ -158,7 +191,9 @@ class ProductionReadinessValidatorTests {
                 .withProperty("app.environment", appEnvironment)
                 .withProperty("spring.jpa.hibernate.ddl-auto", ddlAuto)
                 .withProperty("springdoc.api-docs.enabled", Boolean.toString(apiDocsEnabled))
-                .withProperty("springdoc.swagger-ui.enabled", Boolean.toString(swaggerUiEnabled));
+                .withProperty("springdoc.swagger-ui.enabled", Boolean.toString(swaggerUiEnabled))
+                .withProperty("app.security.rate-limit.enabled", "true")
+                .withProperty("app.security.rate-limit.store", "redis");
     }
 
     private JwtProperties productionJwt() {

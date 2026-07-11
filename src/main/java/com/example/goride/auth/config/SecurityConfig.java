@@ -5,7 +5,7 @@ import javax.crypto.spec.SecretKeySpec;
 
 import com.example.goride.auth.security.RestAccessDeniedHandler;
 import com.example.goride.auth.security.RestAuthenticationEntryPoint;
-import com.example.goride.common.ratelimit.InMemoryRateLimitStore;
+import com.example.goride.common.ratelimit.RateLimitStore;
 import com.example.goride.common.ratelimit.RateLimitFilter;
 import com.example.goride.common.ratelimit.RateLimitProperties;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -47,7 +47,7 @@ public class SecurityConfig {
             RestAccessDeniedHandler accessDeniedHandler,
             CorsConfigurationSource corsConfigurationSource,
             RateLimitProperties rateLimitProperties,
-            InMemoryRateLimitStore rateLimitStore,
+            RateLimitStore rateLimitStore,
             ObjectMapper objectMapper,
             MeterRegistry meterRegistry
     ) throws Exception {

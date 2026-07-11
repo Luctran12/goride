@@ -1,6 +1,6 @@
 # GoRide Front-end Integration Plan
 
-Branch dang cap nhat: `feature/production-api-docs-guardrails`
+Branch dang cap nhat: `feature/redis-rate-limit-store`
 
 Muc tieu file nay:
 - Checklist chuc nang backend da co code va co the tich hop FE.
@@ -93,16 +93,18 @@ FE action:
 
 ### Rate limit cho REST API
 
-Backend bat token-bucket rate limit mac dinh cho REST API, theo client IP. Cac endpoint diagnostics/docs/WebSocket mac dinh duoc exclude: `/actuator/**`, `/v3/api-docs/**`, `/swagger-ui/**`, `/ws/**`, `/ws-native/**`.
+Backend bat token-bucket rate limit mac dinh cho REST API, theo client IP. Local/test dung memory store; staging/production dung Redis Lua atomic de moi replica chia se cung quota. Cac endpoint diagnostics/docs/WebSocket mac dinh duoc exclude.
 
 Runtime config:
 
 ```properties
 RATE_LIMIT_ENABLED=true
+RATE_LIMIT_STORE=memory
 RATE_LIMIT_CAPACITY=120
 RATE_LIMIT_REFILL_TOKENS=120
 RATE_LIMIT_REFILL_PERIOD_SECONDS=60
 RATE_LIMIT_MAX_KEYS=10000
+RATE_LIMIT_REDIS_KEY_PREFIX=goride:rate-limit:
 RATE_LIMIT_EXCLUDED_PATHS=/actuator/**,/v3/api-docs/**,/swagger-ui/**,/swagger-ui.html,/ws/**,/ws-native/**
 RATE_LIMIT_USE_FORWARDED_FOR=false
 ```
@@ -124,6 +126,21 @@ Khi vuot gioi han, backend tra HTTP 429:
 }
 ```
 
+Khi Redis store loi, backend fail closed va tra HTTP 503:
+
+```json
+{
+  "success": false,
+  "error": {
+    "code": "RATE_LIMIT_STORE_UNAVAILABLE",
+    "message": "Rate limit service is unavailable",
+    "details": {
+      "retryAfterSeconds": 1
+    }
+  }
+}
+```
+
 Response headers lien quan:
 
 ```http
@@ -135,6 +152,7 @@ X-RateLimit-Reset: 1782621960
 
 FE action:
 - Khi gap HTTP 429 hoac `error.code=RATE_LIMIT_EXCEEDED`, dung retry tuc thi va schedule retry theo `Retry-After` hoac `error.details.retryAfterSeconds`.
+- Khi gap HTTP 503 hoac `RATE_LIMIT_STORE_UNAVAILABLE`, retry sau it nhat mot giay; backend readiness/Redis can duoc xu ly nhu dependency outage, khong retry storm.
 - Hien thong bao tam thoi, vi du "He thong dang nhan qua nhieu yeu cau, thu lai sau it giay".
 - Giu `requestId`, endpoint va thoi gian request de backend trace log.
 - Voi login/register/booking, disable nut submit trong thoi gian backoff de tranh tao retry storm.
@@ -2627,6 +2645,9 @@ CLOUDFLARE_R2_SECRET_KEY=<r2-secret-key>
 CLOUDFLARE_R2_PUBLIC_BASE_URL=https://cdn.goride.example
 SPRINGDOC_API_DOCS_ENABLED=false
 SPRINGDOC_SWAGGER_UI_ENABLED=false
+RATE_LIMIT_ENABLED=true
+RATE_LIMIT_STORE=redis
+RATE_LIMIT_REDIS_KEY_PREFIX=goride:rate-limit:
 ```
 
 Backend se chan cac loi cau hinh sau trong production:
@@ -2636,6 +2657,7 @@ Backend se chan cac loi cau hinh sau trong production:
 - CORS allowed origins/patterns chua localhost, loopback hoac wildcard `*`.
 - `STORAGE_PROVIDER=r2` nhung thieu endpoint, bucket, access key, secret key hoac public base URL.
 - `springdoc.api-docs.enabled` hoac `springdoc.swagger-ui.enabled` van true; production bat buoc tat ca OpenAPI JSON va Swagger UI.
+- Application rate limiting enabled nhung `app.security.rate-limit.store` khong phai `redis`; multi-replica production bat buoc dung shared bucket.
 
 Devops action:
 - Dung `APP_ENV=local` cho may dev de tiep tuc dung local storage/CORS localhost va giu API docs/Swagger UI enabled theo default.
