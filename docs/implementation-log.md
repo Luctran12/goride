@@ -5,6 +5,84 @@
 > Tu commit `feat: add matching driver search` tro di, moi commit backend can cap nhat file nay trong cung commit.
 
 ---
+## Commit: `feat: add redis-backed distributed rate limiting`
+
+Branch: `feature/redis-rate-limit-store`
+
+Phase: P1 multi-replica production hardening
+
+### Muc tieu
+
+Thay bucket rate limit per-instance bang Redis token bucket dung chung khi deploy nhieu replica, giu nguyen contract 429 cho FE va co loi 503 ro rang khi store khong kha dung.
+
+### Noi dung da trien khai
+
+- Merge `feature/production-api-docs-guardrails` vao `develop` tai `bea0201`.
+- Them `RateLimitStore` abstraction:
+  - `InMemoryRateLimitStore` chi duoc tao khi store la `memory` hoac chua cau hinh;
+  - `RedisRateLimitStore` chi duoc tao khi `RATE_LIMIT_STORE=redis`.
+- Redis store:
+  - dung Lua script de refill/consume/HSET/PEXPIRE atomic;
+  - dung Redis server `TIME` de cac replica khong lech clock;
+  - SHA-256 client key truoc khi luu Redis;
+  - TTL du dai de bucket refill full va tu cleanup khi idle.
+- `RateLimitFilter` phu thuoc interface, giu nguyen 429 headers/body.
+- Khi store throw runtime error:
+  - tra HTTP 503 voi `RATE_LIMIT_STORE_UNAVAILABLE`;
+  - tra `Retry-After: 1`;
+  - tang `goride.rate.limit.requests{outcome="store_error"}`;
+  - khong log client key/IP.
+- Production guardrail:
+  - neu rate limiting enabled, `app.security.rate-limit.store` bat buoc la `redis`;
+  - cho phep memory neu deployment chu dong disable application rate limiting de dung edge gateway.
+- Them config `RATE_LIMIT_STORE` va `RATE_LIMIT_REDIS_KEY_PREFIX`.
+- Cap nhat `integrate-plan.md`, `plan.md`, `docs/current-phase.md`, `docs/implementation-log.md` va `docs/pland.xlsx`.
+
+### Review truoc commit
+
+- Targeted suite: pass 19 tests.
+- Redis 7 Testcontainers:
+  - hai store instances chia se cung bucket;
+  - bucket refill sau configured period;
+  - Spring conditional wiring inject Redis store;
+  - HTTP request thu ba tra 429 va giu headers/error code.
+- Store failure unit test: pass HTTP 503, retry header, JSON error va metric.
+- Full `./mvnw.cmd test`: da chay 436 tests; 426 pass, 10 integration tests loi khoi tao vi Testcontainers khong tim thay Docker environment. Khong co assertion failure.
+- `git diff --check`: pass; chi co warning LF/CRLF tren Windows.
+- Manual code review: pass, khong thay blocker trong Lua atomic token bucket, conditional bean wiring, fail-closed 503, production guardrail hoac contract 429 hien tai.
+- CodeRabbit CLI: chua kha dung trong environment nay.
+- User review: completed 2026-07-11; commit se duoc tao tu dung patch da review.
+
+### Files chinh
+
+- `src/main/java/com/example/goride/common/ratelimit/RateLimitStore.java`
+- `src/main/java/com/example/goride/common/ratelimit/InMemoryRateLimitStore.java`
+- `src/main/java/com/example/goride/common/ratelimit/RedisRateLimitStore.java`
+- `src/main/java/com/example/goride/common/ratelimit/RateLimitFilter.java`
+- `src/main/java/com/example/goride/common/ratelimit/RateLimitProperties.java`
+- `src/main/java/com/example/goride/common/config/ProductionReadinessValidator.java`
+- `src/test/java/com/example/goride/integration/RedisRateLimitStoreIntegrationTests.java`
+- `integrate-plan.md`
+- `plan.md`
+- `docs/current-phase.md`
+- `docs/implementation-log.md`
+- `docs/pland.xlsx`
+
+### Cach review
+
+- Xac nhan local/test default `RATE_LIMIT_STORE=memory` van giu behavior cu.
+- Chay Redis integration test va xac nhan hai instances dung chung quota.
+- Xac nhan 429 contract khong doi va Redis failure tra structured 503.
+- Xac nhan production enabled rate limiting + memory store bi fail startup.
+- Xac nhan Redis keys khong chua raw client IP va co TTL.
+
+### Viec tiep theo
+
+- User review distributed bucket, failure policy va production env contract.
+- Sau review, commit voi message `feat: add redis-backed distributed rate limiting`.
+- Staging dat `RATE_LIMIT_STORE=redis`, theo doi `store_error` va soak test nhieu replica.
+
+
 ## Commit: `chore: enforce production api docs guardrails`
 
 Branch: `feature/production-api-docs-guardrails`
@@ -349,7 +427,7 @@ Them nen tang service area/geofence de backend co the gioi han booking theo vung
 - Full `./mvnw.cmd test`: pass 416 tests, 0 failures, 0 errors.
 - Staged `git diff --cached --check`: passed after docs/workbook update.
 - CodeRabbit CLI: blocked vi `coderabbit` khong co trong PATH tren may nay.
-- User review: pending.
+- User review: completed 2026-07-11; commit se duoc tao tu dung patch da review.
 
 ### Files chinh
 
@@ -409,7 +487,7 @@ Dung phat trien feature moi va them guardrail de backend khong the chay producti
 - Full `./mvnw.cmd test`: pass 403 tests, 0 failures, 0 errors.
 - `git diff --check`: pass; chi co warning LF/CRLF tren Windows.
 - CodeRabbit CLI: blocked vi `coderabbit` khong co trong PATH tren may nay.
-- User review: pending.
+- User review: completed 2026-07-11; commit se duoc tao tu dung patch da review.
 
 ### Files chinh
 

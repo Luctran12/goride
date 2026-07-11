@@ -8,32 +8,33 @@
 
 ## 1. Repository Status
 
-- Current branch: `feature/production-api-docs-guardrails`.
-- Base develop commit: `3ea7317` (`merge: staging readiness smoke gate`).
+- Current branch: `feature/redis-rate-limit-store`.
+- Base develop commit: `bea0201` (`merge: production api docs guardrails`).
 - Latest merged payment feature: `feature/payment-uat-actor-foreign-key`.
-- Latest merged feature on develop: `feature/staging-readiness-smoke`.
+- Latest merged feature on develop: `feature/production-api-docs-guardrails`.
 - Local-only config: `src/main/resources/application.yml` has environment-specific changes and must remain uncommitted.
 - Held WIP: OTLP tracing remains on `feature/otlp-tracing-config` and is not part of this commit.
 - Working direction: stop adding broad new features; finish production readiness/UAT tasks needed to go product.
 
 ---
 
-## 2. Feature Commit
+## 2. Active Work In Review
 
-Feature commit: `chore: enforce production api docs guardrails`.
+Draft commit: `feat: add redis-backed distributed rate limiting`.
 
 Scope implemented in this branch:
-- Add environment-controlled Springdoc API and Swagger UI flags, enabled by default for local/staging use.
-- Reject production startup while either API documentation surface remains enabled.
-- Keep existing authentication/rate-limit behavior unchanged; disabled Springdoc endpoints are not registered.
-- Add coverage for production-safe config, each independently enabled documentation surface and non-production availability.
-- Update frontend/devops integration guidance and project tracking documents.
+- Introduce a conditional `RateLimitStore` abstraction with memory default and Redis provider.
+- Use an atomic Redis Lua token bucket with Redis server time, shared quota across replicas, hashed client keys and idle-key TTL.
+- Keep existing 429 headers/body unchanged for frontend compatibility.
+- Return structured HTTP 503 `RATE_LIMIT_STORE_UNAVAILABLE` with one-second retry guidance when the store fails.
+- Require Redis store in production whenever application rate limiting is enabled.
+- Cover config defaults, production guardrails, shared/refilled Redis buckets, conditional bean wiring and HTTP 429/503 contracts.
 
 Validation so far:
-- Targeted `ProductionReadinessValidatorTests` passed: 9 tests.
-- Full `./mvnw.cmd test` passed: 427 tests, 0 failures, 0 errors.
-- `git diff --check` and final manual review passed; no blocker remains in environment detection, independent flags or non-production behavior.
-- User review completed 2026-07-11; commit is being created from the reviewed patch.
+- Targeted rate-limit/production suite passed: 19 tests, including Redis 7 Testcontainers integration.
+- Full Maven suite reached 436 tests: 426 passed and 10 Docker-backed integration tests errored because Testcontainers could not find a valid Docker environment; no assertion failure was reported.
+- `git diff --check` and manual code review passed with no blocker in the Redis Lua bucket, conditional wiring, production guardrail or 429/503 contracts.
+- User review completed on 2026-07-11; patch is approved for commit and merge.
 - CodeRabbit CLI blocked: `coderabbit` is not in PATH; `sh` is unavailable; WSL `bash` failed with E_ACCESSDENIED and curl could not connect to cli.coderabbit.ai.
 
 

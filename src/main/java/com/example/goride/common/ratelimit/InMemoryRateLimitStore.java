@@ -1,5 +1,6 @@
 package com.example.goride.common.ratelimit;
 
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import java.time.Clock;
@@ -8,7 +9,12 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Component
-public class InMemoryRateLimitStore {
+@ConditionalOnProperty(
+        name = "app.security.rate-limit.store",
+        havingValue = "memory",
+        matchIfMissing = true
+)
+public class InMemoryRateLimitStore implements RateLimitStore {
     private final Clock clock;
     private final Map<String, Bucket> buckets = new ConcurrentHashMap<>();
 
@@ -16,6 +22,7 @@ public class InMemoryRateLimitStore {
         this.clock = clock;
     }
 
+    @Override
     public RateLimitDecision consume(String key, RateLimitProperties properties) {
         long nowMillis = clock.millis();
         long refillPeriodMillis = properties.refillPeriodSeconds() * 1_000;

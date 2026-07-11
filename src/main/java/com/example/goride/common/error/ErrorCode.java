@@ -44,6 +44,7 @@ public enum ErrorCode {
     MATCHING_OFFER_NOT_FOUND(HttpStatus.NOT_FOUND, "Matching offer not found"),
     MATCHING_OFFER_EXPIRED(HttpStatus.UNPROCESSABLE_ENTITY, "Matching offer has expired"),
     RATE_LIMIT_EXCEEDED(HttpStatus.TOO_MANY_REQUESTS, "Too many requests"),
+    RATE_LIMIT_STORE_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "Rate limit service is unavailable"),
     INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "Internal server error");
 
     private final HttpStatus httpStatus;

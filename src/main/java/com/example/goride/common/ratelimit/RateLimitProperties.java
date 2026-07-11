@@ -7,19 +7,25 @@ import java.util.List;
 @ConfigurationProperties(prefix = "app.security.rate-limit")
 public record RateLimitProperties(
         Boolean enabled,
+        Store store,
         int capacity,
         int refillTokens,
         long refillPeriodSeconds,
         int maxKeys,
+        String redisKeyPrefix,
         List<String> excludedPaths,
         Boolean useForwardedFor
 ) {
+    private static final String DEFAULT_REDIS_KEY_PREFIX = "goride:rate-limit:";
+
     public RateLimitProperties {
         enabled = enabled == null || enabled;
+        store = store == null ? Store.MEMORY : store;
         capacity = positiveOrDefault(capacity, 120);
         refillTokens = positiveOrDefault(refillTokens, capacity);
         refillPeriodSeconds = positiveOrDefault(refillPeriodSeconds, 60L);
         maxKeys = positiveOrDefault(maxKeys, 10_000);
+        redisKeyPrefix = defaultString(redisKeyPrefix, DEFAULT_REDIS_KEY_PREFIX);
         excludedPaths = defaultList(
                 excludedPaths,
                 "/actuator/**",
@@ -40,12 +46,21 @@ public record RateLimitProperties(
         return Boolean.TRUE.equals(useForwardedFor);
     }
 
+    public enum Store {
+        MEMORY,
+        REDIS
+    }
+
     private static int positiveOrDefault(int value, int defaultValue) {
         return value > 0 ? value : defaultValue;
     }
 
     private static long positiveOrDefault(long value, long defaultValue) {
         return value > 0 ? value : defaultValue;
+    }
+
+    private static String defaultString(String value, String defaultValue) {
+        return value == null || value.isBlank() ? defaultValue : value.trim();
     }
 
     private static List<String> defaultList(List<String> values, String... defaults) {

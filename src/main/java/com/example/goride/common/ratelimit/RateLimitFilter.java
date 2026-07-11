@@ -10,6 +10,8 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.util.AntPathMatcher;
@@ -25,17 +27,20 @@ public class RateLimitFilter extends OncePerRequestFilter {
     public static final String RATE_LIMIT_RESET_HEADER = "X-RateLimit-Reset";
 
     private static final String FORWARDED_FOR_HEADER = "X-Forwarded-For";
+    private static final Logger log = LoggerFactory.getLogger(RateLimitFilter.class);
+    private static final long STORE_RETRY_AFTER_SECONDS = 1L;
     private static final AntPathMatcher PATH_MATCHER = new AntPathMatcher();
 
     private final RateLimitProperties properties;
-    private final InMemoryRateLimitStore rateLimitStore;
+    private final RateLimitStore rateLimitStore;
     private final ObjectMapper objectMapper;
     private final Counter allowedRequests;
     private final Counter rejectedRequests;
+    private final Counter storeErrors;
 
     public RateLimitFilter(
             RateLimitProperties properties,
-            InMemoryRateLimitStore rateLimitStore,
+            RateLimitStore rateLimitStore,
             ObjectMapper objectMapper,
             MeterRegistry meterRegistry
     ) {
@@ -44,9 +49,12 @@ public class RateLimitFilter extends OncePerRequestFilter {
         this.objectMapper = objectMapper;
         this.allowedRequests = rateLimitCounter(meterRegistry, "allowed");
         this.rejectedRequests = rateLimitCounter(meterRegistry, "rejected");
-        Gauge.builder("goride.rate.limit.buckets", rateLimitStore, InMemoryRateLimitStore::bucketCount)
-                .description("Number of in-memory rate limit buckets currently tracked")
-                .register(meterRegistry);
+        this.storeErrors = rateLimitCounter(meterRegistry, "store_error");
+        if (rateLimitStore instanceof InMemoryRateLimitStore inMemoryStore) {
+            Gauge.builder("goride.rate.limit.buckets", inMemoryStore, InMemoryRateLimitStore::bucketCount)
+                    .description("Number of in-memory rate limit buckets currently tracked")
+                    .register(meterRegistry);
+        }
     }
 
     @Override
@@ -60,7 +68,14 @@ public class RateLimitFilter extends OncePerRequestFilter {
             return;
         }
 
-        RateLimitDecision decision = rateLimitStore.consume("ip:" + resolveClientIp(request), properties);
+        RateLimitDecision decision;
+        try {
+            decision = rateLimitStore.consume("ip:" + resolveClientIp(request), properties);
+        }
+        catch (RuntimeException exception) {
+            handleStoreFailure(response, exception);
+            return;
+        }
         applyRateLimitHeaders(response, decision);
         if (decision.allowed()) {
             allowedRequests.increment();
@@ -78,6 +93,25 @@ public class RateLimitFilter extends OncePerRequestFilter {
                         ErrorCode.RATE_LIMIT_EXCEEDED,
                         ErrorCode.RATE_LIMIT_EXCEEDED.defaultMessage(),
                         Map.of("retryAfterSeconds", decision.retryAfterSeconds())
+                )
+        );
+    }
+
+    private void handleStoreFailure(
+            HttpServletResponse response,
+            RuntimeException exception
+    ) throws IOException {
+        storeErrors.increment();
+        log.error("Rate limit store failed store={}", properties.store(), exception);
+        response.setStatus(ErrorCode.RATE_LIMIT_STORE_UNAVAILABLE.httpStatus().value());
+        response.setHeader(HttpHeaders.RETRY_AFTER, Long.toString(STORE_RETRY_AFTER_SECONDS));
+        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+        objectMapper.writeValue(
+                response.getOutputStream(),
+                ErrorResponse.of(
+                        ErrorCode.RATE_LIMIT_STORE_UNAVAILABLE,
+                        ErrorCode.RATE_LIMIT_STORE_UNAVAILABLE.defaultMessage(),
+                        Map.of("retryAfterSeconds", STORE_RETRY_AFTER_SECONDS)
                 )
         );
     }

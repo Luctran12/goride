@@ -58,6 +58,7 @@ public class ProductionReadinessValidator implements SmartInitializingSingleton 
         validateStorage(violations);
         validateCors(violations);
         validateApiDocumentation(violations);
+        validateRateLimitStore(violations);
         return violations;
     }
 
@@ -123,6 +124,16 @@ public class ProductionReadinessValidator implements SmartInitializingSingleton 
         }
         if (booleanProperty("springdoc.swagger-ui.enabled", true)) {
             violations.add("springdoc.swagger-ui.enabled must be false in production");
+        }
+    }
+
+    private void validateRateLimitStore(List<String> violations) {
+        if (!booleanProperty("app.security.rate-limit.enabled", true)) {
+            return;
+        }
+        String store = normalize(property("app.security.rate-limit.store", "memory"));
+        if (!"redis".equals(store)) {
+            violations.add("app.security.rate-limit.store must be redis in production when rate limiting is enabled");
         }
     }
 
