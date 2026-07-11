@@ -15,13 +15,17 @@ objects:
   - payment_sandbox_e2e_sessions
   - idx_payment_sandbox_e2e_provider_tested_at
   - idx_payment_sandbox_e2e_status
+  - fk_payment_sandbox_e2e_checkout_payment
+  - fk_payment_sandbox_e2e_success_payment
+  - fk_payment_sandbox_e2e_failure_payment
+  - fk_payment_sandbox_e2e_tested_by_user
 pre_deploy_checks:
-  - Run precheck.sql and confirm payment_sandbox_uat_results exists.
+  - Run precheck.sql and confirm users, payments and payment_sandbox_uat_results exist.
   - Confirm payment_sandbox_e2e_sessions does not already exist or is compatible.
 deploy_steps:
   - Run apply.sql before recording real MoMo/VNPAY sandbox E2E evidence.
 post_deploy_checks:
-  - Run verify.sql and confirm table, indexes and required evidence columns exist.
+  - Run verify.sql and confirm table, indexes, required evidence columns and foreign keys exist.
 rollback_plan:
   - Run rollback.sql only if the application release is rolled back and session-level sandbox UAT evidence can be discarded.
 notes:

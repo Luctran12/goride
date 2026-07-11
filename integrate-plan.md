@@ -1653,7 +1653,7 @@ Response `data` tra ve session da ghi:
   "provider": "momo",
   "displayName": "MoMo",
   "sandboxReady": true,
-  "readyForFrontendExposure": true,
+  "sessionEvidencePassed": true,
   "status": "PASSED",
   "checkoutPaymentId": 100,
   "checkoutUrl": "https://sandbox-payment-provider.example/checkout/abc",
@@ -1683,9 +1683,12 @@ Validation backend:
 - `failureCallbackTested=true` yeu cau payment cung provider, status `FAILED` va transaction ref khop.
 - `idempotentReplayTested=true` yeu cau `replayTransactionRef` khop success hoac failure transaction ref da ghi.
 - Endpoint nay khong luu raw callback payload hoac secret; chi luu evidence reference de audit.
+- `sessionEvidencePassed=true` chi nghia la session lich su co status `PASSED` va du nam checks; field nay khong phai gate hien tai de FE expose provider.
+- SQL release rang buoc checkout/success/failure payment ids va tested-by user id bang foreign key `ON DELETE RESTRICT` de giu audit evidence hop le.
 
 Admin/FE action:
 - Admin dashboard co the hien lich su session theo provider de audit ai da test, test luc nao va con thieu check nao.
+- `sandboxReady` trong response phan anh config hien tai, con `sessionEvidencePassed` phan anh evidence cua chinh session.
 - FE consumer payment method khong can goi endpoint session nay; chi dung aggregate `readyForFrontendExposure=true` tu metadata/UAT result de hien MoMo/VNPAY cho nguoi dung.
 - Neu response loi `VALIDATION_ERROR`, dung `details.field`, `details.missingRequirements` hoac payment status hien tai de sua evidence truoc khi record lai.
 #### Runtime config cho provider online

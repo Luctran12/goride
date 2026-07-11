@@ -22,8 +22,59 @@ CREATE TABLE IF NOT EXISTS payment_sandbox_e2e_sessions (
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     CONSTRAINT chk_payment_sandbox_e2e_status CHECK (status IN ('NOT_RUN', 'BLOCKED', 'FAILED', 'PASSED')),
-    CONSTRAINT chk_payment_sandbox_e2e_provider_not_blank CHECK (length(btrim(provider_name)) > 0)
+    CONSTRAINT chk_payment_sandbox_e2e_provider_not_blank CHECK (length(btrim(provider_name)) > 0),
+    CONSTRAINT fk_payment_sandbox_e2e_checkout_payment
+        FOREIGN KEY (checkout_payment_id) REFERENCES payments(id) ON DELETE RESTRICT,
+    CONSTRAINT fk_payment_sandbox_e2e_success_payment
+        FOREIGN KEY (success_payment_id) REFERENCES payments(id) ON DELETE RESTRICT,
+    CONSTRAINT fk_payment_sandbox_e2e_failure_payment
+        FOREIGN KEY (failure_payment_id) REFERENCES payments(id) ON DELETE RESTRICT,
+    CONSTRAINT fk_payment_sandbox_e2e_tested_by_user
+        FOREIGN KEY (tested_by_user_id) REFERENCES users(id) ON DELETE RESTRICT
 );
+
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint
+        WHERE conrelid = 'public.payment_sandbox_e2e_sessions'::regclass
+          AND conname = 'fk_payment_sandbox_e2e_checkout_payment'
+    ) THEN
+        ALTER TABLE payment_sandbox_e2e_sessions
+            ADD CONSTRAINT fk_payment_sandbox_e2e_checkout_payment
+            FOREIGN KEY (checkout_payment_id) REFERENCES payments(id) ON DELETE RESTRICT;
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint
+        WHERE conrelid = 'public.payment_sandbox_e2e_sessions'::regclass
+          AND conname = 'fk_payment_sandbox_e2e_success_payment'
+    ) THEN
+        ALTER TABLE payment_sandbox_e2e_sessions
+            ADD CONSTRAINT fk_payment_sandbox_e2e_success_payment
+            FOREIGN KEY (success_payment_id) REFERENCES payments(id) ON DELETE RESTRICT;
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint
+        WHERE conrelid = 'public.payment_sandbox_e2e_sessions'::regclass
+          AND conname = 'fk_payment_sandbox_e2e_failure_payment'
+    ) THEN
+        ALTER TABLE payment_sandbox_e2e_sessions
+            ADD CONSTRAINT fk_payment_sandbox_e2e_failure_payment
+            FOREIGN KEY (failure_payment_id) REFERENCES payments(id) ON DELETE RESTRICT;
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint
+        WHERE conrelid = 'public.payment_sandbox_e2e_sessions'::regclass
+          AND conname = 'fk_payment_sandbox_e2e_tested_by_user'
+    ) THEN
+        ALTER TABLE payment_sandbox_e2e_sessions
+            ADD CONSTRAINT fk_payment_sandbox_e2e_tested_by_user
+            FOREIGN KEY (tested_by_user_id) REFERENCES users(id) ON DELETE RESTRICT;
+    END IF;
+END $$;
 
 CREATE INDEX IF NOT EXISTS idx_payment_sandbox_e2e_provider_tested_at
     ON payment_sandbox_e2e_sessions (provider_name, tested_at DESC);

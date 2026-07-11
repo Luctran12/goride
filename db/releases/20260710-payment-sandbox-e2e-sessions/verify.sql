@@ -48,4 +48,48 @@ BEGIN
     ) THEN
         RAISE EXCEPTION 'freshness_rejection_tested evidence column is missing';
     END IF;
+
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint
+        WHERE conrelid = 'public.payment_sandbox_e2e_sessions'::regclass
+          AND confrelid = 'public.payments'::regclass
+          AND conname = 'fk_payment_sandbox_e2e_checkout_payment'
+          AND contype = 'f'
+          AND confdeltype = 'r'
+    ) THEN
+        RAISE EXCEPTION 'fk_payment_sandbox_e2e_checkout_payment is missing or invalid';
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint
+        WHERE conrelid = 'public.payment_sandbox_e2e_sessions'::regclass
+          AND confrelid = 'public.payments'::regclass
+          AND conname = 'fk_payment_sandbox_e2e_success_payment'
+          AND contype = 'f'
+          AND confdeltype = 'r'
+    ) THEN
+        RAISE EXCEPTION 'fk_payment_sandbox_e2e_success_payment is missing or invalid';
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint
+        WHERE conrelid = 'public.payment_sandbox_e2e_sessions'::regclass
+          AND confrelid = 'public.payments'::regclass
+          AND conname = 'fk_payment_sandbox_e2e_failure_payment'
+          AND contype = 'f'
+          AND confdeltype = 'r'
+    ) THEN
+        RAISE EXCEPTION 'fk_payment_sandbox_e2e_failure_payment is missing or invalid';
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint
+        WHERE conrelid = 'public.payment_sandbox_e2e_sessions'::regclass
+          AND confrelid = 'public.users'::regclass
+          AND conname = 'fk_payment_sandbox_e2e_tested_by_user'
+          AND contype = 'f'
+          AND confdeltype = 'r'
+    ) THEN
+        RAISE EXCEPTION 'fk_payment_sandbox_e2e_tested_by_user is missing or invalid';
+    END IF;
 END $$;

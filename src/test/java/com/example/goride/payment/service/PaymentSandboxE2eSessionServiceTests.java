@@ -55,7 +55,7 @@ class PaymentSandboxE2eSessionServiceTests {
 
         assertThat(response.provider()).isEqualTo("momo");
         assertThat(response.status()).isEqualTo(PaymentSandboxUatStatus.PASSED);
-        assertThat(response.readyForFrontendExposure()).isTrue();
+        assertThat(response.sessionEvidencePassed()).isTrue();
         assertThat(response.testedAt()).isEqualTo(NOW);
         assertThat(response.testedByUserId()).isEqualTo(77L);
         assertThat(response.missingChecks()).isEmpty();
@@ -183,6 +183,43 @@ class PaymentSandboxE2eSessionServiceTests {
         assertThat(response.get(0).displayName()).isEqualTo("MoMo");
         assertThat(response.get(0).missingChecks())
                 .containsExactly("success-callback", "failure-callback", "idempotent-replay", "freshness-rejection");
+    }
+
+    @Test
+    void listProviderSessionsKeepsSessionEvidenceIndependentFromCurrentReadiness() {
+        PaymentSandboxE2eSessionRepository sessionRepository = mock(PaymentSandboxE2eSessionRepository.class);
+        PaymentSandboxE2eSession session = PaymentSandboxE2eSession.create("momo");
+        session.update(
+                PaymentSandboxUatStatus.PASSED,
+                100L,
+                "https://sandbox.example/checkout",
+                101L,
+                "SUCCESS-TXN",
+                102L,
+                "FAILED-TXN",
+                "SUCCESS-TXN",
+                true,
+                true,
+                true,
+                true,
+                true,
+                "Historical sandbox evidence passed",
+                NOW,
+                77L
+        );
+        when(sessionRepository.findByProviderNameOrderByTestedAtDescCreatedAtDesc("momo"))
+                .thenReturn(List.of(session));
+        PaymentSandboxE2eSessionService service = service(
+                sessionRepository,
+                mock(PaymentRepository.class),
+                mock(PaymentSandboxUatResultService.class),
+                readiness(false)
+        );
+
+        var response = service.listProviderSessions("momo").get(0);
+
+        assertThat(response.sandboxReady()).isFalse();
+        assertThat(response.sessionEvidencePassed()).isTrue();
     }
 
     private PaymentSandboxE2eSessionRequest passedRequest() {
