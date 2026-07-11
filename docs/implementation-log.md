@@ -5,6 +5,65 @@
 > Tu commit `feat: add matching driver search` tro di, moi commit backend can cap nhat file nay trong cung commit.
 
 ---
+## Commit: `chore: enforce production api docs guardrails`
+
+Branch: `feature/production-api-docs-guardrails`
+
+Phase: P1 production attack-surface hardening
+
+### Muc tieu
+
+Khong de OpenAPI JSON va Swagger UI vo tinh public tren production, trong khi van giu tai lieu API san dung cho local/staging integration.
+
+### Noi dung da trien khai
+
+- Merge `feature/staging-readiness-smoke` vao `develop` tai `3ea7317`.
+- Them runtime flags:
+  - `SPRINGDOC_API_DOCS_ENABLED` map toi `springdoc.api-docs.enabled`;
+  - `SPRINGDOC_SWAGGER_UI_ENABLED` map toi `springdoc.swagger-ui.enabled`;
+  - mac dinh `true` de local/staging khong bi thay doi hanh vi.
+- Mo rong `ProductionReadinessValidator`:
+  - khi `APP_ENV=production|prod`, bat buoc ca hai Springdoc flags bang `false`;
+  - fail startup voi message chi ro property nao con enabled.
+- Mo rong test:
+  - production safe config voi ca hai flag disabled;
+  - API docs va Swagger UI bi chan doc lap;
+  - staging van co the bat ca hai surface.
+- Cap nhat `integrate-plan.md`, `plan.md`, `docs/current-phase.md`, `docs/implementation-log.md` va `docs/pland.xlsx`.
+
+### Review truoc commit
+
+- Targeted `ProductionReadinessValidatorTests`: pass 9 tests.
+- Full `./mvnw.cmd test`: pass 427 tests, 0 failures, 0 errors.
+- `git diff --check` va manual code review: pass; khong co blocker trong production detection, independent flags hoac local/staging behavior.
+- CodeRabbit CLI: chua kha dung trong environment nay.
+- User review: completed 2026-07-11; commit created from the reviewed patch.
+
+### Files chinh
+
+- `src/main/java/com/example/goride/common/config/ProductionReadinessValidator.java`
+- `src/main/resources/application.properties`
+- `src/test/java/com/example/goride/common/config/ProductionReadinessValidatorTests.java`
+- `integrate-plan.md`
+- `plan.md`
+- `docs/current-phase.md`
+- `docs/implementation-log.md`
+- `docs/pland.xlsx`
+
+### Cach review
+
+- Chay app local voi default va xac nhan `/v3/api-docs`, `/swagger-ui.html` van kha dung.
+- Chay validator production voi mot trong hai flag con true va xac nhan startup bi chan.
+- Dat ca hai flag false trong production va xac nhan validator pass.
+- Kiem tra error message khong chua secret va chi ten property can sua.
+
+### Viec tiep theo
+
+- Commit voi message `chore: enforce production api docs guardrails`.
+- Merge feature vao `develop` sau khi commit.
+- Deployment production dat ca hai `SPRINGDOC_*_ENABLED=false`.
+
+
 ## Commit: `chore: add staging readiness smoke gate`
 
 Branch: `feature/staging-readiness-smoke`

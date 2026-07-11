@@ -4,6 +4,8 @@ import com.example.goride.auth.config.CorsProperties;
 import com.example.goride.auth.config.JwtProperties;
 import com.example.goride.storage.config.FileStorageProperties;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.mock.env.MockEnvironment;
 
 import java.util.List;
@@ -31,6 +33,18 @@ class ProductionReadinessValidatorTests {
                 productionJwt(),
                 cors(List.of("https://app.goride.example"), List.of()),
                 r2Storage()
+        );
+
+        assertThatCode(validator::validate).doesNotThrowAnyException();
+    }
+
+    @Test
+    void allowsApiDocumentationOutsideProduction() {
+        ProductionReadinessValidator validator = new ProductionReadinessValidator(
+                environmentWithApiDocs("staging", "update", true, true),
+                new JwtProperties("local-dev-secret-change-me-please-change", 15, 7),
+                cors(List.of("http://localhost:5173"), List.of("*")),
+                new FileStorageProperties()
         );
 
         assertThatCode(validator::validate).doesNotThrowAnyException();
@@ -92,6 +106,7 @@ class ProductionReadinessValidatorTests {
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("app.storage.provider must be configured in production");
     }
+
     @Test
     void rejectsLoopbackCorsOriginsInProduction() {
         ProductionReadinessValidator validator = new ProductionReadinessValidator(
@@ -106,10 +121,44 @@ class ProductionReadinessValidatorTests {
                 .hasMessageContaining("app.security.cors.allowed-origins")
                 .hasMessageContaining("app.security.cors.allowed-origin-patterns");
     }
+
+    @ParameterizedTest
+    @CsvSource({
+            "true, false, springdoc.api-docs.enabled",
+            "false, true, springdoc.swagger-ui.enabled"
+    })
+    void rejectsAnyEnabledApiDocumentationSurfaceInProduction(
+            boolean apiDocsEnabled,
+            boolean swaggerUiEnabled,
+            String expectedViolation
+    ) {
+        ProductionReadinessValidator validator = new ProductionReadinessValidator(
+                environmentWithApiDocs("production", "validate", apiDocsEnabled, swaggerUiEnabled),
+                productionJwt(),
+                cors(List.of("https://app.goride.example"), List.of()),
+                r2Storage()
+        );
+
+        assertThatThrownBy(validator::validate)
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining(expectedViolation);
+    }
+
     private MockEnvironment environment(String appEnvironment, String ddlAuto) {
+        return environmentWithApiDocs(appEnvironment, ddlAuto, false, false);
+    }
+
+    private MockEnvironment environmentWithApiDocs(
+            String appEnvironment,
+            String ddlAuto,
+            boolean apiDocsEnabled,
+            boolean swaggerUiEnabled
+    ) {
         return new MockEnvironment()
                 .withProperty("app.environment", appEnvironment)
-                .withProperty("spring.jpa.hibernate.ddl-auto", ddlAuto);
+                .withProperty("spring.jpa.hibernate.ddl-auto", ddlAuto)
+                .withProperty("springdoc.api-docs.enabled", Boolean.toString(apiDocsEnabled))
+                .withProperty("springdoc.swagger-ui.enabled", Boolean.toString(swaggerUiEnabled));
     }
 
     private JwtProperties productionJwt() {
