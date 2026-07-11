@@ -8,10 +8,10 @@
 
 ## 1. Repository Status
 
-- Current branch: `feature/payment-uat-actor-foreign-key`.
-- Base develop commit: `d9b2d98` (`merge: payment sandbox e2e evidence`).
-- Latest merged payment feature: `feature/payment-sandbox-e2e-uat`.
-- Latest merged feature on develop: `feature/payment-sandbox-e2e-uat`.
+- Current branch: `feature/staging-readiness-smoke`.
+- Base develop commit: `1596826` (`merge: payment sandbox uat actor foreign key`).
+- Latest merged payment feature: `feature/payment-uat-actor-foreign-key`.
+- Latest merged feature on develop: `feature/payment-uat-actor-foreign-key`.
 - Local-only config: `src/main/resources/application.yml` has environment-specific changes and must remain uncommitted.
 - Paused WIP: production API docs hardening is stashed as `wip: pause production api docs guardrails` and can be resumed after higher-priority product readiness tasks.
 - Working direction: stop adding broad new features; finish production readiness/UAT tasks needed to go product.
@@ -20,19 +20,21 @@
 
 ## 2. Feature Commit
 
-Feature commit: `fix: enforce payment sandbox uat actor foreign key`.
+Feature commit: `chore: add staging readiness smoke gate`.
 
 Scope implemented in this branch:
-- Add versioned SQL release `20260711-payment-sandbox-uat-actor-fk`.
-- Reject deployment when aggregate UAT evidence contains orphan tested-by user ids.
-- Add `fk_payment_sandbox_uat_tested_by_user` with `ON DELETE RESTRICT`.
-- Verify exact source/target columns, referenced table, delete action and orphan count.
-- Keep rollback data-safe by removing only the constraint.
+- Add a PowerShell smoke command for liveness, readiness, app identity, service-area data and payment metadata.
+- Add optional admin checks for MoMo/VNPAY readiness, aggregate UAT evidence and public exposure consistency.
+- Add strict launch gates for active service areas and online payments with non-zero failure exit codes.
+- Export a secret-free JSON report for deployment evidence.
+- Add a manually triggered GitHub Actions workflow with a 14-day report artifact.
 
 Validation so far:
-- SQL release validator passed: `scripts/validate-db-release.ps1 -ReleasePath db/releases/20260711-payment-sandbox-uat-actor-fk`.
-- Full `./mvnw.cmd test` passed: 424 tests on merge base `d9b2d98`.
-- `git diff --check` passed; final manual review found no blocker in orphan handling, FK verification, release ordering or rollback safety.
+- PowerShell syntax validation passed.
+- Mock staging happy path passed 13 checks with strict service-area and online-payment gates.
+- Missing admin token failure path returned exit code 1 as expected.
+- Full `./mvnw.cmd test` passed: 424 tests, 0 failures, 0 errors.
+- `git diff --check` and final manual review passed; workflow inputs are isolated through environment variables and no blocker remains.
 - User review completed 2026-07-11; commit is being created from the reviewed patch.
 - CodeRabbit CLI blocked: `coderabbit` is not in PATH; `sh` is unavailable; WSL `bash` failed with E_ACCESSDENIED and curl could not connect to cli.coderabbit.ai.
 
