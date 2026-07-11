@@ -7,6 +7,8 @@ import com.example.goride.payment.dto.PaymentCheckoutResponse;
 import com.example.goride.payment.dto.PaymentDetailResponse;
 import com.example.goride.payment.dto.PaymentMethodResponse;
 import com.example.goride.payment.dto.PaymentProviderReadinessResponse;
+import com.example.goride.payment.dto.PaymentSandboxE2eSessionRequest;
+import com.example.goride.payment.dto.PaymentSandboxE2eSessionResponse;
 import com.example.goride.payment.dto.PaymentSandboxUatPlanResponse;
 import com.example.goride.payment.dto.PaymentSandboxUatResultRequest;
 import com.example.goride.payment.dto.PaymentSandboxUatResultResponse;
@@ -16,6 +18,7 @@ import com.example.goride.payment.service.PaymentCheckoutService;
 import com.example.goride.payment.service.PaymentMethodService;
 import com.example.goride.payment.service.PaymentProviderReadinessService;
 import com.example.goride.payment.service.PaymentQueryService;
+import com.example.goride.payment.service.PaymentSandboxE2eSessionService;
 import com.example.goride.payment.service.PaymentSandboxUatPlanService;
 import com.example.goride.payment.service.PaymentSandboxUatResultService;
 import com.example.goride.payment.service.PaymentWebhookService;
@@ -49,6 +52,7 @@ public class PaymentController {
     private final PaymentMethodService paymentMethodService;
     private final PaymentProviderReadinessService paymentProviderReadinessService;
     private final PaymentSandboxUatPlanService paymentSandboxUatPlanService;
+    private final PaymentSandboxE2eSessionService paymentSandboxE2eSessionService;
     private final PaymentSandboxUatResultService paymentSandboxUatResultService;
     private final PaymentWebhookService paymentWebhookService;
     private final CurrentUser currentUser;
@@ -59,6 +63,7 @@ public class PaymentController {
             PaymentMethodService paymentMethodService,
             PaymentProviderReadinessService paymentProviderReadinessService,
             PaymentSandboxUatPlanService paymentSandboxUatPlanService,
+            PaymentSandboxE2eSessionService paymentSandboxE2eSessionService,
             PaymentSandboxUatResultService paymentSandboxUatResultService,
             PaymentWebhookService paymentWebhookService,
             CurrentUser currentUser
@@ -68,6 +73,7 @@ public class PaymentController {
         this.paymentMethodService = paymentMethodService;
         this.paymentProviderReadinessService = paymentProviderReadinessService;
         this.paymentSandboxUatPlanService = paymentSandboxUatPlanService;
+        this.paymentSandboxE2eSessionService = paymentSandboxE2eSessionService;
         this.paymentSandboxUatResultService = paymentSandboxUatResultService;
         this.paymentWebhookService = paymentWebhookService;
         this.currentUser = currentUser;
@@ -94,6 +100,34 @@ public class PaymentController {
     @PreAuthorize("hasRole('ADMIN')")
     public ApiResponse<List<PaymentSandboxUatResultResponse>> listPaymentSandboxUatResults() {
         return ApiResponse.ok(paymentSandboxUatResultService.listResults());
+    }
+
+    @GetMapping("/providers/sandbox-e2e-sessions")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ApiResponse<List<PaymentSandboxE2eSessionResponse>> listPaymentSandboxE2eSessions() {
+        return ApiResponse.ok(paymentSandboxE2eSessionService.listSessions());
+    }
+
+    @GetMapping("/providers/{providerName}/sandbox-e2e-sessions")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ApiResponse<List<PaymentSandboxE2eSessionResponse>> listProviderPaymentSandboxE2eSessions(
+            @PathVariable String providerName
+    ) {
+        return ApiResponse.ok(paymentSandboxE2eSessionService.listProviderSessions(providerName));
+    }
+
+    @PostMapping("/providers/{providerName}/sandbox-e2e-sessions")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ApiResponse<PaymentSandboxE2eSessionResponse> recordProviderPaymentSandboxE2eSession(
+            Authentication authentication,
+            @PathVariable String providerName,
+            @Valid @RequestBody PaymentSandboxE2eSessionRequest request
+    ) {
+        return ApiResponse.ok(paymentSandboxE2eSessionService.recordSession(
+                providerName,
+                request,
+                currentUser.requireUserId(authentication)
+        ));
     }
 
     @PutMapping("/providers/{providerName}/sandbox-uat-result")

@@ -5,6 +5,123 @@
 > Tu commit `feat: add matching driver search` tro di, moi commit backend can cap nhat file nay trong cung commit.
 
 ---
+## Commit: `fix: clarify sandbox session evidence and enforce foreign keys`
+
+Branch: `feature/payment-sandbox-e2e-uat`
+
+Phase: P0 payment provider sandbox E2E/UAT hardening
+
+### Muc tieu
+
+Sua hai finding sau review cua commit `84735cc`: tach ro evidence cua tung sandbox session khoi aggregate gate danh cho FE, va dam bao cac payment/user reference trong SQL release co foreign key that.
+
+### Noi dung da trien khai
+
+- Doi field trong `PaymentSandboxE2eSessionResponse`:
+  - bo `readyForFrontendExposure` khoi session response;
+  - them `sessionEvidencePassed`, chi phan anh session co status `PASSED` va du nam evidence checks;
+  - aggregate `PaymentSandboxUatResultResponse.readyForFrontendExposure` van la gate duy nhat cho FE.
+- Them regression test xac nhan historical session evidence khong bi thay doi khi readiness config hien tai thay doi.
+- Bo sung bon foreign keys cho `payment_sandbox_e2e_sessions`:
+  - checkout/success/failure payment id tham chieu `payments(id)`;
+  - tested-by user id tham chieu `users(id)`;
+  - dung `ON DELETE RESTRICT` de bao toan audit trail.
+- Them idempotent `ALTER TABLE ... ADD CONSTRAINT` guards cho truong hop bang da ton tai nhung thieu constraint.
+- Mo rong `precheck.sql`, `verify.sql` va `manifest.yml` de theo doi va verify day du bon FK.
+- Cap nhat `integrate-plan.md`, `plan.md`, `docs/current-phase.md`, `docs/implementation-log.md` va `docs/pland.xlsx`.
+
+### Review truoc commit
+
+- Targeted payment tests: pass 23 tests.
+- SQL release validator: pass cho `20260710-payment-sandbox-e2e-sessions`.
+- Full `./mvnw.cmd test`: pass 424 tests, 0 failures, 0 errors.
+- `git diff --check`: pass; chi co warning LF/CRLF tren Windows.
+- Manual code review: pass; khong phat hien blocker trong response contract, regression coverage, FK creation guards va SQL verification.
+- CodeRabbit CLI: chua kha dung trong environment nay; khong gan nhan CodeRabbit cho manual review.
+- User review: completed 2026-07-11; commit duoc tao sau review.
+
+### Files chinh
+
+- `src/main/java/com/example/goride/payment/dto/PaymentSandboxE2eSessionResponse.java`
+- `src/test/java/com/example/goride/payment/service/PaymentSandboxE2eSessionServiceTests.java`
+- `db/releases/20260710-payment-sandbox-e2e-sessions/apply.sql`
+- `db/releases/20260710-payment-sandbox-e2e-sessions/precheck.sql`
+- `db/releases/20260710-payment-sandbox-e2e-sessions/verify.sql`
+- `db/releases/20260710-payment-sandbox-e2e-sessions/manifest.yml`
+- `integrate-plan.md`
+- `plan.md`
+- `docs/current-phase.md`
+- `docs/pland.xlsx`
+
+### Viec tiep theo
+
+- User review patch follow-up nay.
+- Sau khi review, commit voi message `fix: clarify sandbox session evidence and enforce foreign keys`.
+- Van can chay real MoMo/VNPAY merchant sandbox UAT truoc khi aggregate `readyForFrontendExposure=true`.
+
+---
+## Commit: `feat: add payment sandbox e2e evidence`
+
+Branch: `feature/payment-sandbox-e2e-uat`
+
+Phase: P0 payment provider sandbox E2E/UAT readiness
+
+### Muc tieu
+
+Bien task MoMo/VNPAY sandbox E2E thanh mot backend workflow co the audit: admin/devops ghi lai tung session test that, backend validate payment evidence truoc khi sync sang aggregate UAT result va FE chi expose provider khi gate cuoi cung pass.
+
+### Noi dung da trien khai
+
+- Them entity `PaymentSandboxE2eSession`, repository va service de luu tung lan UAT sandbox theo provider.
+- Them admin APIs:
+  - `GET /api/v1/payments/providers/sandbox-e2e-sessions`
+  - `GET /api/v1/payments/providers/{providerName}/sandbox-e2e-sessions`
+  - `POST /api/v1/payments/providers/{providerName}/sandbox-e2e-sessions`
+- Validate evidence truoc khi ghi session:
+  - `PASSED` chi hop le khi provider `sandboxReady=true`.
+  - checkout evidence phai co `checkoutPaymentId` va HTTPS `checkoutUrl`.
+  - success callback phai tro den payment cung provider, status `COMPLETED` va transaction ref khop.
+  - failure callback phai tro den payment cung provider, status `FAILED` va transaction ref khop.
+  - replay evidence phai lap lai mot terminal transaction reference da ghi nhan.
+- Sync session sang `PaymentSandboxUatResultService.upsertResult(...)` de aggregate `readyForFrontendExposure` tiep tuc la gate cho FE.
+- Cap nhat sandbox UAT plan de backend checks huong dan record session evidence sau khi chay real sandbox checkout/callback.
+- Them SQL release `db/releases/20260710-payment-sandbox-e2e-sessions` theo manual release process khong dung Flyway.
+- Cap nhat `plan.md`, `integrate-plan.md`, `docs/current-phase.md`, `docs/implementation-log.md` va `docs/pland.xlsx`.
+
+### Review truoc commit
+
+- Targeted payment tests da pass truoc khi update docs: `./mvnw.cmd "-Dtest=PaymentSandboxE2eSessionServiceTests,PaymentSandboxUatResultServiceTests,PaymentSandboxUatPlanServiceTests,PaymentControllerTests" test` (22 tests).
+- SQL release validator da pass: `scripts/validate-db-release.ps1 -ReleasePath db/releases/20260710-payment-sandbox-e2e-sessions`.
+- Full `./mvnw.cmd test`: pass 423 tests, 0 failures, 0 errors.
+- `git diff --check`: pass; chi co warning LF/CRLF tren Windows.
+- Manual code review: pass; khong phat hien blocker trong authorization, payment evidence validation, transaction boundary va SQL release.
+- CodeRabbit CLI: blocked vi `coderabbit` khong co trong PATH, `sh` khong co, `bash` WSL bi E_ACCESSDENIED va curl khong ket noi duoc `cli.coderabbit.ai`; retry installer ngoai sandbox bi tu choi do rui ro chay external installer script.
+- User review: completed 2026-07-10; commit duoc tao sau review.
+
+### Files chinh
+
+- `src/main/java/com/example/goride/payment/domain/PaymentSandboxE2eSession.java`
+- `src/main/java/com/example/goride/payment/service/PaymentSandboxE2eSessionService.java`
+- `src/main/java/com/example/goride/payment/controller/PaymentController.java`
+- `src/main/java/com/example/goride/payment/dto/PaymentSandboxE2eSessionRequest.java`
+- `src/main/java/com/example/goride/payment/dto/PaymentSandboxE2eSessionResponse.java`
+- `src/main/java/com/example/goride/payment/repository/PaymentSandboxE2eSessionRepository.java`
+- `db/releases/20260710-payment-sandbox-e2e-sessions/**`
+- `src/test/java/com/example/goride/payment/service/PaymentSandboxE2eSessionServiceTests.java`
+- `src/test/java/com/example/goride/payment/controller/PaymentControllerTests.java`
+- `plan.md`
+- `integrate-plan.md`
+- `docs/current-phase.md`
+- `docs/implementation-log.md`
+- `docs/pland.xlsx`
+
+### Viec tiep theo
+
+- Chay MoMo/VNPAY sandbox that bang merchant test accounts va public HTTPS callback URL.
+- Ghi session evidence qua endpoint moi cho checkout URL, success callback, failure callback, duplicate replay va freshness rejection.
+- Sau khi aggregate result `readyForFrontendExposure=true`, FE/admin moi bat hien thi online payment cho nguoi dung that.
+
+---
 ## Commit: `docs: mark service area merged`
 
 Branch: `develop`

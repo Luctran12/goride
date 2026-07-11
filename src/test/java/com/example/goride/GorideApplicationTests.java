@@ -8,6 +8,7 @@ import com.example.goride.chat.repository.TripMessageRepository;
 import com.example.goride.driver.repository.DriverProfileRepository;
 import com.example.goride.notification.repository.NotificationRepository;
 import com.example.goride.payment.repository.PaymentRepository;
+import com.example.goride.payment.repository.PaymentSandboxE2eSessionRepository;
 import com.example.goride.payment.repository.PaymentSandboxUatResultRepository;
 import com.example.goride.rating.repository.RatingRepository;
 import com.example.goride.servicearea.repository.ServiceAreaRepository;
@@ -45,6 +46,9 @@ class GorideApplicationTests {
 
 	@MockitoBean
 	private PaymentSandboxUatResultRepository paymentSandboxUatResultRepository;
+
+	@MockitoBean
+	private PaymentSandboxE2eSessionRepository paymentSandboxE2eSessionRepository;
 
 	@MockitoBean
 	private RatingRepository ratingRepository;

@@ -6,6 +6,8 @@ import com.example.goride.common.security.CurrentUser;
 import com.example.goride.payment.domain.PaymentSandboxUatStatus;
 import com.example.goride.payment.domain.PaymentStatus;
 import com.example.goride.payment.dto.PaymentProviderReadinessResponse;
+import com.example.goride.payment.dto.PaymentSandboxE2eSessionRequest;
+import com.example.goride.payment.dto.PaymentSandboxE2eSessionResponse;
 import com.example.goride.payment.dto.PaymentSandboxUatPlanResponse;
 import com.example.goride.payment.dto.PaymentSandboxUatResultRequest;
 import com.example.goride.payment.dto.PaymentSandboxUatResultResponse;
@@ -15,6 +17,7 @@ import com.example.goride.payment.service.PaymentCheckoutService;
 import com.example.goride.payment.service.PaymentMethodService;
 import com.example.goride.payment.service.PaymentProviderReadinessService;
 import com.example.goride.payment.service.PaymentQueryService;
+import com.example.goride.payment.service.PaymentSandboxE2eSessionService;
 import com.example.goride.payment.service.PaymentSandboxUatPlanService;
 import com.example.goride.payment.service.PaymentSandboxUatResultService;
 import com.example.goride.payment.service.PaymentWebhookService;
@@ -89,6 +92,64 @@ class PaymentControllerTests {
         assertThat(response.data()).containsExactly(result);
     }
 
+    @Test
+    void returnsSandboxE2eSessionsForAdminDiagnostics() {
+        PaymentSandboxE2eSessionService e2eSessionService = mock(PaymentSandboxE2eSessionService.class);
+        PaymentSandboxE2eSessionResponse session = mock(PaymentSandboxE2eSessionResponse.class);
+        when(e2eSessionService.listSessions()).thenReturn(List.of(session));
+        PaymentController controller = controller(
+                mock(PaymentWebhookService.class),
+                mock(PaymentProviderReadinessService.class),
+                mock(PaymentSandboxUatPlanService.class),
+                e2eSessionService,
+                mock(PaymentSandboxUatResultService.class),
+                mock(CurrentUser.class)
+        );
+
+        var response = controller.listPaymentSandboxE2eSessions();
+
+        assertThat(response.data()).containsExactly(session);
+    }
+
+    @Test
+    void recordsSandboxE2eSessionWithCurrentAdminUser() {
+        PaymentSandboxE2eSessionService e2eSessionService = mock(PaymentSandboxE2eSessionService.class);
+        PaymentSandboxE2eSessionRequest request = new PaymentSandboxE2eSessionRequest(
+                PaymentSandboxUatStatus.PASSED,
+                100L,
+                "https://sandbox.example/checkout",
+                101L,
+                "SUCCESS-TXN",
+                102L,
+                "FAILED-TXN",
+                "SUCCESS-TXN",
+                true,
+                true,
+                true,
+                true,
+                true,
+                "Sandbox passed",
+                Instant.parse("2026-07-10T08:00:00Z")
+        );
+        PaymentSandboxE2eSessionResponse session = mock(PaymentSandboxE2eSessionResponse.class);
+        when(e2eSessionService.recordSession("momo", request, 42L)).thenReturn(session);
+        CurrentUser currentUser = mock(CurrentUser.class);
+        Authentication authentication = mock(Authentication.class);
+        when(currentUser.requireUserId(authentication)).thenReturn(42L);
+        PaymentController controller = controller(
+                mock(PaymentWebhookService.class),
+                mock(PaymentProviderReadinessService.class),
+                mock(PaymentSandboxUatPlanService.class),
+                e2eSessionService,
+                mock(PaymentSandboxUatResultService.class),
+                currentUser
+        );
+
+        var response = controller.recordProviderPaymentSandboxE2eSession(authentication, "momo", request);
+
+        assertThat(response.data()).isSameAs(session);
+        verify(e2eSessionService).recordSession("momo", request, 42L);
+    }
     @Test
     void updatesSandboxUatResultWithCurrentAdminUser() {
         PaymentSandboxUatResultService resultService = mock(PaymentSandboxUatResultService.class);
@@ -202,6 +263,7 @@ class PaymentControllerTests {
                 paymentWebhookService,
                 mock(PaymentProviderReadinessService.class),
                 mock(PaymentSandboxUatPlanService.class),
+                mock(PaymentSandboxE2eSessionService.class),
                 mock(PaymentSandboxUatResultService.class),
                 mock(CurrentUser.class)
         );
@@ -215,6 +277,7 @@ class PaymentControllerTests {
                 paymentWebhookService,
                 readinessService,
                 mock(PaymentSandboxUatPlanService.class),
+                mock(PaymentSandboxE2eSessionService.class),
                 mock(PaymentSandboxUatResultService.class),
                 mock(CurrentUser.class)
         );
@@ -227,12 +290,30 @@ class PaymentControllerTests {
             PaymentSandboxUatResultService resultService,
             CurrentUser currentUser
     ) {
+        return controller(
+                paymentWebhookService,
+                readinessService,
+                uatPlanService,
+                mock(PaymentSandboxE2eSessionService.class),
+                resultService,
+                currentUser
+        );
+    }
+    private PaymentController controller(
+            PaymentWebhookService paymentWebhookService,
+            PaymentProviderReadinessService readinessService,
+            PaymentSandboxUatPlanService uatPlanService,
+            PaymentSandboxE2eSessionService e2eSessionService,
+            PaymentSandboxUatResultService resultService,
+            CurrentUser currentUser
+    ) {
         return new PaymentController(
                 mock(PaymentQueryService.class),
                 mock(PaymentCheckoutService.class),
                 mock(PaymentMethodService.class),
                 readinessService,
                 uatPlanService,
+                e2eSessionService,
                 resultService,
                 paymentWebhookService,
                 currentUser
