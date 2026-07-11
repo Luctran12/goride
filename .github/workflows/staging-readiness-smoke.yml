@@ -1,0 +1,61 @@
+name: Staging Readiness Smoke
+
+on:
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: Public staging backend URL
+        required: true
+        type: string
+      require_service_areas:
+        description: Fail when no active service area is configured
+        required: true
+        default: true
+        type: boolean
+      require_online_payments:
+        description: Require MoMo and VNPAY readiness plus UAT exposure gates
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    name: Validate staging backend
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run staging readiness smoke
+        shell: pwsh
+        env:
+          GORIDE_ADMIN_TOKEN: ${{ secrets.GORIDE_STAGING_ADMIN_TOKEN }}
+          GORIDE_STAGING_BASE_URL: ${{ inputs.base_url }}
+          GORIDE_REQUIRE_SERVICE_AREAS: ${{ inputs.require_service_areas }}
+          GORIDE_REQUIRE_ONLINE_PAYMENTS: ${{ inputs.require_online_payments }}
+        run: |
+          $parameters = @{
+            BaseUrl = $env:GORIDE_STAGING_BASE_URL
+            OutputPath = "artifacts/staging-readiness-report.json"
+          }
+          if ($env:GORIDE_REQUIRE_SERVICE_AREAS -eq "true") {
+            $parameters.RequireServiceAreas = $true
+          }
+          if ($env:GORIDE_REQUIRE_ONLINE_PAYMENTS -eq "true") {
+            $parameters.RequireOnlinePayments = $true
+          }
+          ./scripts/test-staging-readiness.ps1 @parameters
+
+      - name: Upload smoke report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: staging-readiness-report
+          path: artifacts/staging-readiness-report.json
+          if-no-files-found: warn
+          retention-days: 14

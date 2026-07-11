@@ -1,6 +1,6 @@
 # GoRide Front-end Integration Plan
 
-Branch dang cap nhat: `feature/service-area-zones`
+Branch dang cap nhat: `feature/staging-readiness-smoke`
 
 Muc tieu file nay:
 - Checklist chuc nang backend da co code va co the tich hop FE.
@@ -2578,6 +2578,34 @@ FE/devops action:
 - Neu deployment co log collector, dat `LOGGING_STRUCTURED_FORMAT_CONSOLE=logstash` hoac format Spring Boot ho tro (`ecs`, `gelf`) de stdout chuyen sang JSON structured logs. Mac dinh rong giu console pattern dev hien tai.
 - Structured logs co cac field tu MDC: `requestId`, `http.request.method`, `url.path`, `http.response.status_code`, `event.duration_ms`, kem context `service.name`, `service.environment`, `service.version`. Khong log request body, password, token hoac secret.
 - Khong hien thi cac endpoint nay nhu chuc nang nguoi dung; chi dung cho diagnostics/deployment.
+
+#### Staging readiness smoke gate
+
+Devops co the chay mot lenh tong hop thay vi goi tung endpoint thu cong:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/test-staging-readiness.ps1 -BaseUrl https://staging-api.goride.example -OutputPath artifacts/staging-readiness-report.json
+```
+
+Basic mode kiem tra liveness/readiness, `app.name=goride`, service-area response, CASH va metadata MoMo/VNPAY. Empty service-area va online payment disabled chi la warning, phu hop rollout CASH-only.
+
+Strict launch gate:
+
+```powershell
+$env:GORIDE_ADMIN_TOKEN = "<admin-access-token>"
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/test-staging-readiness.ps1 -BaseUrl https://staging-api.goride.example -RequireServiceAreas -RequireOnlinePayments -OutputPath artifacts/staging-readiness-report.json
+Remove-Item Env:GORIDE_ADMIN_TOKEN
+```
+
+Strict mode tra exit code `1` khi:
+- liveness/readiness/app identity fail;
+- khong co active service area hoac boundary response khong hop le;
+- CASH bi thieu/disabled;
+- MoMo/VNPAY metadata, provider sandbox readiness hoac aggregate UAT gate chua san sang;
+- public online method da enabled nhung `readyForFrontendExposure` chua true;
+- thieu admin token khi yeu cau online payments.
+
+Script khong in token va report JSON khong ghi token. GitHub Actions workflow `Staging Readiness Smoke` doc token tu secret `GORIDE_STAGING_ADMIN_TOKEN`, cho phep bat/tat hai strict gate va luu report artifact 14 ngay. FE khong goi script nay; FE tiep tuc dung API contract, con devops dung report de quyet dinh co mo online payment/service zone cho release candidate hay khong.
 
 ### 4.17 Production startup guardrails
 

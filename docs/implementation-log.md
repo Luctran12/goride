@@ -5,6 +5,64 @@
 > Tu commit `feat: add matching driver search` tro di, moi commit backend can cap nhat file nay trong cung commit.
 
 ---
+## Commit: `chore: add staging readiness smoke gate`
+
+Branch: `feature/staging-readiness-smoke`
+
+Phase: P1 staging deployment validation
+
+### Muc tieu
+
+Bien cac checklist go-product da co thanh mot lenh smoke co exit code va JSON evidence, de devops phat hien deployment chua san sang truoc khi FE/QA chay UAT.
+
+### Noi dung da trien khai
+
+- Merge `feature/payment-uat-actor-foreign-key` vao `develop` tai `1596826`.
+- Them `scripts/test-staging-readiness.ps1`:
+  - kiem tra Actuator liveness, readiness va `app.name`;
+  - kiem tra active service-area data va boundary toi thieu;
+  - xac nhan CASH luon kha dung va MoMo/VNPAY metadata co mat;
+  - neu co admin token, kiem tra provider sandbox readiness, aggregate UAT evidence va exposure consistency;
+  - ho tro `-RequireServiceAreas` va `-RequireOnlinePayments` lam launch gate;
+  - xuat report JSON khong chua admin token va tra exit code 1 khi co check fail.
+- Them workflow `.github/workflows/staging-readiness-smoke.yml` chay thu cong, doc token tu secret `GORIDE_STAGING_ADMIN_TOKEN` va luu report artifact 14 ngay.
+- Cap nhat `integrate-plan.md`, `plan.md`, `docs/current-phase.md`, `docs/implementation-log.md` va `docs/pland.xlsx`.
+
+### Review truoc commit
+
+- PowerShell syntax parse: pass.
+- Mock staging strict happy path: pass 13 checks va JSON report.
+- Missing admin token voi `-RequireOnlinePayments`: fail-safe voi exit code 1 nhu mong doi.
+- Full `./mvnw.cmd test`: pass 424 tests, 0 failures, 0 errors.
+- `git diff --check` va manual code review: pass; workflow input khong duoc noi suy vao PowerShell va khong con blocker.
+- CodeRabbit CLI: chua kha dung trong environment nay.
+- User review: completed 2026-07-11; commit created from the reviewed patch.
+
+### Files chinh
+
+- `scripts/test-staging-readiness.ps1`
+- `.github/workflows/staging-readiness-smoke.yml`
+- `integrate-plan.md`
+- `plan.md`
+- `docs/current-phase.md`
+- `docs/implementation-log.md`
+- `docs/pland.xlsx`
+
+### Cach review
+
+- Chay script voi mock/staging va xac nhan happy path tra exit code 0, report `success=true`.
+- Bo admin token trong strict online mode va xac nhan script tra exit code 1.
+- Kiem tra script khong in hoac ghi admin token vao report.
+- Kiem tra online method enabled trong khi UAT gate false bi danh dau `FAIL`.
+- Kiem tra workflow chi doc secret qua environment va van upload report khi smoke fail.
+
+### Viec tiep theo
+
+- Commit voi message `chore: add staging readiness smoke gate`.
+- Merge feature vao `develop` sau khi commit.
+- Chay workflow tren staging that; luu report cung release candidate evidence.
+
+
 ## Commit: `fix: enforce payment sandbox uat actor foreign key`
 
 Branch: `feature/payment-uat-actor-foreign-key`
