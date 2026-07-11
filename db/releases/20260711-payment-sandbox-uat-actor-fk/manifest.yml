@@ -1,0 +1,27 @@
+release_id: 20260711-payment-sandbox-uat-actor-fk
+title: Enforce payment sandbox UAT tested-by user reference
+author: Codex
+created_at: 2026-07-11
+risk: low
+transactional: true
+requires_downtime: false
+applies_after:
+  - 20260710-payment-sandbox-e2e-sessions
+related_commit: pending
+environments:
+  - staging
+  - production
+objects:
+  - fk_payment_sandbox_uat_tested_by_user
+pre_deploy_checks:
+  - Run precheck.sql and confirm users and payment_sandbox_uat_results exist.
+  - Confirm orphaned_tested_by_user_rows is zero before apply.
+deploy_steps:
+  - Run apply.sql after the payment sandbox E2E session release.
+post_deploy_checks:
+  - Run verify.sql and confirm the FK is valid and no orphan actor references remain.
+rollback_plan:
+  - Run rollback.sql to remove only fk_payment_sandbox_uat_tested_by_user; UAT result rows remain unchanged.
+notes:
+  - Adds referential integrity for aggregate UAT audit actor ids without changing application data.
+  - ON DELETE RESTRICT preserves the admin audit trail; users are soft-deleted by the application.
