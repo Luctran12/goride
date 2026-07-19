@@ -6,6 +6,7 @@ import com.example.goride.storage.config.FileStorageProperties;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.mock.env.MockEnvironment;
 
 import java.util.List;
@@ -177,6 +178,64 @@ class ProductionReadinessValidatorTests {
         assertThatCode(validator::validate).doesNotThrowAnyException();
     }
 
+    @Test
+    void rejectsDisabledOrLoopbackTracingInProduction() {
+        MockEnvironment environment = environment("production", "validate")
+                .withProperty("management.tracing.enabled", "false")
+                .withProperty("management.otlp.tracing.export.enabled", "false")
+                .withProperty("management.otlp.tracing.endpoint", "http://localhost:4318/v1/traces");
+
+        ProductionReadinessValidator validator = new ProductionReadinessValidator(
+                environment,
+                productionJwt(),
+                cors(List.of("https://app.goride.example"), List.of()),
+                r2Storage()
+        );
+
+        assertThatThrownBy(validator::validate)
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("management.tracing.enabled must be true")
+                .hasMessageContaining("management.otlp.tracing.export.enabled must be true")
+                .hasMessageContaining("management.otlp.tracing.endpoint must be an absolute non-loopback");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"-0.1", "0", "1.1", "NaN"})
+    void rejectsUnsafeTracingSamplingProbability(String samplingProbability) {
+        MockEnvironment environment = environment("production", "validate")
+                .withProperty("management.tracing.sampling.probability", samplingProbability);
+
+        ProductionReadinessValidator validator = new ProductionReadinessValidator(
+                environment,
+                productionJwt(),
+                cors(List.of("https://app.goride.example"), List.of()),
+                r2Storage()
+        );
+
+        assertThatThrownBy(validator::validate)
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("management.tracing.sampling.probability must be greater than 0");
+    }
+
+    @Test
+    void allowsExplicitProductionTracingOptOutForExternalAgent() {
+        MockEnvironment environment = environment("production", "validate")
+                .withProperty("app.observability.tracing.required-in-production", "false")
+                .withProperty("management.tracing.enabled", "false")
+                .withProperty("management.otlp.tracing.export.enabled", "false")
+                .withProperty("management.otlp.tracing.endpoint", "http://localhost:4318/v1/traces")
+                .withProperty("management.tracing.sampling.probability", "0");
+
+        ProductionReadinessValidator validator = new ProductionReadinessValidator(
+                environment,
+                productionJwt(),
+                cors(List.of("https://app.goride.example"), List.of()),
+                r2Storage()
+        );
+
+        assertThatCode(validator::validate).doesNotThrowAnyException();
+    }
+
     private MockEnvironment environment(String appEnvironment, String ddlAuto) {
         return environmentWithApiDocs(appEnvironment, ddlAuto, false, false);
     }
@@ -193,7 +252,15 @@ class ProductionReadinessValidatorTests {
                 .withProperty("springdoc.api-docs.enabled", Boolean.toString(apiDocsEnabled))
                 .withProperty("springdoc.swagger-ui.enabled", Boolean.toString(swaggerUiEnabled))
                 .withProperty("app.security.rate-limit.enabled", "true")
-                .withProperty("app.security.rate-limit.store", "redis");
+                .withProperty("app.security.rate-limit.store", "redis")
+                .withProperty("app.observability.tracing.required-in-production", "true")
+                .withProperty("management.tracing.enabled", "true")
+                .withProperty("management.otlp.tracing.export.enabled", "true")
+                .withProperty(
+                        "management.otlp.tracing.endpoint",
+                        "http://otel-collector:4318/v1/traces"
+                )
+                .withProperty("management.tracing.sampling.probability", "0.1");
     }
 
     private JwtProperties productionJwt() {

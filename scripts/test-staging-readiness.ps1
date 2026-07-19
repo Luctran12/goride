@@ -14,6 +14,9 @@ param(
     [switch]$RequireOnlinePayments,
 
     [Parameter()]
+    [switch]$RequireTracing,
+
+    [Parameter()]
     [ValidateNotNullOrEmpty()]
     [string]$ExpectedAppName = "goride",
 
@@ -169,6 +172,24 @@ else {
     Add-Check -Name "Application identity" -Status "FAIL" -Details "Expected app.name=$ExpectedAppName."
 }
 
+if (-not $info.succeeded) {
+    $status = if ($RequireTracing) { "FAIL" } else { "SKIP" }
+    Add-Check -Name "Distributed tracing" -Status $status -Details "Actuator info is unavailable."
+}
+else {
+    $tracingEnabled = $info.body.observability.tracingEnabled -eq $true
+    $otlpExportEnabled = $info.body.observability.otlpExportEnabled -eq $true
+    if ($tracingEnabled -and $otlpExportEnabled) {
+        Add-Check -Name "Distributed tracing" -Status "PASS" -Details "Tracing and OTLP export are enabled."
+    }
+    elseif ($RequireTracing) {
+        Add-Check -Name "Distributed tracing" -Status "FAIL" -Details "Tracing or OTLP export is disabled."
+    }
+    else {
+        Add-Check -Name "Distributed tracing" -Status "WARN" -Details "Tracing or OTLP export is disabled."
+    }
+}
+
 $serviceAreaResult = Get-ApiData -CheckName "Service areas endpoint" -Path "/api/v1/service-areas"
 $serviceAreas = @(if ($serviceAreaResult.succeeded) { $serviceAreaResult.data })
 if ($serviceAreaResult.succeeded) {
@@ -287,6 +308,7 @@ $report = [ordered]@{
     baseUrl = $baseUri
     requireServiceAreas = [bool]$RequireServiceAreas
     requireOnlinePayments = [bool]$RequireOnlinePayments
+    requireTracing = [bool]$RequireTracing
     success = ($failedCount -eq 0)
     failedCount = $failedCount
     warningCount = $warningCount

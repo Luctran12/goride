@@ -17,6 +17,11 @@ on:
         required: true
         default: false
         type: boolean
+      require_tracing:
+        description: Require Micrometer tracing and OTLP export at runtime
+        required: true
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -38,6 +43,7 @@ jobs:
           GORIDE_STAGING_BASE_URL: ${{ inputs.base_url }}
           GORIDE_REQUIRE_SERVICE_AREAS: ${{ inputs.require_service_areas }}
           GORIDE_REQUIRE_ONLINE_PAYMENTS: ${{ inputs.require_online_payments }}
+          GORIDE_REQUIRE_TRACING: ${{ inputs.require_tracing }}
         run: |
           $parameters = @{
             BaseUrl = $env:GORIDE_STAGING_BASE_URL
@@ -48,6 +54,9 @@ jobs:
           }
           if ($env:GORIDE_REQUIRE_ONLINE_PAYMENTS -eq "true") {
             $parameters.RequireOnlinePayments = $true
+          }
+          if ($env:GORIDE_REQUIRE_TRACING -eq "true") {
+            $parameters.RequireTracing = $true
           }
           ./scripts/test-staging-readiness.ps1 @parameters
 
