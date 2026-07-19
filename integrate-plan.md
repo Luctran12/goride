@@ -324,6 +324,7 @@ type PaymentSandboxUatStatus = "NOT_RUN" | "BLOCKED" | "FAILED" | "PASSED";
 - [x] Admin/devops co payment sandbox UAT plan de xem callback endpoint, missing config va kich ban test truoc khi expose online payment.
 - [x] Admin/devops co endpoint luu ket qua sandbox UAT evidence, tinh `readyForFrontendExposure` de FE biet provider nao da du dieu kien hien thi.
 - [x] Admin/devops co endpoint sandbox E2E session de record tung lan test checkout URL, success/failure callback, replay va freshness evidence voi payment id/transaction ref that.
+- [x] Payment method metadata expose `readyForFrontendExposure` va `consumerEnabled` de FE show online method chi sau khi aggregate UAT pass.
 - [x] Backend reject booking neu `paymentMethod` chua duoc enable.
 - [x] Co checkout foundation endpoint cho payment `PENDING`.
 - [x] Co webhook foundation endpoint cho payment provider external callback.
@@ -340,6 +341,7 @@ type PaymentSandboxUatStatus = "NOT_RUN" | "BLOCKED" | "FAILED" | "PASSED";
 - [x] Driver confirm da nhan tien mat.
 - [x] Payment `PENDING -> COMPLETED`, set `paidAt`.
 - [x] Payment completed workflow dung chung de notify va dua driver ve `AVAILABLE`.
+- [x] Online payment `PENDING` sau trip completed dua driver ve `AVAILABLE` ngay de tai xe khong bi ket trong luc passenger checkout; CASH van doi driver confirm.
 - [x] Passenger/driver/admin xem payment detail theo trip.
 - [x] Notify passenger va driver khi payment completed.
 - [x] Set Redis driver status ve `AVAILABLE` sau payment completed.
@@ -1408,7 +1410,7 @@ FE action:
 ### 4.7 Payment cash
 
 Payment record duoc tao khi driver complete trip. FE khong co endpoint create payment rieng.
-Backend da co provider abstraction noi bo. `CASH` enabled mac dinh; `VNPAY` va `MOMO` chi enabled khi provider bean da registered, config `enabled=true` va du config checkout rieng cho tung provider. Ca hai provider online da co signed checkout va callback foundation; production van nen disabled cho den khi sandbox/UAT thanh cong.
+Backend da co provider abstraction noi bo. `CASH` enabled mac dinh; `VNPAY` va `MOMO` chi `enabled=true` khi provider bean da registered, config `enabled=true` va du config checkout rieng cho tung provider. FE passenger phai dung `consumerEnabled=true` de render online method cho user that; field nay chi true khi backend config/readiness du va aggregate sandbox UAT evidence da pass. Ca hai provider online da co signed checkout va callback foundation; production van nen disabled cho den khi sandbox/UAT thanh cong.
 
 #### Lay danh sach payment methods
 
@@ -1428,7 +1430,9 @@ Response `data`:
     "checkoutRequired": false,
     "sandbox": false,
     "providerConfigured": true,
-    "providerRegistered": true
+    "providerRegistered": true,
+    "readyForFrontendExposure": true,
+    "consumerEnabled": true
   },
   {
     "method": "MOMO",
@@ -1438,7 +1442,9 @@ Response `data`:
     "checkoutRequired": true,
     "sandbox": true,
     "providerConfigured": false,
-    "providerRegistered": true
+    "providerRegistered": true,
+    "readyForFrontendExposure": false,
+    "consumerEnabled": false
   },
   {
     "method": "VNPAY",
@@ -1448,15 +1454,18 @@ Response `data`:
     "checkoutRequired": true,
     "sandbox": true,
     "providerConfigured": false,
-    "providerRegistered": true
+    "providerRegistered": true,
+    "readyForFrontendExposure": false,
+    "consumerEnabled": false
   }
 ]
 ```
 
 FE action:
 - Goi endpoint nay khi mo booking/payment screen de render option payment method, khong hardcode availability.
-- Chi cho user chon method co `enabled=true`.
-- Neu backend tra `enabled=false`, disable/hide option hoac hien "Coming soon".
+- Chi cho passenger chon method co `consumerEnabled=true`.
+- `enabled=true` nghia la provider du config checkout cho booking/UAT co kiem soat; online method van phai an voi user neu `readyForFrontendExposure=false` hoac `consumerEnabled=false`.
+- Neu backend tra `consumerEnabled=false`, disable/hide option hoac hien "Coming soon".
 - Backend cung reject booking neu client gui method chua enabled bang `PAYMENT_PROVIDER_UNSUPPORTED`.
 
 #### Admin kiem tra provider sandbox readiness
@@ -1507,7 +1516,7 @@ Response `data`:
 
 Admin/devops action:
 - Goi endpoint nay sau khi set env sandbox de xac nhan `sandboxReady=true` truoc khi chay UAT sandbox.
-- De expose MoMo/VNPAY cho user that, FE/admin nen kiem tra them sandbox UAT result co `readyForFrontendExposure=true`.
+- De expose MoMo/VNPAY cho user that, FE passenger nen uu tien field `consumerEnabled=true` tu `GET /api/v1/payments/methods`; admin co the doi chieu sandbox UAT result `readyForFrontendExposure=true`.
 - Khong log/commit secret; response chi tra ten requirement bi thieu, khong tra gia tri config.
 - Neu `checkoutReady=false`, checkout URL chua nen duoc test tren FE.
 - Neu `webhookReady=false`, chua nen chay callback sandbox vi backend se reject callback hoac khong reconcile duoc payment.
@@ -1624,7 +1633,7 @@ Request:
 Admin/devops action:
 - Chi mark `PASSED` sau khi test checkout URL, success callback, failure callback, duplicate terminal callback va callback freshness rejection tren sandbox that.
 - Backend reject `PASSED` neu provider chua `sandboxReady=true` hoac con thieu bat ky check nao; response loi `VALIDATION_ERROR` co `details.missingRequirements` hoac `details.missingChecks`.
-- FE/admin dashboard co the dung `readyForFrontendExposure=true` lam gate cuoi cung de hien MoMo/VNPAY cho user that tren moi truong UAT/production.
+- FE/admin dashboard co the dung `readyForFrontendExposure=true` de giai thich gate UAT; UI passenger nen show online method khi metadata `/methods` co `consumerEnabled=true`.
 - Nen uu tien ghi session E2E chi tiet bang endpoint ben duoi; endpoint `PUT` nay van huu ich neu can cap nhat aggregate result thu cong.
 - Endpoint chi luu evidence va notes ngan; khong luu raw callback payload, card/wallet data, access key hay secret.
 - Aggregate evidence `testedByUserId` duoc rang buoc toi `users(id)` boi release `20260711-payment-sandbox-uat-actor-fk`; thay doi nay khong doi JSON contract.
@@ -1717,7 +1726,7 @@ Validation backend:
 Admin/FE action:
 - Admin dashboard co the hien lich su session theo provider de audit ai da test, test luc nao va con thieu check nao.
 - `sandboxReady` trong response phan anh config hien tai, con `sessionEvidencePassed` phan anh evidence cua chinh session.
-- FE consumer payment method khong can goi endpoint session nay; chi dung aggregate `readyForFrontendExposure=true` tu metadata/UAT result de hien MoMo/VNPAY cho nguoi dung.
+- FE consumer payment method khong can goi endpoint session nay; chi dung `consumerEnabled=true` trong metadata `/methods`, hoac aggregate `readyForFrontendExposure=true` tren admin/UAT dashboard de giai thich trang thai gate.
 - Neu response loi `VALIDATION_ERROR`, dung `details.field`, `details.missingRequirements` hoac payment status hien tai de sua evidence truoc khi record lai.
 #### Tu dong hoa callback sandbox tren staging
 
@@ -1816,7 +1825,7 @@ FE action:
 - Goi sau trip `COMPLETED`/payment `PENDING` de biet payment method co can redirect khong.
 - Voi `CASH`, `checkoutRequired=false`, FE hien man hinh thanh toan tien mat va cho driver confirm; khong mo webview/checkout URL khi `checkoutUrl` null hoac khong co field.
 - Voi `VNPAY`, neu `checkoutRequired=true`, FE mo `checkoutUrl` va theo doi payment status/webhook flow.
-- Voi `MOMO`, neu backend expose `enabled=true`, FE mo `checkoutUrl` (`payUrl`) tu response; sau redirect refresh payment detail trong khi backend xu ly IPN.
+- Voi `MOMO`, neu backend expose `consumerEnabled=true`, FE mo `checkoutUrl` (`payUrl`) tu response; sau redirect refresh payment detail trong khi backend xu ly IPN.
 - Endpoint chi hop le cho payment `PENDING`; neu payment da completed backend tra `PAYMENT_INVALID_STATUS`, FE nen refresh payment detail.
 
 #### Provider webhook callback

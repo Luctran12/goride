@@ -25,6 +25,21 @@ public class PaymentCompletionWorkflow {
         this.tripRealtimeNotifier = tripRealtimeNotifier;
     }
 
+    public void handleOnlinePaymentAwaitingCheckout(Payment payment) {
+        if (!payment.getMethod().checkoutRequired()) {
+            return;
+        }
+        if (payment.getStatus() != PaymentStatus.PENDING) {
+            throw new BusinessException(
+                    ErrorCode.PAYMENT_INVALID_STATUS,
+                    "Only pending online payment can release driver before checkout"
+            );
+        }
+        Trip trip = assignedTrip(payment, "Online payment must belong to an assigned trip");
+        Long driverId = trip.getDriver().getId();
+        runAfterCommit(() -> driverCandidateStore.markCandidateAvailable(driverId));
+    }
+
     public void handleCompletedPayment(Payment payment) {
         if (payment.getStatus() != PaymentStatus.COMPLETED) {
             throw new BusinessException(
@@ -32,13 +47,7 @@ public class PaymentCompletionWorkflow {
                     "Only completed payment can trigger payment completion workflow"
             );
         }
-        Trip trip = payment.getTrip();
-        if (trip.getDriver() == null) {
-            throw new BusinessException(
-                    ErrorCode.PAYMENT_INVALID_STATUS,
-                    "Completed payment must belong to an assigned trip"
-            );
-        }
+        Trip trip = assignedTrip(payment, "Completed payment must belong to an assigned trip");
 
         Long passengerId = trip.getPassenger().getId();
         Long driverId = trip.getDriver().getId();
@@ -48,6 +57,14 @@ public class PaymentCompletionWorkflow {
             tripRealtimeNotifier.notifyPassenger(passengerId, notification);
             tripRealtimeNotifier.notifyUser(driverId, notification);
         });
+    }
+
+    private Trip assignedTrip(Payment payment, String message) {
+        Trip trip = payment.getTrip();
+        if (trip.getDriver() == null) {
+            throw new BusinessException(ErrorCode.PAYMENT_INVALID_STATUS, message);
+        }
+        return trip;
     }
 
     private void runAfterCommit(Runnable action) {

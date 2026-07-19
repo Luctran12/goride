@@ -5,6 +5,62 @@
 > Tu commit `feat: add matching driver search` tro di, moi commit backend can cap nhat file nay trong cung commit.
 
 ---
+## Commit: `feat: complete online payment exposure gate`
+
+Branch: `feature/online-payment-production-gate`
+
+Phase: P0 payment provider completion / launch gate
+
+### Muc tieu
+
+Hoan thien contract backend de FE biet chinh xac khi nao duoc show MoMo/VNPAY cho passenger, dong thoi khong lam tai xe bi ket busy trong luc passenger dang checkout online sau khi chuyen da completed.
+
+### Noi dung da trien khai
+
+- Mo rong `PaymentMethodResponse`:
+  - `readyForFrontendExposure`: aggregate sandbox UAT gate cho provider online.
+  - `consumerEnabled`: field FE passenger nen dung de render/chon payment method.
+- Cap nhat `PaymentMethodService`:
+  - Giu `enabled=true` la backend/provider checkout availability cho booking/UAT co kiem soat.
+  - Online `consumerEnabled=true` chi khi provider registered, checkout/webhook config du, sandbox mode ready va aggregate UAT evidence `PASSED` voi tat ca required checks.
+  - CASH luon `consumerEnabled=true` khi cash provider registered.
+- Cap nhat online payment lifecycle:
+  - Them `PaymentCompletionWorkflow.handleOnlinePaymentAwaitingCheckout(...)` de dua driver ve `AVAILABLE` khi payment MoMo/VNPAY vua duoc tao `PENDING` sau trip completion.
+  - CASH khong doi behavior: van doi driver confirm tien mat de payment completed va release driver.
+  - Payment provider callback success van dung workflow completed hien co de notify passenger/driver va idempotent release driver.
+- Cap nhat tai lieu FE va project plan de dung `consumerEnabled` thay vi chi nhin `enabled` khi expose MoMo/VNPAY.
+- Cap nhat `docs/pland.xlsx` theo status feature nay.
+
+### Review truoc commit
+
+- Targeted payment method/lifecycle suite: pass 14 tests.
+- Full Maven regression: pass 450 tests.
+- `git diff --check`: pass; chi co canh bao CRLF tu Git tren Windows.
+- CodeRabbit CLI: unavailable trong PATH (`coderabbit` command not found).
+- User review: completed 2026-07-19; commit created on feature branch, chua merge/push.
+
+### Files chinh
+
+- `src/main/java/com/example/goride/payment/dto/PaymentMethodResponse.java`
+- `src/main/java/com/example/goride/payment/service/PaymentMethodService.java`
+- `src/main/java/com/example/goride/payment/service/TripPaymentService.java`
+- `src/main/java/com/example/goride/payment/service/PaymentCompletionWorkflow.java`
+- `src/test/java/com/example/goride/payment/service/PaymentMethodServiceTests.java`
+- `src/test/java/com/example/goride/payment/service/TripPaymentServiceTests.java`
+- `src/test/java/com/example/goride/payment/service/PaymentCompletionWorkflowTests.java`
+- `integrate-plan.md`
+- `plan.md`
+- `docs/current-phase.md`
+- `docs/pland.xlsx`
+
+### Viec tiep theo
+
+- Chay real merchant sandbox checkout cho MoMo va VNPAY tren staging voi public HTTPS callback URL.
+- Record sandbox E2E session `PASSED` cho tung provider va xac nhan `/api/v1/payments/methods` tra `consumerEnabled=true`.
+- Sau real UAT pass, cap nhat FE de render MoMo/VNPAY dua tren `consumerEnabled` va refresh payment detail sau redirect/provider callback.
+
+---
+
 ## Commit: `feat: wire production otlp tracing`
 
 Branch: `feature/production-observability-wiring`
@@ -3349,7 +3405,7 @@ Cap nhat thong ke so chuyen da hoan thanh cua driver ngay khi trip chuyen sang `
 
 ### Review truoc commit
 
-- Da xac nhan increment chi nam trong nhÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡nh `COMPLETED`, sau khi domain transition hop le.
+- Da xac nhan increment chi nam trong nhÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¾ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡nh `COMPLETED`, sau khi domain transition hop le.
 - Da xac nhan trip lock va profile lock cung nam trong transaction de tranh double-count theo concurrent complete request.
 - Da xac nhan transition khong phai `COMPLETED` khong query driver profile.
 - Da chay `./mvnw.cmd -Dtest=DriverTripStatusServiceTests test`: pass 8 tests.

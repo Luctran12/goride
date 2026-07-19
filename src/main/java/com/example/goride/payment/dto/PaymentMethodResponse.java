@@ -10,14 +10,17 @@ public record PaymentMethodResponse(
         boolean checkoutRequired,
         boolean sandbox,
         boolean providerConfigured,
-        boolean providerRegistered
+        boolean providerRegistered,
+        boolean readyForFrontendExposure,
+        boolean consumerEnabled
 ) {
     public static PaymentMethodResponse of(
             PaymentMethod method,
             boolean enabled,
             boolean sandbox,
             boolean providerConfigured,
-            boolean providerRegistered
+            boolean providerRegistered,
+            boolean readyForFrontendExposure
     ) {
         return new PaymentMethodResponse(
                 method,
@@ -27,7 +30,9 @@ public record PaymentMethodResponse(
                 method.checkoutRequired(),
                 sandbox,
                 providerConfigured,
-                providerRegistered
+                providerRegistered,
+                readyForFrontendExposure,
+                enabled && readyForFrontendExposure
         );
     }
 }
