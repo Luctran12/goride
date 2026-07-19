@@ -327,6 +327,7 @@ type PaymentSandboxUatStatus = "NOT_RUN" | "BLOCKED" | "FAILED" | "PASSED";
 - [x] Payment method metadata expose `readyForFrontendExposure` va `consumerEnabled` de FE show online method chi sau khi aggregate UAT pass.
 - [x] Backend reject booking neu `paymentMethod` chua duoc enable.
 - [x] Co checkout foundation endpoint cho payment `PENDING`.
+- [x] Co `POST /api/v1/payments/trips/{tripId}/checkout` lam endpoint chinh de FE tao provider checkout; `GET /checkout` duoc giu lam alias tuong thich.
 - [x] Co webhook foundation endpoint cho payment provider external callback.
 - [x] VNPAY co signed checkout URL provider khi du config sandbox.
 - [x] VNPAY webhook/callback verify `vnp_SecureHash`, merchant code va amount truoc khi cap nhat payment.
@@ -1547,13 +1548,14 @@ Response `data` gom prerequisites, danh sach provider va cac scenario can test t
       "checkoutReady": true,
       "webhookReady": true,
       "sandboxReady": true,
-      "checkoutEndpoint": "GET /api/v1/payments/trips/{tripId}/checkout",
+      "checkoutEndpoint": "POST /api/v1/payments/trips/{tripId}/checkout",
       "webhookEndpoint": "POST /api/v1/payments/providers/momo/webhook",
       "returnUrl": "https://app.example/payments/momo/return",
       "ipnUrl": "https://api.example/api/v1/payments/providers/momo/webhook",
       "missingRequirements": [],
       "frontendActions": [
-        "Show this payment method only when GET /api/v1/payments/methods marks it enabled.",
+        "Show this payment method to passengers only when GET /api/v1/payments/methods returns consumerEnabled=true; enabled=true is for controlled UAT checkout.",
+        "Call POST /api/v1/payments/trips/{tripId}/checkout after trip completion and open the returned checkoutUrl.",
         "After provider redirect, call GET /api/v1/payments/trips/{tripId} until payment status is terminal."
       ],
       "backendChecks": [
@@ -1798,12 +1800,14 @@ FE action:
 - Khi provider online enabled, FE can xu ly `checkoutRequired=true`.
 - `sandbox=true` dung cho moi truong test provider; production nen set `sandbox=false` va secret qua env/secret manager.
 
-#### Lay checkout session theo trip
+#### Tao/lay checkout session theo trip
 
 ```http
-GET /api/v1/payments/trips/{tripId}/checkout
+POST /api/v1/payments/trips/{tripId}/checkout
 Authorization: Bearer <passengerOrDriverOrAdminToken>
 ```
+
+Endpoint chinh cho FE moi la `POST` vi MoMo/VNPAY co the tao provider order/session khi checkout. `GET /api/v1/payments/trips/{tripId}/checkout` van duoc giu lam alias tuong thich cho FE cu, nhung khong nen dung cho code moi.
 
 Response `data` voi CASH:
 
@@ -1822,9 +1826,9 @@ Response `data` voi CASH:
 ```
 
 FE action:
-- Goi sau trip `COMPLETED`/payment `PENDING` de biet payment method co can redirect khong.
+- Goi `POST /api/v1/payments/trips/{tripId}/checkout` sau trip `COMPLETED`/payment `PENDING` de tao/lay checkout session va biet payment method co can redirect khong.
 - Voi `CASH`, `checkoutRequired=false`, FE hien man hinh thanh toan tien mat va cho driver confirm; khong mo webview/checkout URL khi `checkoutUrl` null hoac khong co field.
-- Voi `VNPAY`, neu `checkoutRequired=true`, FE mo `checkoutUrl` va theo doi payment status/webhook flow.
+- Voi `VNPAY`, neu `checkoutRequired=true`, FE mo `checkoutUrl` va theo doi payment status/webhook flow; retry nen goi lai cung trip/payment de provider idempotency giu checkout on dinh.
 - Voi `MOMO`, neu backend expose `consumerEnabled=true`, FE mo `checkoutUrl` (`payUrl`) tu response; sau redirect refresh payment detail trong khi backend xu ly IPN.
 - Endpoint chi hop le cho payment `PENDING`; neu payment da completed backend tra `PAYMENT_INVALID_STATUS`, FE nen refresh payment detail.
 

@@ -88,7 +88,7 @@ class PaymentSandboxUatPlanServiceTests {
 
         assertThat(provider.status()).isEqualTo("READY_FOR_SANDBOX_UAT");
         assertThat(provider.readyForFrontendExposure()).isFalse();
-        assertThat(provider.checkoutEndpoint()).isEqualTo("GET /api/v1/payments/trips/{tripId}/checkout");
+        assertThat(provider.checkoutEndpoint()).isEqualTo("POST /api/v1/payments/trips/{tripId}/checkout");
         assertThat(provider.returnUrl()).isEqualTo("https://app.goride.test/payments/momo/return");
         assertThat(provider.ipnUrl()).isEqualTo("https://api.goride.test/api/v1/payments/providers/momo/webhook");
         assertThat(provider.frontendActions())

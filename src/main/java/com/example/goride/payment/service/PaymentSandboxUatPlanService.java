@@ -11,7 +11,7 @@ import java.util.List;
 
 @Service
 public class PaymentSandboxUatPlanService {
-    private static final String PAYMENT_CHECKOUT_ENDPOINT = "GET /api/v1/payments/trips/{tripId}/checkout";
+    private static final String PAYMENT_CHECKOUT_ENDPOINT = "POST /api/v1/payments/trips/{tripId}/checkout";
     private static final String PAYMENT_DETAIL_ENDPOINT = "GET /api/v1/payments/trips/{tripId}";
     private static final String PAYMENT_METHODS_ENDPOINT = "GET /api/v1/payments/methods";
     private static final String PAYMENT_SANDBOX_E2E_SESSION_ENDPOINT = "POST /api/v1/payments/providers/{providerName}/sandbox-e2e-sessions";
@@ -100,7 +100,7 @@ public class PaymentSandboxUatPlanService {
             );
         }
         return List.of(
-                "Show this payment method only when " + PAYMENT_METHODS_ENDPOINT + " marks it enabled.",
+                "Show this payment method to passengers only when " + PAYMENT_METHODS_ENDPOINT + " returns consumerEnabled=true; enabled=true is for controlled UAT checkout.",
                 "Call " + PAYMENT_CHECKOUT_ENDPOINT + " after trip completion and open the returned checkoutUrl.",
                 "After provider redirect, call " + PAYMENT_DETAIL_ENDPOINT + " until payment status is terminal."
         );

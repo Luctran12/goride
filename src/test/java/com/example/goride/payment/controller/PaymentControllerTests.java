@@ -1,10 +1,12 @@
 package com.example.goride.payment.controller;
 
+import com.example.goride.booking.domain.PaymentMethod;
 import com.example.goride.common.error.BusinessException;
 import com.example.goride.common.error.ErrorCode;
 import com.example.goride.common.security.CurrentUser;
 import com.example.goride.payment.domain.PaymentSandboxUatStatus;
 import com.example.goride.payment.domain.PaymentStatus;
+import com.example.goride.payment.dto.PaymentCheckoutResponse;
 import com.example.goride.payment.dto.PaymentProviderReadinessResponse;
 import com.example.goride.payment.dto.PaymentSandboxE2eSessionRequest;
 import com.example.goride.payment.dto.PaymentSandboxE2eSessionResponse;
@@ -26,7 +28,9 @@ import org.mockito.ArgumentCaptor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.PostMapping;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -183,6 +187,42 @@ class PaymentControllerTests {
     }
 
     @Test
+    void exposesPostTripPaymentCheckoutEndpoint() throws NoSuchMethodException {
+        PostMapping mapping = PaymentController.class
+                .getMethod("createTripPaymentCheckout", Authentication.class, Long.class)
+                .getAnnotation(PostMapping.class);
+
+        assertThat(mapping).isNotNull();
+        assertThat(mapping.value()).containsExactly("/trips/{tripId}/checkout");
+    }
+
+    @Test
+    void createsTripPaymentCheckoutWithCurrentUser() {
+        PaymentCheckoutService checkoutService = mock(PaymentCheckoutService.class);
+        CurrentUser currentUser = mock(CurrentUser.class);
+        Authentication authentication = mock(Authentication.class);
+        PaymentCheckoutResponse checkout = new PaymentCheckoutResponse(
+                70L,
+                99L,
+                BigDecimal.valueOf(120_000),
+                PaymentMethod.MOMO,
+                PaymentStatus.PENDING,
+                "momo",
+                true,
+                "https://sandbox.example/checkout",
+                null
+        );
+        when(currentUser.requireUserId(authentication)).thenReturn(42L);
+        when(checkoutService.getTripPaymentCheckout(42L, 99L)).thenReturn(checkout);
+        PaymentController controller = controller(checkoutService, currentUser);
+
+        var response = controller.createTripPaymentCheckout(authentication, 99L);
+
+        assertThat(response.data()).isSameAs(checkout);
+        verify(checkoutService).getTripPaymentCheckout(42L, 99L);
+    }
+
+    @Test
     void returnsNoContentForHandledMomoIpn() {
         PaymentWebhookService paymentWebhookService = mock(PaymentWebhookService.class);
         when(paymentWebhookService.handleProviderWebhook(eq("momo"), anyMap(), anyMap()))
@@ -299,6 +339,24 @@ class PaymentControllerTests {
                 currentUser
         );
     }
+
+    private PaymentController controller(
+            PaymentCheckoutService checkoutService,
+            CurrentUser currentUser
+    ) {
+        return new PaymentController(
+                mock(PaymentQueryService.class),
+                checkoutService,
+                mock(PaymentMethodService.class),
+                mock(PaymentProviderReadinessService.class),
+                mock(PaymentSandboxUatPlanService.class),
+                mock(PaymentSandboxE2eSessionService.class),
+                mock(PaymentSandboxUatResultService.class),
+                mock(PaymentWebhookService.class),
+                currentUser
+        );
+    }
+
     private PaymentController controller(
             PaymentWebhookService paymentWebhookService,
             PaymentProviderReadinessService readinessService,

@@ -5,6 +5,50 @@
 > Tu commit `feat: add matching driver search` tro di, moi commit backend can cap nhat file nay trong cung commit.
 
 ---
+## Commit: `feat: add payment checkout post endpoint`
+
+Branch: `feature/payment-checkout-post-endpoint`
+
+Phase: P0 payment provider completion / FE checkout contract
+
+### Muc tieu
+
+Chuan hoa API checkout online cho FE: tao provider checkout la hanh dong co side effect voi MoMo/VNPAY, nen endpoint chinh can la `POST` thay vi chi dung `GET` legacy.
+
+### Noi dung da trien khai
+
+- Them `POST /api/v1/payments/trips/{tripId}/checkout` trong `PaymentController`.
+- Giu `GET /api/v1/payments/trips/{tripId}/checkout` lam alias tuong thich cho FE cu.
+- Dung chung private controller method cho GET/POST de luon di qua cung `PaymentCheckoutService` va `CurrentUser` access rule.
+- Cap nhat `PaymentSandboxUatPlanService` de response admin/devops advertise endpoint checkout chinh la `POST`.
+- Cap nhat UAT plan wording: FE passenger chi expose online method khi `/methods` tra `consumerEnabled=true`; `enabled=true` la backend/UAT checkout availability.
+- Cap nhat `integrate-plan.md`, `plan.md` va workbook tracking cho contract checkout moi.
+
+### Review truoc commit
+
+- Targeted checkout/controller/UAT plan suite: pass 17 tests.
+- Full Maven regression: pass 452 tests.
+- `git diff --check`: pass; Git reports Windows CRLF conversion warnings only.
+- CodeRabbit CLI: unavailable trong PATH (`coderabbit` command not found).
+- User review: completed 2026-07-19; commit created on feature branch, not merged or pushed yet.
+
+### Files chinh
+
+- `src/main/java/com/example/goride/payment/controller/PaymentController.java`
+- `src/main/java/com/example/goride/payment/service/PaymentSandboxUatPlanService.java`
+- `src/test/java/com/example/goride/payment/controller/PaymentControllerTests.java`
+- `src/test/java/com/example/goride/payment/service/PaymentSandboxUatPlanServiceTests.java`
+- `integrate-plan.md`
+- `plan.md`
+- `docs/current-phase.md`
+- `docs/pland.xlsx`
+
+### Viec tiep theo
+
+- Sau commit nay, merge vao `develop` khi user yeu cau va tiep tuc real merchant sandbox UAT cho MoMo/VNPAY.
+- Chay real merchant sandbox checkout cho MoMo/VNPAY, record sandbox E2E session `PASSED`, roi moi expose online payment cho passenger qua `consumerEnabled=true`.
+
+---
 ## Commit: `feat: complete online payment exposure gate`
 
 Branch: `feature/online-payment-production-gate`
