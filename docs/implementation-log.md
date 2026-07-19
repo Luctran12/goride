@@ -5,6 +5,50 @@
 > Tu commit `feat: add matching driver search` tro di, moi commit backend can cap nhat file nay trong cung commit.
 
 ---
+## Commit: `feat: wire production otlp tracing`
+
+Branch: `feature/production-observability-wiring`
+
+Phase: P1 production observability wiring
+
+### Muc tieu
+
+Bien correlation ID hien co thanh trace co the tim kiem tren collector, them startup/smoke guardrails de production khong vo tinh chay khi tracing bat buoc nhung exporter chua san sang.
+
+### Noi dung da trien khai
+
+- Them Micrometer OpenTelemetry bridge va OTLP exporter theo dependency management cua Spring Boot.
+- Them config `TRACING_*`/`OTLP_TRACING_*` cho sampling, endpoint, timeout va OpenTelemetry resource attributes; local/test mac dinh disabled.
+- Them `traceId`/`spanId` vao plain console pattern va gan request ID da sanitize vao span attribute `request.id`.
+- Them typed `/actuator/info` contributor chi expose hai boolean tracing/export enabled, khong expose collector URL hoac authentication headers.
+- Them production fail-fast cho tracing/export disabled, collector URL loopback/credential-bearing va sampling invalid; cho phep opt-out ro rang khi deployment dung external Java agent/platform tracing.
+- Them `-RequireTracing` vao staging smoke va workflow input de strict promotion gate doc typed actuator flags.
+- Cap nhat `plan.md`, `integrate-plan.md`, `docs/current-phase.md` va `docs/pland.xlsx` trong cung feature.
+
+### Review truoc commit
+
+- Targeted observability/security/production suite: pass 24 tests.
+- HTTP integration test xac nhan `/actuator/info` tra boolean va khong leak OTLP endpoint.
+- PowerShell parser, workflow input interpolation check va `git diff --check`: pass; chi co canh bao CRLF tu Git tren Windows.
+- Full `./mvnw.cmd test`: pass 445 tests.
+- Manual review: pass; khong thay blocker trong OTLP config, production guardrail, actuator info hoac smoke workflow.
+- Actionlint va CodeRabbit CLI: chua kha dung; da thay bang workflow static check cuc bo cho run block input interpolation.
+- User review: completed 2026-07-19; commit created from the reviewed patch on the feature branch.
+
+### Files chinh
+
+- `pom.xml`
+- `src/main/java/com/example/goride/common/config/ObservabilityConfig.java`
+- `src/main/java/com/example/goride/common/config/ProductionReadinessValidator.java`
+- `src/main/resources/application.properties`
+- `scripts/test-staging-readiness.ps1`
+- `.github/workflows/staging-readiness-smoke.yml`
+- `integrate-plan.md`
+- `plan.md`
+- `docs/current-phase.md`
+- `docs/pland.xlsx`
+
+---
 ## Commit: `ci: automate payment sandbox callback verification`
 
 Branch: `feature/payment-sandbox-e2e-automation`
@@ -3305,7 +3349,7 @@ Cap nhat thong ke so chuyen da hoan thanh cua driver ngay khi trip chuyen sang `
 
 ### Review truoc commit
 
-- Da xac nhan increment chi nam trong nhÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡nh `COMPLETED`, sau khi domain transition hop le.
+- Da xac nhan increment chi nam trong nhÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡nh `COMPLETED`, sau khi domain transition hop le.
 - Da xac nhan trip lock va profile lock cung nam trong transaction de tranh double-count theo concurrent complete request.
 - Da xac nhan transition khong phai `COMPLETED` khong query driver profile.
 - Da chay `./mvnw.cmd -Dtest=DriverTripStatusServiceTests test`: pass 8 tests.

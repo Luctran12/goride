@@ -65,6 +65,7 @@ FE nen map `error.code` thay vi chi doc text message.
 - Backend luon tra `X-Request-Id` trong response header; neu FE khong gui hoac gui gia tri khong an toan, backend tu sinh UUID.
 - Error response cung co field `requestId`. Khi hien man loi/support, FE nen luu `requestId`, endpoint, thoi gian va `error.code` de backend tim dung log.
 - Log request completion co MDC fields `requestId`, `http.request.method`, `url.path`, `http.response.status_code`, `event.duration_ms` de log collector search/correlation tot hon khi bat structured logging.
+- Khi tracing duoc bat, console log co them `traceId`/`spanId` va moi server span co attribute `request.id` lay tu `X-Request-Id` da sanitize. Support co the tim theo request ID roi mo dung distributed trace.
 - Khong dua access token, refresh token, password hoac thong tin nhay cam vao `X-Request-Id`.
 
 
@@ -105,6 +106,13 @@ RATE_LIMIT_REFILL_TOKENS=120
 RATE_LIMIT_REFILL_PERIOD_SECONDS=60
 RATE_LIMIT_MAX_KEYS=10000
 RATE_LIMIT_REDIS_KEY_PREFIX=goride:rate-limit:
+TRACING_REQUIRED_IN_PRODUCTION=true
+TRACING_ENABLED=true
+TRACING_SAMPLING_PROBABILITY=0.1
+OTLP_TRACING_ENABLED=true
+OTLP_TRACING_ENDPOINT=http://otel-collector:4318/v1/traces
+OTLP_TRACING_CONNECT_TIMEOUT=5s
+OTLP_TRACING_TIMEOUT=10s
 RATE_LIMIT_EXCLUDED_PATHS=/actuator/**,/v3/api-docs/**,/swagger-ui/**,/swagger-ui.html,/ws/**,/ws-native/**
 RATE_LIMIT_USE_FORWARDED_FOR=false
 ```
@@ -2609,16 +2617,23 @@ APP_GROUP=goride-backend
 APP_ENV=staging
 APP_VERSION=2026.07.05
 LOGGING_STRUCTURED_FORMAT_CONSOLE=logstash
+TRACING_ENABLED=true
+TRACING_SAMPLING_PROBABILITY=0.1
+OTLP_TRACING_ENABLED=true
+OTLP_TRACING_ENDPOINT=http://otel-collector:4318/v1/traces
+OTLP_TRACING_CONNECT_TIMEOUT=5s
+OTLP_TRACING_TIMEOUT=10s
 ```
 
 FE/devops action:
 - Dung `/actuator` de xem discovery links cua cac endpoint actuator expose.
 - Dung `/actuator/health/liveness` cho container/process liveness probe.
 - Dung `/actuator/health/readiness` cho readiness probe; endpoint nay phu thuoc DB va Redis nen co the tra non-2xx khi dependency chua san sang.
-- Dung `/actuator/info` de xac nhan app identity (`app.name=goride`) trong smoke test.
+- Dung `/actuator/info` de xac nhan app identity (`app.name=goride`) va hai boolean an toan `observability.tracingEnabled`, `observability.otlpExportEnabled`; response khong expose collector URL/header xac thuc.
 - Dung `/actuator/prometheus` cho Prometheus/platform scraper; canh bao khi 5xx tang, latency tang, hoac `goride_rate_limit_requests_total{outcome="rejected"}` tang bat thuong.
 - Neu deployment co log collector, dat `LOGGING_STRUCTURED_FORMAT_CONSOLE=logstash` hoac format Spring Boot ho tro (`ecs`, `gelf`) de stdout chuyen sang JSON structured logs. Mac dinh rong giu console pattern dev hien tai.
-- Structured logs co cac field tu MDC: `requestId`, `http.request.method`, `url.path`, `http.response.status_code`, `event.duration_ms`, kem context `service.name`, `service.environment`, `service.version`. Khong log request body, password, token hoac secret.
+- Structured logs co cac field tu MDC: `requestId`, `traceId`, `spanId`, `http.request.method`, `url.path`, `http.response.status_code`, `event.duration_ms`, kem context `service.name`, `service.environment`, `service.version`. Khong log request body, password, token hoac secret.
+- Repository chi cau hinh app de phat OTLP trace va Prometheus metrics. Devops van phai deploy OTLP collector/backend, stdout log shipping, dashboards va alerts ben ngoai repository.
 - Khong hien thi cac endpoint nay nhu chuc nang nguoi dung; chi dung cho diagnostics/deployment.
 
 #### Staging readiness smoke gate
@@ -2635,7 +2650,7 @@ Strict launch gate:
 
 ```powershell
 $env:GORIDE_ADMIN_TOKEN = "<admin-access-token>"
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts/test-staging-readiness.ps1 -BaseUrl https://staging-api.goride.example -RequireServiceAreas -RequireOnlinePayments -OutputPath artifacts/staging-readiness-report.json
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/test-staging-readiness.ps1 -BaseUrl https://staging-api.goride.example -RequireServiceAreas -RequireOnlinePayments -RequireTracing -OutputPath artifacts/staging-readiness-report.json
 Remove-Item Env:GORIDE_ADMIN_TOKEN
 ```
 
@@ -2645,6 +2660,7 @@ Strict mode tra exit code `1` khi:
 - CASH bi thieu/disabled;
 - MoMo/VNPAY metadata, provider sandbox readiness hoac aggregate UAT gate chua san sang;
 - public online method da enabled nhung `readyForFrontendExposure` chua true;
+- `-RequireTracing` duoc bat nhung `/actuator/info` bao tracing hoac OTLP export chua enabled;
 - thieu admin token khi yeu cau online payments.
 
 Script khong in token va report JSON khong ghi token. GitHub Actions workflow `Staging Readiness Smoke` doc token tu secret `GORIDE_STAGING_ADMIN_TOKEN`, cho phep bat/tat hai strict gate va luu report artifact 14 ngay. FE khong goi script nay; FE tiep tuc dung API contract, con devops dung report de quyet dinh co mo online payment/service zone cho release candidate hay khong.
@@ -2672,6 +2688,13 @@ SPRINGDOC_SWAGGER_UI_ENABLED=false
 RATE_LIMIT_ENABLED=true
 RATE_LIMIT_STORE=redis
 RATE_LIMIT_REDIS_KEY_PREFIX=goride:rate-limit:
+TRACING_REQUIRED_IN_PRODUCTION=true
+TRACING_ENABLED=true
+TRACING_SAMPLING_PROBABILITY=0.1
+OTLP_TRACING_ENABLED=true
+OTLP_TRACING_ENDPOINT=http://otel-collector:4318/v1/traces
+OTLP_TRACING_CONNECT_TIMEOUT=5s
+OTLP_TRACING_TIMEOUT=10s
 ```
 
 Backend se chan cac loi cau hinh sau trong production:
@@ -2682,12 +2705,15 @@ Backend se chan cac loi cau hinh sau trong production:
 - `STORAGE_PROVIDER=r2` nhung thieu endpoint, bucket, access key, secret key hoac public base URL.
 - `springdoc.api-docs.enabled` hoac `springdoc.swagger-ui.enabled` van true; production bat buoc tat ca OpenAPI JSON va Swagger UI.
 - Application rate limiting enabled nhung `app.security.rate-limit.store` khong phai `redis`; multi-replica production bat buoc dung shared bucket.
+- `TRACING_REQUIRED_IN_PRODUCTION=true` nhung tracing/exporter bi tat, sampling khong nam trong `(0,1]`, hoac OTLP endpoint khong phai absolute HTTP(S) URL an toan.
+- OTLP collector URL chua localhost/loopback, `0.0.0.0` hoac embedded username/password; production phai tro den collector co the truy cap tu workload.
 
 Devops action:
 - Dung `APP_ENV=local` cho may dev de tiep tuc dung local storage/CORS localhost va giu API docs/Swagger UI enabled theo default.
 - Staging co the giu docs enabled cho QA/FE; production phai set ca hai `SPRINGDOC_*_ENABLED=false` va `/v3/api-docs`, `/swagger-ui/**` se khong duoc dang ky.
 - Truoc staging/production, set day du env vars tren platform, khong commit secret vao Git.
 - Neu app fail voi message `Production readiness check failed`, doc tung property trong message va sua env/deployment config truoc khi restart.
+- Neu platform dung OpenTelemetry Java agent/sidecar thay cho exporter trong process, set `TRACING_REQUIRED_IN_PRODUCTION=false` mot cach chu dong va ghi ro collector validation trong deployment runbook; day khong phai default.
 
 FE action:
 - FE khong can doi request body/header cho guardrail nay.

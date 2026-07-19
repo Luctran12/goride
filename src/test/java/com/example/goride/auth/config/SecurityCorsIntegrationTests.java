@@ -27,6 +27,7 @@ import static org.springframework.http.HttpMethod.POST;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest(properties = "management.endpoint.health.group.readiness.include=readinessState")
@@ -101,6 +102,15 @@ class SecurityCorsIntegrationTests {
                         "X-Request-Id, Retry-After, X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Reset"
                 ))
                 .andExpect(header().exists("X-Request-Id"));
+    }
+
+    @Test
+    void exposesSafeTracingRuntimeFlagsWithoutCollectorDetails() throws Exception {
+        mockMvc.perform(get("/actuator/info"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.observability.tracingEnabled").value(false))
+                .andExpect(jsonPath("$.observability.otlpExportEnabled").value(false))
+                .andExpect(jsonPath("$.observability.endpoint").doesNotExist());
     }
 
     @Test

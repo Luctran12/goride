@@ -7,6 +7,8 @@ import org.springframework.beans.factory.SmartInitializingSingleton;
 import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Component;
 
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -59,6 +61,7 @@ public class ProductionReadinessValidator implements SmartInitializingSingleton 
         validateCors(violations);
         validateApiDocumentation(violations);
         validateRateLimitStore(violations);
+        validateTracing(violations);
         return violations;
     }
 
@@ -135,6 +138,56 @@ public class ProductionReadinessValidator implements SmartInitializingSingleton 
         if (!"redis".equals(store)) {
             violations.add("app.security.rate-limit.store must be redis in production when rate limiting is enabled");
         }
+    }
+
+    private void validateTracing(List<String> violations) {
+        if (!booleanProperty("app.observability.tracing.required-in-production", true)) {
+            return;
+        }
+        if (!booleanProperty("management.tracing.enabled", false)) {
+            violations.add("management.tracing.enabled must be true when production tracing is required");
+        }
+        if (!booleanProperty("management.otlp.tracing.export.enabled", false)) {
+            violations.add("management.otlp.tracing.export.enabled must be true when production tracing is required");
+        }
+
+        String endpoint = property("management.otlp.tracing.endpoint", "");
+        try {
+            URI uri = new URI(endpoint);
+            String scheme = normalize(uri.getScheme());
+            String host = normalize(uri.getHost());
+            if (!Set.of("http", "https").contains(scheme)
+                    || host.isEmpty()
+                    || uri.getUserInfo() != null
+                    || isUnsafeCollectorHost(host)) {
+                violations.add(
+                        "management.otlp.tracing.endpoint must be an absolute non-loopback HTTP(S) collector URL "
+                                + "without embedded credentials"
+                );
+            }
+        } catch (URISyntaxException exception) {
+            violations.add("management.otlp.tracing.endpoint must be a valid collector URL");
+        }
+
+        double samplingProbability = environment.getProperty(
+                "management.tracing.sampling.probability",
+                Double.class,
+                0.1D
+        );
+        if (!Double.isFinite(samplingProbability)
+                || samplingProbability <= 0.0D
+                || samplingProbability > 1.0D) {
+            violations.add("management.tracing.sampling.probability must be greater than 0 and at most 1");
+        }
+    }
+
+    private boolean isUnsafeCollectorHost(String host) {
+        String normalizedHost = host.replace("[", "").replace("]", "");
+        return "localhost".equals(normalizedHost)
+                || normalizedHost.endsWith(".localhost")
+                || normalizedHost.startsWith("127.")
+                || "0.0.0.0".equals(normalizedHost)
+                || "::1".equals(normalizedHost);
     }
 
     private List<String> unsafeCorsValues(List<String> values) {
