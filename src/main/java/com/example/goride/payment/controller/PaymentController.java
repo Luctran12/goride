@@ -162,6 +162,22 @@ public class PaymentController {
             Authentication authentication,
             @PathVariable Long tripId
     ) {
+        return tripPaymentCheckout(authentication, tripId);
+    }
+
+    @PostMapping("/trips/{tripId}/checkout")
+    @PreAuthorize("hasAnyRole('PASSENGER', 'DRIVER', 'ADMIN')")
+    public ApiResponse<PaymentCheckoutResponse> createTripPaymentCheckout(
+            Authentication authentication,
+            @PathVariable Long tripId
+    ) {
+        return tripPaymentCheckout(authentication, tripId);
+    }
+
+    private ApiResponse<PaymentCheckoutResponse> tripPaymentCheckout(
+            Authentication authentication,
+            Long tripId
+    ) {
         return ApiResponse.ok(paymentCheckoutService.getTripPaymentCheckout(
                 currentUser.requireUserId(authentication),
                 tripId

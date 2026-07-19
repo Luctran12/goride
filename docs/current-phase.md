@@ -8,10 +8,10 @@
 
 ## 1. Repository Status
 
-- Current branch: `feature/online-payment-production-gate`.
-- Base develop commit: `e6aba60` (`merge: production observability wiring`).
-- Latest merged payment feature: `feature/payment-sandbox-e2e-automation`.
-- Latest merged feature on develop: `feature/production-observability-wiring`.
+- Current branch: `feature/payment-checkout-post-endpoint`.
+- Base develop commit: `6284ce5` (`merge: online payment exposure gate`).
+- Latest merged payment feature: `feature/online-payment-production-gate`.
+- Latest merged feature on develop: `feature/online-payment-production-gate`.
 - Local-only config: `src/main/resources/application.yml` has environment-specific changes and must remain uncommitted.
 - Working direction: stop adding broad new features; finish payment/provider UAT and launch reliability tasks needed to go product.
 
@@ -19,23 +19,22 @@
 
 ## 2. Active Work In Review
 
-Draft commit: `feat: complete online payment exposure gate`.
+Draft commit: `feat: add payment checkout post endpoint`.
 
 Scope implemented in this branch:
-- Add `readyForFrontendExposure` and `consumerEnabled` to `GET /api/v1/payments/methods`.
-- Keep `enabled` as backend/provider checkout availability for controlled booking/UAT flows.
-- Compute `consumerEnabled=true` only when online provider config/readiness is sufficient and aggregate sandbox UAT evidence has passed.
-- Keep CASH `consumerEnabled=true` without sandbox evidence.
-- Release the assigned driver immediately after a checkout-required online payment becomes `PENDING` at trip completion, so driver availability is not blocked while passenger completes MoMo/VNPAY checkout.
-- Preserve existing payment completed notifications and driver release on successful provider callbacks.
-- Update `integrate-plan.md`, `plan.md`, `docs/current-phase.md`, `docs/implementation-log.md` and `docs/pland.xlsx` with the new FE contract and status.
+- Add canonical `POST /api/v1/payments/trips/{tripId}/checkout` for FE/provider checkout creation.
+- Keep existing `GET /api/v1/payments/trips/{tripId}/checkout` as a compatibility alias for older FE builds.
+- Share controller logic between GET and POST so auth/user access, payment status validation and provider idempotency stay in one service path.
+- Update payment sandbox UAT plan response to advertise the POST checkout endpoint.
+- Update UAT plan wording so passenger exposure uses `/methods.consumerEnabled=true`; `enabled=true` remains controlled backend/UAT checkout availability.
+- Update `integrate-plan.md`, `plan.md`, `docs/current-phase.md`, `docs/implementation-log.md` and `docs/pland.xlsx` with the new FE checkout contract.
 
 Validation so far:
-- Targeted payment method/lifecycle suite passed: 14 tests.
-- Full Maven regression passed: 450 tests.
+- Targeted checkout/controller/UAT plan suite passed: 17 tests.
+- Full Maven regression: pass 452 tests.
 - `git diff --check`: pass; Git reports Windows CRLF conversion warnings only.
 - CodeRabbit CLI: unavailable in PATH (`coderabbit` command not found).
-- User review: completed 2026-07-19; feature commit created, not merged or pushed yet.
+- User review: completed 2026-07-19; commit created on feature branch, not merged or pushed yet.
 
 ---
 
