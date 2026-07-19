@@ -8,49 +8,39 @@
 
 ## 1. Repository Status
 
-- Current branch: `feature/payment-checkout-post-endpoint`.
-- Base develop commit: `6284ce5` (`merge: online payment exposure gate`).
-- Latest merged payment feature: `feature/online-payment-production-gate`.
-- Latest merged feature on develop: `feature/online-payment-production-gate`.
+- Current branch: `feature/payment-production-exposure-gate`.
+- Base develop commit: `39fb871` (`merge: payment checkout post endpoint`).
+- Latest merged payment feature: `feature/payment-checkout-post-endpoint`.
+- Latest merged feature on develop: `feature/payment-checkout-post-endpoint`.
 - Local-only config: `src/main/resources/application.yml` has environment-specific changes and must remain uncommitted.
-- Working direction: stop adding broad new features; finish payment/provider UAT and launch reliability tasks needed to go product.
+- Working direction: finish online payment/provider launch gates before adding advanced features.
 
 ---
 
 ## 2. Active Work In Review
 
-Draft commit: `feat: add payment checkout post endpoint`.
+Draft commit: `fix: allow production payment exposure after uat`.
 
 Scope implemented in this branch:
-- Add canonical `POST /api/v1/payments/trips/{tripId}/checkout` for FE/provider checkout creation.
-- Keep existing `GET /api/v1/payments/trips/{tripId}/checkout` as a compatibility alias for older FE builds.
-- Share controller logic between GET and POST so auth/user access, payment status validation and provider idempotency stay in one service path.
-- Update payment sandbox UAT plan response to advertise the POST checkout endpoint.
-- Update UAT plan wording so passenger exposure uses `/methods.consumerEnabled=true`; `enabled=true` remains controlled backend/UAT checkout availability.
-- Update `integrate-plan.md`, `plan.md`, `docs/current-phase.md`, `docs/implementation-log.md` and `docs/pland.xlsx` with the new FE checkout contract.
+- Keep `enabled=true` as backend/provider checkout availability when provider runtime and checkout config are present.
+- Compute online `readyForFrontendExposure`/`consumerEnabled` from provider registered, provider enabled, checkout config, webhook config and aggregate UAT evidence `PASSED`.
+- Stop requiring current runtime `sandbox=true` for passenger exposure after UAT evidence has already passed, so switching provider config to production mode does not hide MoMo/VNPAY again.
+- Keep `sandboxReady` as the admin/devops signal for whether the current environment can run sandbox UAT now.
+- Update `PaymentSandboxUatResultResponse.readyForFrontendExposure` to use checkout+webhook readiness plus passed evidence, while `sandboxReady` remains separate.
+- Add regression tests for `/payments/methods` and sandbox UAT result response in production mode after UAT pass.
 
 Validation so far:
-- Targeted checkout/controller/UAT plan suite passed: 17 tests.
-- Full Maven regression: pass 452 tests.
+- Targeted payment method/UAT result suite passed: 11 tests.
+- Full Maven regression: pass 454 tests.
 - `git diff --check`: pass; Git reports Windows CRLF conversion warnings only.
 - CodeRabbit CLI: unavailable in PATH (`coderabbit` command not found).
 - User review: completed 2026-07-19; commit created on feature branch, not merged or pushed yet.
 
 ---
 
-## 3. Next Product-Readiness Priorities
+## 3. Remaining Product-Readiness Gate
 
-P0:
-- Run real MoMo/VNPAY sandbox E2E validation with merchant test accounts and public HTTPS callback URL.
-- Use the sandbox E2E session endpoints to record checkout URL, success/failure callbacks, duplicate replay and freshness rejection evidence.
-- Confirm `/api/v1/payments/methods` returns `consumerEnabled=true` for each online provider only after aggregate `readyForFrontendExposure=true`.
-
-P1:
-- Run the protected callback workflow for MoMo and VNPAY on staging, archive sanitized reports and pair them with real merchant checkout evidence.
-- Deploy an OTLP collector, centralized log shipping, Prometheus dashboards and alerts; backend exporter/config/startup gates are code-ready.
-
-P2:
-- Provision and UAT Cloudflare R2 uploads in staging.
-- Tune surge pricing thresholds with staging demand/supply data.
-- Apply service-area SQL release in staging, create real launch-city polygons, and UAT common pickup/dropoff pairs.
-- Add analytics/exporting after launch-critical UAT tasks are stable.
+Code-side online payment flow is now expected to be ready for FE integration once this branch is reviewed and merged. The remaining P0 item is external UAT:
+- Run real MoMo/VNPAY sandbox E2E validation with merchant test accounts and a public HTTPS callback URL.
+- Record sandbox E2E sessions with checkout URL, success/failure callbacks, duplicate replay and freshness rejection evidence.
+- Confirm `/api/v1/payments/methods` returns `consumerEnabled=true` after aggregate evidence is `PASSED`, including after provider config is switched from sandbox to production mode.

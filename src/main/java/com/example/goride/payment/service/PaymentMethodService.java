@@ -49,8 +49,8 @@ public class PaymentMethodService {
         boolean webhookConfigured = webhookConfigured(paymentMethod, settings);
         boolean providerConfigured = settings.isEnabled() && checkoutConfigured;
         boolean enabled = providerRegistered && providerConfigured;
-        boolean sandboxReady = settings.isSandbox() && enabled && webhookConfigured;
-        boolean readyForFrontendExposure = sandboxReady && sandboxUatResultRepository
+        boolean webhookReady = providerRegistered && settings.isEnabled() && webhookConfigured;
+        boolean readyForFrontendExposure = enabled && webhookReady && sandboxUatResultRepository
                 .findByProviderName(paymentMethod.providerName())
                 .map(PaymentSandboxUatResult::passedAllRequiredChecks)
                 .orElse(false);

@@ -5,6 +5,53 @@
 > Tu commit `feat: add matching driver search` tro di, moi commit backend can cap nhat file nay trong cung commit.
 
 ---
+## Commit: `fix: allow production payment exposure after uat`
+
+Branch: `feature/payment-production-exposure-gate`
+
+Phase: P0 payment provider completion / production exposure gate
+
+### Muc tieu
+
+Sua gate online payment de MoMo/VNPAY khong bi an lai khi chuyen provider tu sandbox mode sang production mode sau khi sandbox UAT evidence da `PASSED`.
+
+### Noi dung da trien khai
+
+- Cap nhat `PaymentMethodService`:
+  - `enabled=true` van la backend/provider checkout availability khi provider registered, enabled va du checkout config.
+  - `readyForFrontendExposure`/`consumerEnabled` cho online provider yeu cau provider registered, enabled, du checkout config, du webhook config va aggregate UAT evidence `PASSED`.
+  - Khong con yeu cau current config `sandbox=true` khi tinh passenger exposure, de production mode `sandbox=false` van expose duoc sau UAT pass.
+- Cap nhat `PaymentSandboxUatResultResponse`:
+  - `sandboxReady` van la tin hieu admin/devops de biet moi truong hien tai co the chay sandbox UAT hay khong.
+  - `readyForFrontendExposure` tach khoi `sandboxReady`, dung checkout+webhook readiness va evidence passed.
+- Them regression tests cho case da UAT pass, sau do disable sandbox mode ma `/payments/methods.consumerEnabled` van true.
+- Cap nhat `integrate-plan.md`, `plan.md`, `docs/current-phase.md` va `docs/pland.xlsx` de FE/devops biet khong duoc tu chan online method chi vi `sandbox=false` o production.
+
+### Review truoc commit
+
+- Targeted payment method/UAT result suite: pass 11 tests.
+- Full Maven regression: pass 454 tests.
+- `git diff --check`: pass; Git reports Windows CRLF conversion warnings only.
+- CodeRabbit CLI: unavailable trong PATH (`coderabbit` command not found).
+- User review: completed 2026-07-19; commit created on feature branch, not merged or pushed yet.
+
+### Files chinh
+
+- `src/main/java/com/example/goride/payment/service/PaymentMethodService.java`
+- `src/main/java/com/example/goride/payment/dto/PaymentSandboxUatResultResponse.java`
+- `src/test/java/com/example/goride/payment/service/PaymentMethodServiceTests.java`
+- `src/test/java/com/example/goride/payment/service/PaymentSandboxUatResultServiceTests.java`
+- `integrate-plan.md`
+- `plan.md`
+- `docs/current-phase.md`
+- `docs/pland.xlsx`
+
+### Viec tiep theo
+
+- Sau commit nay, merge vao `develop` va tiep tuc what3words integration tren feature branch rieng.
+- Chay real merchant sandbox checkout/callback tren MoMo/VNPAY, record E2E evidence `PASSED`, roi verify production config `sandbox=false` van tra `consumerEnabled=true`.
+
+---
 ## Commit: `feat: add payment checkout post endpoint`
 
 Branch: `feature/payment-checkout-post-endpoint`

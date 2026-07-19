@@ -43,7 +43,7 @@ public record PaymentSandboxUatResultResponse(
                 readiness.provider(),
                 readiness.displayName(),
                 readiness.sandboxReady(),
-                readiness.sandboxReady() && evidencePassed,
+                readiness.checkoutReady() && readiness.webhookReady() && evidencePassed,
                 status,
                 checkoutUrlTested,
                 successCallbackTested,
