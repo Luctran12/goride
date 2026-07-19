@@ -69,10 +69,41 @@ class PaymentCompletionWorkflowTests {
     }
 
     @Test
+    void releasesDriverForPendingOnlinePaymentWithoutPaymentNotification() {
+        Payment payment = Payment.createPending(completedTrip(driver(20L), PaymentMethod.MOMO));
+
+        workflow.handleOnlinePaymentAwaitingCheckout(payment);
+
+        verify(driverCandidateStore).markCandidateAvailable(20L);
+        verifyNoInteractions(tripRealtimeNotifier);
+    }
+
+    @Test
+    void ignoresCashPaymentWhenCheckingOnlinePaymentAwaitingCheckout() {
+        Payment payment = Payment.createPending(completedTrip(driver(20L), PaymentMethod.CASH));
+
+        workflow.handleOnlinePaymentAwaitingCheckout(payment);
+
+        verifyNoInteractions(driverCandidateStore, tripRealtimeNotifier);
+    }
+
+    @Test
     void rejectsPaymentThatIsNotCompleted() {
-        Payment payment = Payment.createPending(completedTrip(driver(20L)));
+        Payment payment = Payment.createPending(completedTrip(driver(20L), PaymentMethod.CASH));
 
         assertThatThrownBy(() -> workflow.handleCompletedPayment(payment))
+                .isInstanceOfSatisfying(BusinessException.class, exception ->
+                        assertThat(exception.errorCode()).isEqualTo(ErrorCode.PAYMENT_INVALID_STATUS)
+                );
+
+        verifyNoInteractions(driverCandidateStore, tripRealtimeNotifier);
+    }
+
+    @Test
+    void rejectsNonPendingOnlinePaymentAwaitingCheckout() {
+        Payment payment = completedPayment(PaymentMethod.MOMO);
+
+        assertThatThrownBy(() -> workflow.handleOnlinePaymentAwaitingCheckout(payment))
                 .isInstanceOfSatisfying(BusinessException.class, exception ->
                         assertThat(exception.errorCode()).isEqualTo(ErrorCode.PAYMENT_INVALID_STATUS)
                 );
@@ -91,13 +122,17 @@ class PaymentCompletionWorkflowTests {
     }
 
     private Payment completedPayment() {
-        Payment payment = Payment.createPending(completedTrip(driver(20L)));
+        return completedPayment(PaymentMethod.CASH);
+    }
+
+    private Payment completedPayment(PaymentMethod paymentMethod) {
+        Payment payment = Payment.createPending(completedTrip(driver(20L), paymentMethod));
         payment.markCompleted();
         return payment;
     }
 
-    private Trip completedTrip(User driver) {
-        Trip trip = sampleTrip();
+    private Trip completedTrip(User driver, PaymentMethod paymentMethod) {
+        Trip trip = sampleTrip(paymentMethod);
         trip.accept(driver);
         trip.markArrived();
         trip.startTrip();
@@ -105,7 +140,7 @@ class PaymentCompletionWorkflowTests {
         return trip;
     }
 
-    private Trip sampleTrip() {
+    private Trip sampleTrip(PaymentMethod paymentMethod) {
         User passenger = passenger(10L);
         PricingConfig pricingConfig = PricingConfig.create(
                 VehicleType.MOTORBIKE,
@@ -119,7 +154,7 @@ class PaymentCompletionWorkflowTests {
         Trip trip = Trip.create(
                 passenger,
                 VehicleType.MOTORBIKE,
-                PaymentMethod.CASH,
+                paymentMethod,
                 "Ben Thanh Market",
                 point(106.7000, 10.7700),
                 "Tan Son Nhat Airport",

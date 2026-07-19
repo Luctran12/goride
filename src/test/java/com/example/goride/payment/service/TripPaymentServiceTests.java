@@ -9,8 +9,11 @@ import com.example.goride.driver.domain.VehicleType;
 import com.example.goride.payment.domain.Payment;
 import com.example.goride.payment.domain.PaymentStatus;
 import com.example.goride.payment.provider.CashPaymentProvider;
+import com.example.goride.payment.provider.PaymentCheckoutSession;
 import com.example.goride.payment.provider.PaymentProvider;
 import com.example.goride.payment.provider.PaymentProviderRegistry;
+import com.example.goride.payment.provider.PaymentWebhookRequest;
+import com.example.goride.payment.provider.PaymentWebhookResult;
 import com.example.goride.payment.repository.PaymentRepository;
 import com.example.goride.user.domain.User;
 import com.example.goride.user.domain.UserRole;
@@ -44,25 +47,30 @@ class TripPaymentServiceTests {
     @Mock
     private PaymentRepository paymentRepository;
 
+    @Mock
+    private PaymentCompletionWorkflow paymentCompletionWorkflow;
+
     private TripPaymentService service;
 
     @BeforeEach
     void setUp() {
         service = new TripPaymentService(
                 paymentRepository,
-                new PaymentProviderRegistry(List.of(new CashPaymentProvider()))
+                new PaymentProviderRegistry(List.of(new CashPaymentProvider())),
+                paymentCompletionWorkflow
         );
     }
 
     @Test
     void createsPendingPaymentForCompletedTrip() {
-        Trip trip = completedTrip();
+        Trip trip = completedTrip(PaymentMethod.CASH);
         when(paymentRepository.findByTripId(99L)).thenReturn(Optional.empty());
         when(paymentRepository.save(any(Payment.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         Payment payment = service.createPendingPayment(trip);
 
         verify(paymentRepository).save(payment);
+        verify(paymentCompletionWorkflow, never()).handleOnlinePaymentAwaitingCheckout(any(Payment.class));
         assertThat(payment.getTrip()).isSameAs(trip);
         assertThat(payment.getAmount()).isEqualByComparingTo(BigDecimal.valueOf(20000));
         assertThat(payment.getMethod()).isEqualTo(PaymentMethod.CASH);
@@ -71,7 +79,7 @@ class TripPaymentServiceTests {
 
     @Test
     void returnsExistingPaymentWithoutCreatingDuplicate() {
-        Trip trip = completedTrip();
+        Trip trip = completedTrip(PaymentMethod.CASH);
         Payment existingPayment = Payment.createPending(trip);
         when(paymentRepository.findByTripId(99L)).thenReturn(Optional.of(existingPayment));
 
@@ -79,14 +87,33 @@ class TripPaymentServiceTests {
 
         assertThat(payment).isSameAs(existingPayment);
         verify(paymentRepository, never()).save(any(Payment.class));
+        verify(paymentCompletionWorkflow, never()).handleOnlinePaymentAwaitingCheckout(any(Payment.class));
+    }
+
+    @Test
+    void releasesDriverWhenOnlinePaymentIsAwaitingCheckout() {
+        Trip trip = completedTrip(PaymentMethod.MOMO);
+        TripPaymentService onlineService = new TripPaymentService(
+                paymentRepository,
+                new PaymentProviderRegistry(List.of(new CashPaymentProvider(), new StubOnlineProvider())),
+                paymentCompletionWorkflow
+        );
+        when(paymentRepository.findByTripId(99L)).thenReturn(Optional.empty());
+        when(paymentRepository.save(any(Payment.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        Payment payment = onlineService.createPendingPayment(trip);
+
+        assertThat(payment.getMethod()).isEqualTo(PaymentMethod.MOMO);
+        verify(paymentCompletionWorkflow).handleOnlinePaymentAwaitingCheckout(payment);
     }
 
     @Test
     void rejectsPaymentMethodWithoutRegisteredProvider() {
-        Trip trip = completedTrip();
+        Trip trip = completedTrip(PaymentMethod.MOMO);
         TripPaymentService serviceWithoutProvider = new TripPaymentService(
                 paymentRepository,
-                new PaymentProviderRegistry(List.of())
+                new PaymentProviderRegistry(List.of()),
+                paymentCompletionWorkflow
         );
         when(paymentRepository.findByTripId(99L)).thenReturn(Optional.empty());
 
@@ -96,6 +123,7 @@ class TripPaymentServiceTests {
                 );
 
         verify(paymentRepository, never()).save(any(Payment.class));
+        verify(paymentCompletionWorkflow, never()).handleOnlinePaymentAwaitingCheckout(any(Payment.class));
     }
 
     @Test
@@ -109,8 +137,8 @@ class TripPaymentServiceTests {
                 .hasMessageContaining("Duplicate payment provider");
     }
 
-    private Trip completedTrip() {
-        Trip trip = sampleTrip();
+    private Trip completedTrip(PaymentMethod paymentMethod) {
+        Trip trip = sampleTrip(paymentMethod);
         trip.accept(driver(20L));
         trip.markArrived();
         trip.startTrip();
@@ -118,7 +146,7 @@ class TripPaymentServiceTests {
         return trip;
     }
 
-    private Trip sampleTrip() {
+    private Trip sampleTrip(PaymentMethod paymentMethod) {
         PricingConfig pricingConfig = PricingConfig.create(
                 VehicleType.MOTORBIKE,
                 BigDecimal.valueOf(10000),
@@ -131,7 +159,7 @@ class TripPaymentServiceTests {
         Trip trip = Trip.create(
                 passenger(10L),
                 VehicleType.MOTORBIKE,
-                PaymentMethod.CASH,
+                paymentMethod,
                 "Ben Thanh Market",
                 point(106.7000, 10.7700),
                 "Tan Son Nhat Airport",
@@ -159,5 +187,27 @@ class TripPaymentServiceTests {
 
     private static org.locationtech.jts.geom.Point point(double longitude, double latitude) {
         return GEOMETRY_FACTORY.createPoint(new Coordinate(longitude, latitude));
+    }
+
+    private static class StubOnlineProvider implements PaymentProvider {
+        @Override
+        public PaymentMethod paymentMethod() {
+            return PaymentMethod.MOMO;
+        }
+
+        @Override
+        public Payment createPendingPayment(Trip trip) {
+            return Payment.createPending(trip);
+        }
+
+        @Override
+        public PaymentCheckoutSession createCheckoutSession(Payment payment) {
+            return new PaymentCheckoutSession(true, "https://sandbox-payment.example/checkout", null);
+        }
+
+        @Override
+        public PaymentWebhookResult handleWebhook(PaymentWebhookRequest request) {
+            throw new UnsupportedOperationException("Not needed for TripPaymentServiceTests");
+        }
     }
 }

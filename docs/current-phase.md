@@ -1,6 +1,6 @@
 # GoRide Current Phase
 
-> Last updated: 2026-07-16, Asia/Bangkok
+> Last updated: 2026-07-19, Asia/Bangkok
 >
 > Purpose: source of truth before starting or reviewing the next backend commit.
 
@@ -8,35 +8,34 @@
 
 ## 1. Repository Status
 
-- Current branch: `feature/production-observability-wiring`.
-- Base develop commit: `4e96274` (`merge: payment sandbox callback automation`).
+- Current branch: `feature/online-payment-production-gate`.
+- Base develop commit: `e6aba60` (`merge: production observability wiring`).
 - Latest merged payment feature: `feature/payment-sandbox-e2e-automation`.
-- Latest merged feature on develop: `feature/payment-sandbox-e2e-automation`.
+- Latest merged feature on develop: `feature/production-observability-wiring`.
 - Local-only config: `src/main/resources/application.yml` has environment-specific changes and must remain uncommitted.
-- Historical WIP branch `feature/otlp-tracing-config` remains unmerged; this branch supersedes it on the current develop base.
-- Working direction: stop adding broad new features; finish production readiness/UAT tasks needed to go product.
+- Working direction: stop adding broad new features; finish payment/provider UAT and launch reliability tasks needed to go product.
 
 ---
 
 ## 2. Active Work In Review
 
-Draft commit: `feat: wire production otlp tracing`.
+Draft commit: `feat: complete online payment exposure gate`.
 
 Scope implemented in this branch:
-- Add Micrometer OpenTelemetry bridge and OTLP exporter dependencies managed by Spring Boot 3.5.
-- Configure disabled-by-default local/test tracing, OTLP endpoint/timeouts, sampling and OpenTelemetry resource attributes.
-- Add `traceId`/`spanId` to plain console logs and attach the sanitized request ID as a high-cardinality span attribute.
-- Expose only typed tracing/export-enabled flags through `/actuator/info`; collector URL and auth headers remain private.
-- Fail production startup when required tracing/exporter/collector/sampling configuration is unsafe, with an explicit external-agent opt-out.
-- Extend staging readiness smoke with optional `-RequireTracing` and workflow input.
+- Add `readyForFrontendExposure` and `consumerEnabled` to `GET /api/v1/payments/methods`.
+- Keep `enabled` as backend/provider checkout availability for controlled booking/UAT flows.
+- Compute `consumerEnabled=true` only when online provider config/readiness is sufficient and aggregate sandbox UAT evidence has passed.
+- Keep CASH `consumerEnabled=true` without sandbox evidence.
+- Release the assigned driver immediately after a checkout-required online payment becomes `PENDING` at trip completion, so driver availability is not blocked while passenger completes MoMo/VNPAY checkout.
+- Preserve existing payment completed notifications and driver release on successful provider callbacks.
+- Update `integrate-plan.md`, `plan.md`, `docs/current-phase.md`, `docs/implementation-log.md` and `docs/pland.xlsx` with the new FE contract and status.
 
 Validation so far:
-- Targeted observability/security/production suite passed: 24 tests.
-- PowerShell parser and `git diff --check`: pass.
-- Full Maven regression passed: 445 tests.
-- Manual review passed without blockers.
-- User review completed on 2026-07-19; feature commit created on branch and is not merged/pushed yet.
-
+- Targeted payment method/lifecycle suite passed: 14 tests.
+- Full Maven regression passed: 450 tests.
+- `git diff --check`: pass; Git reports Windows CRLF conversion warnings only.
+- CodeRabbit CLI: unavailable in PATH (`coderabbit` command not found).
+- User review: completed 2026-07-19; feature commit created, not merged or pushed yet.
 
 ---
 
@@ -44,8 +43,8 @@ Validation so far:
 
 P0:
 - Run real MoMo/VNPAY sandbox E2E validation with merchant test accounts and public HTTPS callback URL.
-- Use the new sandbox E2E session endpoints to record checkout URL, success/failure callbacks, duplicate replay and freshness rejection evidence.
-- Only expose MoMo/VNPAY to real users after aggregate UAT result returns `readyForFrontendExposure=true`.
+- Use the sandbox E2E session endpoints to record checkout URL, success/failure callbacks, duplicate replay and freshness rejection evidence.
+- Confirm `/api/v1/payments/methods` returns `consumerEnabled=true` for each online provider only after aggregate `readyForFrontendExposure=true`.
 
 P1:
 - Run the protected callback workflow for MoMo and VNPAY on staging, archive sanitized reports and pair them with real merchant checkout evidence.
