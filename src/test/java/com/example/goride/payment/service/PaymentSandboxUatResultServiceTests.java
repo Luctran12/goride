@@ -50,6 +50,20 @@ class PaymentSandboxUatResultServiceTests {
     }
 
     @Test
+    void listResultsKeepsFrontendExposureReadyAfterSandboxModeIsDisabledAndEvidencePassed() {
+        PaymentSandboxUatResultRepository repository = mock(PaymentSandboxUatResultRepository.class);
+        when(repository.findByProviderName("momo")).thenReturn(Optional.of(passedResult("momo")));
+        PaymentSandboxUatResultService service = service(repository, productionReadinessAfterUat());
+
+        var response = service.listResults().get(0);
+
+        assertThat(response.sandboxReady()).isFalse();
+        assertThat(response.readyForFrontendExposure()).isTrue();
+        assertThat(response.status()).isEqualTo(PaymentSandboxUatStatus.PASSED);
+        assertThat(response.missingChecks()).isEmpty();
+    }
+
+    @Test
     void upsertPassedResultRequiresReadyProviderAndAllChecks() {
         PaymentSandboxUatResultRepository repository = mock(PaymentSandboxUatResultRepository.class);
         when(repository.findByProviderName("momo")).thenReturn(Optional.empty());
@@ -109,6 +123,40 @@ class PaymentSandboxUatResultServiceTests {
                 );
     }
 
+    private PaymentSandboxUatResult passedResult(String providerName) {
+        PaymentSandboxUatResult result = PaymentSandboxUatResult.create(providerName);
+        result.update(
+                PaymentSandboxUatStatus.PASSED,
+                true,
+                true,
+                true,
+                true,
+                true,
+                "Sandbox callbacks passed",
+                NOW,
+                99L
+        );
+        return result;
+    }
+
+    private PaymentProviderReadinessResponse productionReadinessAfterUat() {
+        return new PaymentProviderReadinessResponse(
+                PaymentMethod.MOMO,
+                "momo",
+                "MoMo",
+                true,
+                false,
+                true,
+                true,
+                true,
+                true,
+                true,
+                false,
+                List.of("sandbox-mode"),
+                86_400,
+                300
+        );
+    }
     private PaymentSandboxUatResultRequest passedRequest(Instant testedAt) {
         return new PaymentSandboxUatResultRequest(
                 PaymentSandboxUatStatus.PASSED,

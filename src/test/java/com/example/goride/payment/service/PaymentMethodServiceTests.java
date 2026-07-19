@@ -121,6 +121,36 @@ class PaymentMethodServiceTests {
     }
 
     @Test
+    void keepsOnlineMethodConsumerEnabledAfterSandboxModeIsDisabledWhenUatPassed() {
+        PaymentProviderProperties properties = momoProperties();
+        properties.getMomo().setSandbox(false);
+        PaymentSandboxUatResultRepository repository = mock(PaymentSandboxUatResultRepository.class);
+        when(repository.findByProviderName("momo")).thenReturn(Optional.of(passedSandboxUatResult("momo")));
+
+        PaymentMethodService service = new PaymentMethodService(
+                new PaymentProviderRegistry(List.of(
+                        new CashPaymentProvider(),
+                        new MoMoPaymentProvider(
+                                properties,
+                                mock(MoMoPaymentClient.class),
+                                mock(PaymentRepository.class),
+                                mock(PaymentCompletionWorkflow.class),
+                                new PaymentWebhookFreshnessPolicy()
+                        )
+                )),
+                properties,
+                repository
+        );
+
+        PaymentMethodResponse momoResponse = find(service.listPaymentMethods(), PaymentMethod.MOMO);
+
+        assertThat(momoResponse.sandbox()).isFalse();
+        assertThat(momoResponse.enabled()).isTrue();
+        assertThat(momoResponse.readyForFrontendExposure()).isTrue();
+        assertThat(momoResponse.consumerEnabled()).isTrue();
+    }
+
+    @Test
     void marksVnpayEnabledWhenCheckoutProviderAndConfigExist() {
         PaymentProviderProperties properties = new PaymentProviderProperties();
         PaymentProviderProperties.ProviderSettings vnpay = properties.getVnpay();
