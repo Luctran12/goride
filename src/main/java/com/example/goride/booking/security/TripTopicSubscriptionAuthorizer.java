@@ -2,6 +2,7 @@ package com.example.goride.booking.security;
 
 import com.example.goride.booking.repository.TripRepository;
 import com.example.goride.common.security.StompSubscriptionAuthorizer;
+import com.example.goride.matching.service.OfferedTripAccessService;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
@@ -17,9 +18,14 @@ public class TripTopicSubscriptionAuthorizer implements StompSubscriptionAuthori
             Pattern.compile("^/topic/trip/(\\d+)/(status|location|messages)$");
 
     private final TripRepository tripRepository;
+    private final OfferedTripAccessService offeredTripAccessService;
 
-    public TripTopicSubscriptionAuthorizer(TripRepository tripRepository) {
+    public TripTopicSubscriptionAuthorizer(
+            TripRepository tripRepository,
+            OfferedTripAccessService offeredTripAccessService
+    ) {
         this.tripRepository = tripRepository;
+        this.offeredTripAccessService = offeredTripAccessService;
     }
 
     @Override
@@ -38,17 +44,28 @@ public class TripTopicSubscriptionAuthorizer implements StompSubscriptionAuthori
         }
 
         Long tripId = Long.valueOf(matcher.group(1));
+        String topicType = matcher.group(2);
         Long userId = parseUserId(authentication);
-        if (!tripRepository.existsAccessibleTripTopicByUserId(tripId, userId)) {
-            throw new AccessDeniedException("User is not allowed to subscribe to this trip topic");
+        if (tripRepository.existsAccessibleTripTopicByUserId(tripId, userId)) {
+            return;
         }
+        if ("status".equals(topicType)
+                && hasRole(authentication, "ROLE_DRIVER")
+                && offeredTripAccessService.hasActiveOffer(tripId, userId)) {
+            return;
+        }
+        throw new AccessDeniedException("User is not allowed to subscribe to this trip topic");
     }
 
     private boolean hasAdminRole(Authentication authentication) {
+        return hasRole(authentication, "ROLE_ADMIN");
+    }
+
+    private boolean hasRole(Authentication authentication, String role) {
         return authentication.getAuthorities()
                 .stream()
                 .map(GrantedAuthority::getAuthority)
-                .anyMatch("ROLE_ADMIN"::equals);
+                .anyMatch(role::equals);
     }
 
     private Long parseUserId(Authentication authentication) {

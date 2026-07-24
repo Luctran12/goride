@@ -1127,6 +1127,7 @@ Passenger can subscribe:
 ```
 
 Khi driver accept, passenger nhan `TRIP_ACCEPTED` notification va topic status `ACCEPTED`. Khi driver reject/offer timeout, passenger khong nhan `NO_DRIVER_FOUND` neu trip van co the tiep tuc search/rematch.
+- Trong luc offer con active, driver duoc goi `GET /api/v1/bookings/{tripId}` va subscribe `/topic/trip/{tripId}/status` de hydrate man offer/nhan cancel status truoc khi bam accept. Driver chua duoc subscribe `/topic/trip/{tripId}/messages` hoac `/topic/trip/{tripId}/location` truoc khi tro thanh assigned driver.
 
 #### Routing cho tai xe den pickup/dropoff
 
@@ -1298,6 +1299,8 @@ Payload:
 GET /api/v1/tracking/trips/{tripId}/driver-location
 Authorization: Bearer <passengerToken>
 ```
+
+Neu backend tra `DRIVER_LOCATION_NOT_FOUND` HTTP 404 ngay sau khi driver accept, day la trang thai tam thoi: driver chua gui location dau tien cho trip. FE nen hien "dang doi vi tri tai xe" va tiep tuc nghe `/topic/trip/{tripId}/location` hoac retry REST fallback co debounce.
 
 FE action:
 - Goi REST khi mo lai app/deep link vao trip screen.
@@ -2789,7 +2792,7 @@ connectHeaders: {
 
 Luu y: `/ws` la SockJS endpoint nen request `GET /ws/info` phai tra `200`. `/ws-native` la endpoint cho native WebSocket. Backend authenticate o STOMP `CONNECT`; neu thieu hoac sai `Authorization: Bearer <accessToken>`, connection frame bi tu choi. Sau khi connect thanh cong, backend gan `Principal`/roles tu JWT cho message mapping nhu `/app/driver.location`.
 
-Subscribe vao `/topic/trip/{tripId}/status`, `/topic/trip/{tripId}/location` va `/topic/trip/{tripId}/messages` chi thanh cong neu JWT user la passenger cua trip, driver cua trip, hoac admin. Neu FE subscribe nham trip, backend reject frame voi `FORBIDDEN`/access denied o WebSocket layer.
+Subscribe vao `/topic/trip/{tripId}/location` va `/topic/trip/{tripId}/messages` chi thanh cong neu JWT user la passenger cua trip, driver cua trip, hoac admin. `/topic/trip/{tripId}/status` cung cho driver dang giu active matching offer subscribe truoc khi accept de theo doi cancel/offer status. Neu FE subscribe nham trip, backend reject frame voi `FORBIDDEN`/access denied o WebSocket layer.
 
 ### Destinations can subscribe
 

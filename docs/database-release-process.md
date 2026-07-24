@@ -57,6 +57,27 @@ not execute SQL.
 6. Smoke test affected backend APIs.
 7. Keep `rollback.sql` ready during the deployment window.
 
+## Local Hibernate Update Compatibility
+
+For local development, Hibernate `ddl-auto=update` can still run before a
+manual SQL release is applied. When adding a new `NOT NULL` column to a table
+that may already contain rows, keep the Java mapping aligned with the SQL
+release by declaring a safe database default in `columnDefinition`.
+
+Example from trips surge pricing:
+
+```java
+@Column(
+        name = "fare_surge_multiplier",
+        nullable = false,
+        precision = 4,
+        scale = 2,
+        columnDefinition = "numeric(4,2) default 1.00"
+)
+```
+
+The SQL release must still backfill or default existing rows. For staging and
+production, run the reviewed release SQL; do not depend on Hibernate update.
 ## GoRide-Specific Notes
 
 - PostgreSQL/PostGIS is required for geometry columns such as trip pickup,
