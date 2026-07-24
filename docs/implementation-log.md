@@ -5,7 +5,56 @@
 > Tu commit `feat: add matching driver search` tro di, moi commit backend can cap nhat file nay trong cung commit.
 
 ---
-## Commit: `fix: harden trip startup and offer access`
+
+## Commit: `feat: bootstrap driver location after offer accept`
+
+Branch: `feature/driver-location-bootstrap`
+
+Phase: Product hardening / booking-matching-tracking continuity
+
+### Muc tieu
+
+Passenger co the nhan vi tri tai xe ngay sau khi driver accept offer, khong phai doi den luc driver bam bat dau chuyen hoac gui ban tin tracking trip-scoped dau tien.
+
+### Noi dung da trien khai
+
+- Mo rong `DriverAvailabilityStore` voi snapshot vi tri online gom driver id, latitude, longitude va `updatedAt`.
+- `RedisDriverAvailabilityStore` ghi `locationUpdatedAt` moi lan driver online/heartbeat va chi tra snapshot khi status TTL con hieu luc, Redis GEO co toa do va metadata co timestamp hop le.
+- Them `TripDriverLocationBootstrapService` de chuyen snapshot availability thanh `DriverLocationResponse`, cache vao `LatestDriverLocationStore` va broadcast `/topic/trip/{tripId}/location`.
+- Goi bootstrap sau transaction accept offer commit; reject/timeout khong tao trip location.
+- Tach loi doc Redis, save cache va broadcast thanh warning log; cac loi phu nay khong lam response accept bi fail sau khi database da commit.
+- Them integration assertion: passenger goi REST driver-location ngay sau `ACCEPTED` nhan toa do online cua driver.
+- Cap nhat `integrate-plan.md`, `plan.md`, `docs/current-phase.md` va `docs/pland.xlsx` cho hop dong FE va status tracking.
+- Giu `src/main/resources/application.yml` la thay doi local, khong commit.
+
+### Review truoc commit
+
+- Targeted availability/matching/tracking suite: pass 26 tests.
+- Full Maven: 470 tests discovered, 460 pass; 10 integration tests bi Docker/Testcontainers initialization error, khong co assertion failure.
+- `git diff --check`: pass; Git chi bao Windows CRLF conversion warnings.
+- CodeRabbit CLI unavailable trong PATH (`coderabbit` command not found).
+
+### Files chinh
+
+- `src/main/java/com/example/goride/driver/service/availability/DriverAvailabilityStore.java`
+- `src/main/java/com/example/goride/driver/service/availability/RedisDriverAvailabilityStore.java`
+- `src/main/java/com/example/goride/tracking/service/TripDriverLocationBootstrapService.java`
+- `src/main/java/com/example/goride/matching/service/DriverOfferResponseService.java`
+- `src/test/java/com/example/goride/driver/service/availability/RedisDriverAvailabilityStoreTests.java`
+- `src/test/java/com/example/goride/tracking/service/TripDriverLocationBootstrapServiceTests.java`
+- `src/test/java/com/example/goride/matching/service/DriverOfferResponseServiceTests.java`
+- `src/test/java/com/example/goride/integration/BookingMatchingRoutingIntegrationTests.java`
+- `integrate-plan.md`
+- `plan.md`
+- `docs/current-phase.md`
+- `docs/pland.xlsx`
+
+### Viec tiep theo
+
+- Test tren hai thiet bi: passenger nhan `ACCEPTED`, hydrate REST va thay vi tri online cua driver truoc khi trip bat dau.
+- Tiep tuc real merchant sandbox UAT cho MoMo/VNPAY sau khi commit nay duoc review va merge.
+
+---## Commit: `fix: harden trip startup and offer access`
 
 Branch: `feature/trip-surge-schema-default`
 

@@ -9,9 +9,12 @@ import org.springframework.data.redis.core.HashOperations;
 import org.springframework.data.redis.core.GeoOperations;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
+import org.springframework.data.geo.Point;
 
 import java.math.BigDecimal;
 import java.time.Duration;
+import java.time.Instant;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -85,6 +88,51 @@ class RedisDriverAvailabilityStoreTests {
         assertThat(refreshed).isFalse();
         verify(redisTemplate, never()).opsForGeo();
         verify(redisTemplate, never()).opsForHash();
+    }
+
+    @Test
+    void findLocationReturnsCurrentOnlineDriverPositionAndTimestamp() {
+        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
+        when(valueOperations.get("driver:20:status")).thenReturn("BUSY");
+        when(redisTemplate.opsForGeo()).thenReturn(geoOperations);
+        when(geoOperations.position("drivers:online", "20"))
+                .thenReturn(List.of(new Point(106.7009, 10.7769)));
+        when(redisTemplate.opsForHash()).thenReturn(hashOperations);
+        when(hashOperations.get("driver:20:meta", "locationUpdatedAt"))
+                .thenReturn("2026-07-24T10:15:30Z");
+
+        var location = store.findLocation(20L);
+
+        assertThat(location).contains(new DriverAvailabilityStore.DriverLocation(
+                20L,
+                BigDecimal.valueOf(10.7769),
+                BigDecimal.valueOf(106.7009),
+                Instant.parse("2026-07-24T10:15:30Z")
+        ));
+    }
+
+    @Test
+    void findLocationSkipsExpiredDriverStatus() {
+        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
+        when(valueOperations.get("driver:20:status")).thenReturn(null);
+
+        assertThat(store.findLocation(20L)).isEmpty();
+
+        verify(redisTemplate, never()).opsForGeo();
+        verify(redisTemplate, never()).opsForHash();
+    }
+
+    @Test
+    void findLocationSkipsLegacyMetadataWithoutTimestamp() {
+        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
+        when(valueOperations.get("driver:20:status")).thenReturn("AVAILABLE");
+        when(redisTemplate.opsForGeo()).thenReturn(geoOperations);
+        when(geoOperations.position("drivers:online", "20"))
+                .thenReturn(List.of(new Point(106.7009, 10.7769)));
+        when(redisTemplate.opsForHash()).thenReturn(hashOperations);
+        when(hashOperations.get("driver:20:meta", "locationUpdatedAt")).thenReturn(null);
+
+        assertThat(store.findLocation(20L)).isEmpty();
     }
 
     @Test

@@ -1,19 +1,19 @@
 # GoRide Project Completion Plan
 
-Last updated: 2026-07-19, Asia/Bangkok
+Last updated: 2026-07-24, Asia/Bangkok
 
 ## Project Snapshot
 
 | Item | Status |
 | --- | --- |
-| Working branch | `feature/online-payment-production-gate` |
-| Latest merged feature on develop | `feature/production-observability-wiring` via `e6aba60` |
-| Develop base commit for this feature | `e6aba60` (`merge: production observability wiring`) |
-| Current feature | Online payment frontend exposure gate and driver lifecycle polish |
-| Test status | Targeted payment method/lifecycle suite passed 14 tests; full Maven suite passed 450 tests |
+| Working branch | `feature/driver-location-bootstrap` |
+| Latest merged feature on develop | `feature/trip-surge-schema-default` via `eee3359` |
+| Develop base commit for this feature | `eee3359` (`merge: harden trip startup and offer access`) |
+| Current feature | Bootstrap passenger-visible driver location immediately after offer acceptance |
+| Test status | Targeted availability/matching/tracking suite passed 26 tests; full Maven ran 470 tests with 460 pass and 10 Docker/Testcontainers initialization errors |
 | Diff hygiene | `git diff --check` passed; Windows line-ending warnings only |
-| Code review | User review completed on 2026-07-19; CodeRabbit CLI is unavailable in PATH |
-| Publish status | User review completed on 2026-07-19; committed on feature branch, not merged/pushed |
+| Code review | Internal review completed; CodeRabbit CLI is unavailable in PATH |
+| Publish status | Feature implementation is on its review branch and is not merged or pushed |
 | Local config | `src/main/resources/application.yml` is environment-specific and must stay uncommitted |
 
 ## Completed Backend Modules
@@ -30,7 +30,7 @@ Last updated: 2026-07-19, Asia/Bangkok
 | Trip lifecycle | Driver response, arrived/start/complete transitions, passenger/driver trip history, payment confirmation hooks | `/api/v1/drivers/trips/{tripId}/respond`, `/status`, `/payment-confirm` | Trip completion can compute final fare from tracking history. |
 | Matching | Nearby driver lookup, offer dispatch, accept/reject handling, timeout handling, retry/no-driver flow, rematch on driver availability, scheduled ride dispatch into matching | Internal matching services, scheduled ride scheduler and driver availability events | Initial no-candidate booking remains `SEARCHING`; driver reject/offer timeout also keeps the trip searchable when no immediate next driver is available; scheduled rides open matching at the configured dispatch lead time; driver online/heartbeat events retry unmatched searching trips and dispatch offers when a candidate becomes available; passenger cancellation clears active matching state/driver lock and dismisses the stale driver offer. |
 | WebSocket security | JWT-authenticated STOMP `CONNECT`, trip topic authorization, user-specific messaging, SockJS/native endpoint compatibility | `/ws` for SockJS, `/ws-native` for native STOMP, trip subscription topics | `GET /ws/info` is supported for SockJS clients while native clients retain a dedicated endpoint. |
-| Realtime tracking | Driver location updates from accepted trip onward, REST fallback for latest location/history, trip location notifications | `POST /api/v1/tracking/trips/{tripId}/driver-location`, WebSocket driver location channel | Caches/broadcasts driver location for `ACCEPTED`, `ARRIVED`, `IN_PROGRESS`; persists history for fare only during `IN_PROGRESS`. |
+| Realtime tracking | Driver location updates from accepted trip onward, accept-time bootstrap from the latest valid online heartbeat, REST fallback for latest location/history, trip location notifications | `POST /api/v1/tracking/trips/{tripId}/driver-location`, `/api/v1/tracking/trips/{tripId}/driver-location`, WebSocket driver location channel | Immediately after accept, backend maps the driver's valid Redis GEO heartbeat to the trip, caches it and broadcasts it; later trip-scoped updates continue for `ACCEPTED`, `ARRIVED`, `IN_PROGRESS`, while fare history is persisted only during `IN_PROGRESS`. |
 | In-trip messaging | Passenger-driver trip chat, persisted message history, REST send/history fallback, STOMP send and trip topic broadcast with subscription authorization | `GET/POST /api/v1/trips/{tripId}/messages`, `/app/trip.message`, `/topic/trip/{tripId}/messages` | Passenger and assigned driver can send during `ACCEPTED`, `ARRIVED`, `IN_PROGRESS`; admin can read/subscribe for support but cannot send as a participant. |
 | Cash payment | Cash payment record, payment detail, cash confirmation, payment completion workflow | `/api/v1/payments/trips/{tripId}`, driver payment confirmation endpoint | CASH path is implemented end to end enough for MVP trip completion. |
 | Payment checkout and webhook foundation | Payment provider registry/config, signed checkout/webhooks, readiness/UAT/session evidence, `/methods` consumer exposure metadata, canonical `POST /checkout` endpoint, online pending lifecycle release, callback freshness/replay policy and protected staging callback automation | Payment APIs plus `scripts/test-payment-sandbox-e2e.ps1` and `.github/workflows/payment-sandbox-e2e.yml` | FE should render online methods using `consumerEnabled=true`; `enabled=true` remains backend/UAT checkout availability. Passenger exposure uses checkout+webhook readiness plus aggregate UAT evidence, not current `sandbox=true`, so production mode can expose providers after UAT pass. `POST /api/v1/payments/trips/{tripId}/checkout` is the primary FE endpoint for provider checkout creation; `GET /checkout` remains legacy-compatible. Online pending payments release the driver after trip completion, while real wallet/bank-app merchant UAT is still required before public exposure. |
