@@ -31,6 +31,8 @@ db/releases/YYYYMMDD-short-name/
 - Store generated SQL in Git before deployment. Do not edit SQL directly on a
   server.
 - Run `scripts/validate-db-release.ps1` before review.
+- For a new `NOT NULL` column on an existing table, include a safe default/backfill in `apply.sql` and align the entity
+   `columnDefinition` so local Hibernate `ddl-auto=update` does not generate unsafe DDL.
 
 ## Recommended Flow
 

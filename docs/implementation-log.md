@@ -5,7 +5,58 @@
 > Tu commit `feat: add matching driver search` tro di, moi commit backend can cap nhat file nay trong cung commit.
 
 ---
-## Commit: `fix: allow production payment exposure after uat`
+## Commit: `fix: harden trip startup and offer access`
+
+Branch: `feature/trip-surge-schema-default`
+
+Phase: Product hardening / booking-matching runtime cleanup
+
+### Muc tieu
+
+Fix hai warning gap khi test thuc te: Hibernate local `ddl-auto=update` sinh DDL unsafe cho `trips.fare_surge_multiplier`, va driver offer modal bi `FORBIDDEN`/WebSocket `AccessDeniedException` khi doc trip status truoc luc accept.
+
+### Noi dung da trien khai
+
+- Cap nhat mapping `Trip.fareSurgeMultiplier` them database default `numeric(4,2) default 1.00`, can bang voi SQL release `db/releases/20260707-surge-pricing-rules/apply.sql`.
+- Them test guard de giu default DB cho `fare_surge_multiplier` khi Hibernate local update schema.
+- Ghi ro vao `docs/database-release-process.md` va `db/releases/README.md` cach xu ly cot moi `NOT NULL` tren bang da co data khi khong dung Flyway.
+- Them `OfferedTripAccessService` de kiem tra Redis matching state: driver chi duoc xem trip khi la `offeredDriverId` cua offer con active.
+- Cho `BookingService.getMyBooking` chap nhan driver dang giu active matching offer, giup FE offer modal doc trip detail truoc khi driver accept.
+- Cho `TripTopicSubscriptionAuthorizer` chap nhan active offered driver subscribe rieng `/topic/trip/{tripId}/status`; van chan `/messages` va `/location` truoc khi driver tro thanh assigned driver.
+- Cap nhat `integrate-plan.md`: driver offer modal co the GET trip/subcribe status trong luc offer con active; `DRIVER_LOCATION_NOT_FOUND` sau accept la trang thai tam thoi neu driver chua gui location dau tien.
+- Xoa file local/untracked `docs/GoRide_Thesis_Proposal.docx` khoi project theo yeu cau; file nay khong nam trong commit vi chua duoc track.
+- Local config `src/main/resources/application.yml` khong duoc commit.
+
+### Review truoc commit
+
+- Targeted `TripTests`: pass 9 tests.
+- Targeted `BookingServiceTests,TripTopicSubscriptionAuthorizerTests,OfferedTripAccessServiceTests`: pass 25 tests.
+- Combined `TripTests,BookingServiceTests,TripTopicSubscriptionAuthorizerTests,OfferedTripAccessServiceTests,SecurityCorsIntegrationTests`: pass 38 tests.
+- `git diff --check`: pass; Git reports Windows CRLF conversion warnings only.
+- Full `./mvnw.cmd test`: blocked by Docker/Testcontainers API permission denied.
+- CodeRabbit CLI unavailable trong PATH (`coderabbit` command not found).
+
+### Files chinh
+
+- `src/main/java/com/example/goride/booking/domain/Trip.java`
+- `src/main/java/com/example/goride/matching/service/OfferedTripAccessService.java`
+- `src/main/java/com/example/goride/booking/service/BookingService.java`
+- `src/main/java/com/example/goride/booking/security/TripTopicSubscriptionAuthorizer.java`
+- `src/test/java/com/example/goride/booking/domain/TripTests.java`
+- `src/test/java/com/example/goride/matching/service/OfferedTripAccessServiceTests.java`
+- `src/test/java/com/example/goride/booking/service/BookingServiceTests.java`
+- `src/test/java/com/example/goride/booking/security/TripTopicSubscriptionAuthorizerTests.java`
+- `docs/current-phase.md`
+- `docs/database-release-process.md`
+- `db/releases/README.md`
+- `integrate-plan.md`
+
+### Viec tiep theo
+
+- Restart local backend va test lai booking flow. Driver offer modal khong con bi spam `FORBIDDEN` cho `/api/v1/bookings/{tripId}` va `/topic/trip/{tripId}/status` khi offer con active.
+- Neu van thay `DRIVER_LOCATION_NOT_FOUND` ngay sau accept, FE xu ly nhu loading state cho den khi driver gui location dau tien qua `/app/driver.location`.
+
+---## Commit: `fix: allow production payment exposure after uat`
 
 Branch: `feature/payment-production-exposure-gate`
 

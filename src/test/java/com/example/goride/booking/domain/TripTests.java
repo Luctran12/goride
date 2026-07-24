@@ -3,6 +3,7 @@ package com.example.goride.booking.domain;
 import com.example.goride.driver.domain.VehicleType;
 import com.example.goride.user.domain.User;
 import com.example.goride.user.domain.UserRole;
+import jakarta.persistence.Column;
 import org.junit.jupiter.api.Test;
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.GeometryFactory;
@@ -17,6 +18,16 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class TripTests {
     private static final GeometryFactory GEOMETRY_FACTORY = new GeometryFactory(new PrecisionModel(), 4326);
+
+    @Test
+    void fareSurgeMultiplierColumnKeepsDatabaseDefaultForExistingRows() throws NoSuchFieldException {
+        Column column = Trip.class.getDeclaredField("fareSurgeMultiplier").getAnnotation(Column.class);
+
+        assertThat(column.nullable()).isFalse();
+        assertThat(column.precision()).isEqualTo(4);
+        assertThat(column.scale()).isEqualTo(2);
+        assertThat(column.columnDefinition()).isEqualTo("numeric(4,2) default 1.00");
+    }
 
     @Test
     void createStartsSearchingWithCashPayment() {

@@ -91,7 +91,13 @@ public class Trip {
     @JoinColumn(name = "pricing_config_id", nullable = false)
     private PricingConfig pricingConfig;
 
-    @Column(name = "fare_surge_multiplier", nullable = false, precision = 4, scale = 2)
+    @Column(
+            name = "fare_surge_multiplier",
+            nullable = false,
+            precision = 4,
+            scale = 2,
+            columnDefinition = "numeric(4,2) default 1.00"
+    )
     private BigDecimal fareSurgeMultiplier = BigDecimal.ONE;
 
     @Column(name = "requested_at", nullable = false)

@@ -21,6 +21,7 @@ import com.example.goride.booking.service.SurgePricingService.SurgePricingQuote;
 import com.example.goride.common.error.BusinessException;
 import com.example.goride.common.error.ErrorCode;
 import com.example.goride.driver.domain.VehicleType;
+import com.example.goride.matching.service.OfferedTripAccessService;
 import com.example.goride.payment.service.PaymentMethodService;
 import com.example.goride.servicearea.service.ServiceAreaService;
 import com.example.goride.user.domain.User;
@@ -71,6 +72,9 @@ class BookingServiceTests {
 
     @Mock
     private PaymentMethodService paymentMethodService;
+
+    @Mock
+    private OfferedTripAccessService offeredTripAccessService;
 
     @Mock
     private SurgePricingService surgePricingService;
@@ -297,6 +301,28 @@ class BookingServiceTests {
                 );
     }
 
+    @Test
+    void getMyBookingAllowsDriverHoldingActiveMatchingOffer() {
+        User passenger = withUserId(
+                User.create("Passenger", "0900000000", null, "hash", Set.of(UserRole.PASSENGER)),
+                10L
+        );
+        User offeredDriver = withUserId(
+                User.create("Driver", "0900000001", null, "hash", Set.of(UserRole.DRIVER)),
+                20L
+        );
+        Trip trip = withTripId(sampleTrip(passenger), 99L);
+        when(userRepository.findByIdAndDeletedAtIsNull(20L)).thenReturn(Optional.of(offeredDriver));
+        when(tripRepository.findByIdAndDeletedAtIsNull(99L)).thenReturn(Optional.of(trip));
+        when(offeredTripAccessService.hasActiveOffer(99L, 20L)).thenReturn(true);
+
+        var response = bookingService.getMyBooking(20L, 99L);
+
+        assertThat(response.id()).isEqualTo(99L);
+        assertThat(response.passengerId()).isEqualTo(10L);
+        assertThat(response.driverId()).isNull();
+        assertThat(response.status()).isEqualTo(TripStatus.SEARCHING);
+    }
     @Test
     void listMyBookingsCombinesPassengerAndDriverTripsNewestFirst() {
         User riderDriver = withUserId(

@@ -20,6 +20,7 @@ import com.example.goride.booking.service.distance.DistanceService;
 import com.example.goride.booking.service.SurgePricingService.SurgePricingQuote;
 import com.example.goride.common.error.BusinessException;
 import com.example.goride.common.error.ErrorCode;
+import com.example.goride.matching.service.OfferedTripAccessService;
 import com.example.goride.payment.service.PaymentMethodService;
 import com.example.goride.servicearea.service.ServiceAreaService;
 import com.example.goride.user.domain.User;
@@ -55,6 +56,7 @@ public class BookingService {
     private final TripStatusHistoryRepository tripStatusHistoryRepository;
     private final DistanceService distanceService;
     private final PaymentMethodService paymentMethodService;
+    private final OfferedTripAccessService offeredTripAccessService;
     private final SurgePricingService surgePricingService;
     private final ServiceAreaService serviceAreaService;
     private final ApplicationEventPublisher eventPublisher;
@@ -68,6 +70,7 @@ public class BookingService {
             TripStatusHistoryRepository tripStatusHistoryRepository,
             DistanceService distanceService,
             PaymentMethodService paymentMethodService,
+            OfferedTripAccessService offeredTripAccessService,
             SurgePricingService surgePricingService,
             ServiceAreaService serviceAreaService,
             ApplicationEventPublisher eventPublisher,
@@ -80,6 +83,7 @@ public class BookingService {
         this.tripStatusHistoryRepository = tripStatusHistoryRepository;
         this.distanceService = distanceService;
         this.paymentMethodService = paymentMethodService;
+        this.offeredTripAccessService = offeredTripAccessService;
         this.surgePricingService = surgePricingService;
         this.serviceAreaService = serviceAreaService;
         this.eventPublisher = eventPublisher;
@@ -295,7 +299,9 @@ public class BookingService {
     private void assertCanAccessTrip(User user, Trip trip) {
         if (user.hasRole(UserRole.ADMIN)
                 || Objects.equals(user.getId(), trip.getPassenger().getId())
-                || (trip.getDriver() != null && Objects.equals(user.getId(), trip.getDriver().getId()))) {
+                || (trip.getDriver() != null && Objects.equals(user.getId(), trip.getDriver().getId()))
+                || (user.hasRole(UserRole.DRIVER)
+                        && offeredTripAccessService.hasActiveOffer(trip.getId(), user.getId()))) {
             return;
         }
         throw new BusinessException(ErrorCode.FORBIDDEN);
