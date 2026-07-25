@@ -20,6 +20,7 @@ import com.example.goride.matching.notification.DriverOfferNotifier;
 import com.example.goride.notification.dto.TripStatusNotification;
 import com.example.goride.notification.dto.UserNotification;
 import com.example.goride.notification.service.TripRealtimeNotifier;
+import com.example.goride.tracking.service.TripDriverLocationBootstrapService;
 import com.example.goride.user.domain.User;
 import com.example.goride.user.domain.UserRole;
 import com.example.goride.user.repository.UserRepository;
@@ -73,6 +74,9 @@ class DriverOfferResponseServiceTests {
     @Mock
     private TripRealtimeNotifier tripRealtimeNotifier;
 
+    @Mock
+    private TripDriverLocationBootstrapService tripDriverLocationBootstrapService;
+
     private DriverOfferResponseService service;
 
     @BeforeEach
@@ -84,7 +88,8 @@ class DriverOfferResponseServiceTests {
                 candidateStore,
                 matchingService,
                 driverOfferNotifier,
-                tripRealtimeNotifier
+                tripRealtimeNotifier,
+                tripDriverLocationBootstrapService
         );
     }
 
@@ -104,6 +109,7 @@ class DriverOfferResponseServiceTests {
         verify(candidateStore).markCandidateBusy(20L);
         verify(candidateStore).releaseCandidateLock(20L);
         verify(candidateStore).clearTripMatching(99L);
+        verify(tripDriverLocationBootstrapService).bootstrap(99L, 20L);
         verifyPassengerNotification(TripStatus.ACCEPTED);
         assertThat(response.tripId()).isEqualTo(99L);
         assertThat(response.status()).isEqualTo(TripStatus.ACCEPTED);
@@ -162,6 +168,7 @@ class DriverOfferResponseServiceTests {
         verify(tripStatusHistoryRepository, never()).save(any());
         verify(tripRealtimeNotifier, never()).notifyPassenger(any(), any());
         verify(tripRealtimeNotifier, never()).broadcastTripStatus(any(), any());
+        verifyNoInteractions(tripDriverLocationBootstrapService);
         assertThat(response.status()).isEqualTo(TripStatus.SEARCHING);
         assertThat(trip.getStatus()).isEqualTo(TripStatus.SEARCHING);
         assertThat(rejectedCaptor.getValue()).containsExactlyInAnyOrder(18L, 19L, 20L);
@@ -182,6 +189,7 @@ class DriverOfferResponseServiceTests {
         verify(tripStatusHistoryRepository, never()).save(any());
         verify(tripRealtimeNotifier, never()).notifyPassenger(any(), any());
         verify(tripRealtimeNotifier, never()).broadcastTripStatus(any(), any());
+        verifyNoInteractions(tripDriverLocationBootstrapService);
         assertThat(response.status()).isEqualTo(TripStatus.SEARCHING);
         assertThat(trip.getStatus()).isEqualTo(TripStatus.SEARCHING);
     }

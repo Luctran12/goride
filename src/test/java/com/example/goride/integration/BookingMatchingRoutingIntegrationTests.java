@@ -122,6 +122,14 @@ class BookingMatchingRoutingIntegrationTests extends PostgresRedisIntegrationTes
                 .andExpect(jsonPath("$.data.tripId").value(tripId))
                 .andExpect(jsonPath("$.data.status").value("ACCEPTED"));
 
+        mockMvc.perform(get("/api/v1/tracking/trips/{tripId}/driver-location", tripId)
+                        .header("Authorization", bearer(passenger.accessToken())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.tripId").value(tripId))
+                .andExpect(jsonPath("$.data.driverId").value(driver.userId()))
+                .andExpect(jsonPath("$.data.lat").value(10.7768))
+                .andExpect(jsonPath("$.data.lng").value(106.7008));
+
         mockMvc.perform(post("/api/v1/drivers/trips/{tripId}/route", tripId)
                         .header("Authorization", bearer(driver.accessToken()))
                         .contentType(MediaType.APPLICATION_JSON)

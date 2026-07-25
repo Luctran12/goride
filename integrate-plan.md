@@ -1300,12 +1300,14 @@ GET /api/v1/tracking/trips/{tripId}/driver-location
 Authorization: Bearer <passengerToken>
 ```
 
-Neu backend tra `DRIVER_LOCATION_NOT_FOUND` HTTP 404 ngay sau khi driver accept, day la trang thai tam thoi: driver chua gui location dau tien cho trip. FE nen hien "dang doi vi tri tai xe" va tiep tuc nghe `/topic/trip/{tripId}/location` hoac retry REST fallback co debounce.
+Ngay sau khi driver accept, backend thu bootstrap vi tri tu heartbeat online con hieu luc trong Redis GEO, gan vi tri do voi `tripId`, cache cho REST fallback va broadcast qua `/topic/trip/{tripId}/location`. Ban tin bootstrap co `bearing=null`, `speed=null`; `updatedAt` la thoi diem heartbeat da ghi vi tri, khong phai thoi diem accept.
+
+Neu backend tra `DRIVER_LOCATION_NOT_FOUND` HTTP 404 sau khi driver accept, heartbeat online khong con du lieu hop le hoac Redis tam thoi khong doc duoc. FE coi day la trang thai tam thoi, hien "Dang cho vi tri tai xe" va doi driver gui location trip-scoped tiep theo.
 
 FE action:
-- Goi REST khi mo lai app/deep link vao trip screen.
-- Sau do dung WebSocket topic de realtime.
-- Neu `DRIVER_LOCATION_NOT_FOUND`, hien "Dang cho vi tri tai xe".
+- Khi nhan status `ACCEPTED`, goi REST mot lan de hydrate ngay vi tri bootstrap, sau do dung WebSocket topic de realtime.
+- Goi lai REST khi mo lai app/deep link vao trip screen.
+- Neu `DRIVER_LOCATION_NOT_FOUND`, hien "Dang cho vi tri tai xe" va retry co debounce; khong huy trip.
 - Chi bat dau subscribe/polling vi tri khi trip da co driver va status la `ACCEPTED`, `ARRIVED` hoac `IN_PROGRESS`; khong polling khi status con `SEARCHING` hoac da la `NO_DRIVER`.
 - Backend nhan vi tri driver tu luc `ACCEPTED` de passenger thay tai xe dang den diem don. Vi tri truoc `IN_PROGRESS` chi duoc cache/broadcast realtime, khong luu vao trip location history dung de tinh quang duong/final fare.
 - Khi status con `SEARCHING`, hien man hinh dang tim tai xe va cho offer/status qua WebSocket; khong coi `DRIVER_LOCATION_NOT_FOUND` la loi.

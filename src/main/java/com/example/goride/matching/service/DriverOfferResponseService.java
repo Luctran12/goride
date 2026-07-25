@@ -17,6 +17,7 @@ import com.example.goride.matching.notification.DriverOfferNotifier;
 import com.example.goride.notification.dto.TripStatusNotification;
 import com.example.goride.notification.dto.UserNotification;
 import com.example.goride.notification.service.TripRealtimeNotifier;
+import com.example.goride.tracking.service.TripDriverLocationBootstrapService;
 import com.example.goride.user.domain.User;
 import com.example.goride.user.domain.UserRole;
 import com.example.goride.user.repository.UserRepository;
@@ -40,6 +41,7 @@ public class DriverOfferResponseService {
     private final MatchingService matchingService;
     private final DriverOfferNotifier driverOfferNotifier;
     private final TripRealtimeNotifier tripRealtimeNotifier;
+    private final TripDriverLocationBootstrapService tripDriverLocationBootstrapService;
 
     public DriverOfferResponseService(
             TripRepository tripRepository,
@@ -48,7 +50,8 @@ public class DriverOfferResponseService {
             DriverCandidateStore candidateStore,
             MatchingService matchingService,
             DriverOfferNotifier driverOfferNotifier,
-            TripRealtimeNotifier tripRealtimeNotifier
+            TripRealtimeNotifier tripRealtimeNotifier,
+            TripDriverLocationBootstrapService tripDriverLocationBootstrapService
     ) {
         this.tripRepository = tripRepository;
         this.tripStatusHistoryRepository = tripStatusHistoryRepository;
@@ -57,6 +60,7 @@ public class DriverOfferResponseService {
         this.matchingService = matchingService;
         this.driverOfferNotifier = driverOfferNotifier;
         this.tripRealtimeNotifier = tripRealtimeNotifier;
+        this.tripDriverLocationBootstrapService = tripDriverLocationBootstrapService;
     }
 
     @Transactional
@@ -96,6 +100,7 @@ public class DriverOfferResponseService {
         candidateStore.markCandidateBusy(driverId);
         candidateStore.releaseCandidateLock(driverId);
         candidateStore.clearTripMatching(tripId);
+        bootstrapDriverLocation(savedTrip);
         notifyPassengerTripAccepted(savedTrip);
         return response(savedTrip);
     }
@@ -125,6 +130,12 @@ public class DriverOfferResponseService {
         return nextOffer
                 .map(offer -> response(trip))
                 .orElseGet(() -> response(trip));
+    }
+
+    private void bootstrapDriverLocation(Trip trip) {
+        Long tripId = trip.getId();
+        Long driverId = trip.getDriver().getId();
+        runAfterCommit(() -> tripDriverLocationBootstrapService.bootstrap(tripId, driverId));
     }
 
     private void notifyPassengerTripAccepted(Trip trip) {

@@ -6,8 +6,10 @@ import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 @Component
 public class RedisDriverAvailabilityStore implements DriverAvailabilityStore {
@@ -53,9 +55,44 @@ public class RedisDriverAvailabilityStore implements DriverAvailabilityStore {
                 "vehicleType", availability.vehicleType().name(),
                 "rating", availability.rating().toPlainString(),
                 "name", nullToBlank(availability.driverName()),
-                "avatarUrl", nullToBlank(availability.avatarUrl())
+                "avatarUrl", nullToBlank(availability.avatarUrl()),
+                "locationUpdatedAt", Instant.now().toString()
         ));
         redisTemplate.expire(metaKey(driverId), properties.heartbeatTimeout());
+    }
+
+    @Override
+    public Optional<DriverLocation> findLocation(Long driverId) {
+        if (driverId == null) {
+            return Optional.empty();
+        }
+
+        String driverIdValue = String.valueOf(driverId);
+        if (redisTemplate.opsForValue().get(statusKey(driverIdValue)) == null) {
+            return Optional.empty();
+        }
+
+        List<Point> positions = redisTemplate.opsForGeo().position(ONLINE_DRIVERS_KEY, driverIdValue);
+        if (positions == null || positions.isEmpty() || positions.get(0) == null) {
+            return Optional.empty();
+        }
+
+        Object updatedAt = redisTemplate.opsForHash().get(metaKey(driverIdValue), "locationUpdatedAt");
+        if (updatedAt == null) {
+            return Optional.empty();
+        }
+
+        try {
+            Point position = positions.get(0);
+            return Optional.of(new DriverLocation(
+                    driverId,
+                    BigDecimal.valueOf(position.getY()),
+                    BigDecimal.valueOf(position.getX()),
+                    Instant.parse(String.valueOf(updatedAt))
+            ));
+        } catch (RuntimeException exception) {
+            return Optional.empty();
+        }
     }
 
     @Override
