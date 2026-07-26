@@ -1,5 +1,6 @@
 package com.example.goride.booking.dto;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.example.goride.booking.domain.PaymentMethod;
 import com.example.goride.booking.domain.Trip;
 import com.example.goride.booking.domain.TripStatus;
@@ -7,6 +8,7 @@ import com.example.goride.driver.domain.VehicleType;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.List;
 
 public record TripResponse(
         Long id,
@@ -29,10 +31,19 @@ public record TripResponse(
         Instant startedAt,
         Instant completedAt,
         Instant cancelledAt,
-        String cancelReason
+        String cancelReason,
+        @JsonInclude(JsonInclude.Include.NON_NULL)
+        List<TripStatusHistoryResponse> statusHistory
 ) {
     public static TripResponse from(Trip trip) {
+        return from(trip, null);
+    }
+
+    public static TripResponse from(Trip trip, List<TripStatusHistoryResponse> statusHistory) {
         Long driverId = trip.getDriver() == null ? null : trip.getDriver().getId();
+        List<TripStatusHistoryResponse> detailStatusHistory = statusHistory == null
+                ? null
+                : List.copyOf(statusHistory);
         return new TripResponse(
                 trip.getId(),
                 trip.getPassenger().getId(),
@@ -54,7 +65,8 @@ public record TripResponse(
                 trip.getStartedAt(),
                 trip.getCompletedAt(),
                 trip.getCancelledAt(),
-                trip.getCancelReason()
+                trip.getCancelReason(),
+                detailStatusHistory
         );
     }
 }

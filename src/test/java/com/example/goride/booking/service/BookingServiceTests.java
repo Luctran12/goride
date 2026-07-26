@@ -267,14 +267,46 @@ class BookingServiceTests {
                 10L
         );
         Trip trip = withTripId(sampleTrip(passenger), 99L);
+        TripStatusHistory created = TripStatusHistory.record(
+                trip,
+                null,
+                TripStatus.SEARCHING,
+                passenger,
+                "Booking created"
+        );
+        TripStatusHistory cancelled = TripStatusHistory.record(
+                trip,
+                TripStatus.SEARCHING,
+                TripStatus.CANCELLED,
+                null,
+                null
+        );
+        ReflectionTestUtils.setField(created, "id", 1L);
+        ReflectionTestUtils.setField(created, "changedAt", Instant.parse("2026-05-18T08:00:00Z"));
+        ReflectionTestUtils.setField(cancelled, "id", 2L);
+        ReflectionTestUtils.setField(cancelled, "changedAt", Instant.parse("2026-05-18T08:05:00Z"));
         when(userRepository.findByIdAndDeletedAtIsNull(10L)).thenReturn(Optional.of(passenger));
         when(tripRepository.findByIdAndDeletedAtIsNull(99L)).thenReturn(Optional.of(trip));
+        when(tripStatusHistoryRepository.findByTripIdOrderByChangedAtAsc(99L))
+                .thenReturn(List.of(created, cancelled));
 
         var response = bookingService.getMyBooking(10L, 99L);
 
         assertThat(response.id()).isEqualTo(99L);
         assertThat(response.passengerId()).isEqualTo(10L);
         assertThat(response.status()).isEqualTo(TripStatus.SEARCHING);
+        assertThat(response.statusHistory()).hasSize(2);
+        assertThat(response.statusHistory().get(0).id()).isEqualTo(1L);
+        assertThat(response.statusHistory().get(0).fromStatus()).isNull();
+        assertThat(response.statusHistory().get(0).toStatus()).isEqualTo(TripStatus.SEARCHING);
+        assertThat(response.statusHistory().get(0).changedByUserId()).isEqualTo(10L);
+        assertThat(response.statusHistory().get(0).note()).isEqualTo("Booking created");
+        assertThat(response.statusHistory().get(1).id()).isEqualTo(2L);
+        assertThat(response.statusHistory().get(1).changedByUserId()).isNull();
+        assertThat(response.statusHistory()).extracting("changedAt").containsExactly(
+                Instant.parse("2026-05-18T08:00:00Z"),
+                Instant.parse("2026-05-18T08:05:00Z")
+        );
     }
 
     @Test
@@ -295,6 +327,7 @@ class BookingServiceTests {
                 .isInstanceOfSatisfying(BusinessException.class, exception ->
                         assertThat(exception.errorCode()).isEqualTo(ErrorCode.FORBIDDEN)
                 );
+        verify(tripStatusHistoryRepository, never()).findByTripIdOrderByChangedAtAsc(any());
     }
 
     @Test

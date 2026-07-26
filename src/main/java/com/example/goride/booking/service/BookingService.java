@@ -10,6 +10,7 @@ import com.example.goride.booking.dto.BookingEstimateRequest;
 import com.example.goride.booking.dto.BookingLocationRequest;
 import com.example.goride.booking.dto.FareEstimateResponse;
 import com.example.goride.booking.dto.TripResponse;
+import com.example.goride.booking.dto.TripStatusHistoryResponse;
 import com.example.goride.booking.event.BookingCancelledEvent;
 import com.example.goride.booking.event.BookingCreatedEvent;
 import com.example.goride.booking.repository.PricingConfigRepository;
@@ -144,7 +145,12 @@ public class BookingService {
         User user = getActiveUser(currentUserId);
         Trip trip = getActiveTrip(tripId);
         assertCanAccessTrip(user, trip);
-        return TripResponse.from(trip);
+        List<TripStatusHistoryResponse> statusHistory = tripStatusHistoryRepository
+                .findByTripIdOrderByChangedAtAsc(tripId)
+                .stream()
+                .map(TripStatusHistoryResponse::from)
+                .toList();
+        return TripResponse.from(trip, statusHistory);
     }
 
     @Transactional(readOnly = true)
