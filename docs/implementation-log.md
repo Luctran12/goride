@@ -5,6 +5,44 @@
 > Tu commit `feat: add matching driver search` tro di, moi commit backend can cap nhat file nay trong cung commit.
 
 ---
+## Commit: `docs: define admin analytics backend phases`
+
+Branch: `codex/admin-v2`
+
+Phase: Admin Analytics Backend — Phase 0: Contracts and Architecture
+
+### Muc tieu
+
+Chot semantic KPI, kien truc telemetry, API draft va benchmark protocol truoc khi thay doi database hoac matching runtime.
+
+### Noi dung da trien khai
+
+- Doi ten master plan thanh `admin-analytics-backend-implementation-plan.md` va tach thanh 9 phase co review gate rieng.
+- Dinh nghia metric dictionary, quy tac `[from, to)`, timezone, terminal state va null/zero semantics.
+- Tach `completedTrips` theo completion throughput khoi `completedTripsByRequestCohort` dung trong `completionRate`.
+- Dinh nghia Admin Analytics API draft, freshness metadata, spatial guardrails va backward compatibility.
+- Dinh nghia dataset/benchmark protocol cho direct query va materialized read model.
+- Ghi ADR chon PostgreSQL lam durable telemetry source, Redis chi giu vai tro operational matching state.
+
+### Review truoc commit
+
+- Tat ca relative Markdown links trong master/phase documents resolve.
+- Khong con unresolved `TODO`, `TBD` hoac placeholder.
+- `git diff --check`: pass; chi co warning LF/CRLF tren Windows.
+- Khong co production schema hoac runtime behavior trong Phase 0.
+- User review: approved 2026-07-28.
+
+### Files chinh
+
+- `docs/admin-analytics-backend-implementation-plan.md`
+- `docs/admin-analytics-phases/*`
+- `docs/admin-analytics/metric-dictionary.md`
+- `docs/admin-analytics/api-contract-draft.md`
+- `docs/admin-analytics/benchmark-protocol.md`
+- `docs/admin-analytics/adr/ADR-001-matching-telemetry-consistency.md`
+- `docs/current-phase.md`
+
+---
 ## Commit: `feat: wire production otlp tracing`
 
 Branch: `feature/production-observability-wiring`

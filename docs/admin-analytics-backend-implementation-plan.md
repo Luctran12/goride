@@ -6,7 +6,21 @@
 >
 > Ngày lập kế hoạch: 2026-07-26
 >
-> Trạng thái: Đề xuất triển khai sau khi phạm vi Admin Web v2 hiện tại được review và chốt.
+> Trạng thái: Đang triển khai theo phase trên nhánh `codex/admin-v2`; Phase 0 là checkpoint hiện tại.
+
+## Hồ sơ thực thi theo phase
+
+| Phase | Hồ sơ thực thi | Review gate |
+| --- | --- | --- |
+| 0 | [`phase-00-contracts-and-architecture.md`](admin-analytics-phases/phase-00-contracts-and-architecture.md) | Metric, ADR, API draft và benchmark protocol được duyệt |
+| 1 | [`phase-01-telemetry-schema.md`](admin-analytics-phases/phase-01-telemetry-schema.md) | Schema/release SQL và repository tests được duyệt |
+| 2 | [`phase-02-matching-instrumentation.md`](admin-analytics-phases/phase-02-matching-instrumentation.md) | Matching telemetry đầy đủ và idempotent |
+| 3 | [`phase-03-direct-analytics-api.md`](admin-analytics-phases/phase-03-direct-analytics-api.md) | Direct-query correctness baseline được duyệt |
+| 4 | [`phase-04-spatial-and-supply-analytics.md`](admin-analytics-phases/phase-04-spatial-and-supply-analytics.md) | PostGIS/supply correctness và query plan được duyệt |
+| 5 | [`phase-05-materialized-read-models.md`](admin-analytics-phases/phase-05-materialized-read-models.md) | Direct/materialized equivalence và refresh semantics được duyệt |
+| 6 | [`phase-06-api-hardening-and-handoff.md`](admin-analytics-phases/phase-06-api-hardening-and-handoff.md) | Backend contract ổn định để bàn giao frontend |
+| 7 | [`phase-07-dataset-and-benchmark.md`](admin-analytics-phases/phase-07-dataset-and-benchmark.md) | Dataset và raw benchmark artifacts tái lập được |
+| 8 | [`phase-08-hardening-and-thesis-artifacts.md`](admin-analytics-phases/phase-08-hardening-and-thesis-artifacts.md) | Full backend review và thesis traceability hoàn tất |
 
 ---
 
@@ -114,7 +128,7 @@ Core scope:
 - matching performance;
 - completed-payment revenue;
 - direct SQL và materialized-view comparison;
-- Admin API và dashboard.
+- Admin API và hợp đồng bàn giao cho frontend.
 
 Ngoài core scope:
 
@@ -137,9 +151,10 @@ Metric dictionary phải được chốt trong commit đầu tiên và được 
 | --- | --- | --- |
 | `tripRequests` | Số trip được tạo trong khoảng thời gian theo `requestedAt` | `trips` |
 | `completedTrips` | Số trip có trạng thái `COMPLETED` và `completedAt` nằm trong khoảng lọc | `trips` |
+| `completedTripsByRequestCohort` | Số trip được yêu cầu trong khoảng lọc và cuối cùng đạt `COMPLETED` | `trips` |
 | `cancelledTrips` | Số trip kết thúc ở `CANCELLED` | `trips` |
 | `noDriverTrips` | Số trip kết thúc ở `NO_DRIVER` | `trips` |
-| `completionRate` | `completedTrips / tripRequests`, trả `null` khi mẫu số bằng 0 | `trips` |
+| `completionRate` | `completedTripsByRequestCohort / tripRequests`, trả `null` khi mẫu số bằng 0 | `trips` |
 | `completedRevenue` | Tổng `payments.amount` chỉ với payment `COMPLETED`, lọc theo `paidAt` | `payments` |
 | `matchingRuns` | Số matching run được bắt đầu trong khoảng thời gian | `matching_runs` |
 | `matchedRuns` | Số matching run có outcome `MATCHED` | `matching_runs` |
@@ -452,7 +467,8 @@ Response dự kiến:
   "to": "2026-07-31T17:00:00Z",
   "reportingTimezone": "Asia/Ho_Chi_Minh",
   "tripRequests": 10000,
-  "completedTrips": 8200,
+  "completedTrips": 8250,
+  "completedTripsByRequestCohort": 8200,
   "cancelledTrips": 900,
   "noDriverTrips": 900,
   "completionRate": 0.82,
@@ -502,7 +518,7 @@ Mỗi feature tối thiểu có:
   "properties": {
     "cellId": "stable-cell-id",
     "tripRequests": 120,
-    "completedTrips": 97,
+    "completedTripsByRequestCohort": 97,
     "completionRate": 0.8083
   }
 }
@@ -631,9 +647,9 @@ Không bật materialized view mặc định trước khi:
 
 ---
 
-## 10. Admin Web
+## 10. Hợp đồng backend và bàn giao cho Admin Web
 
-Các màn hình đề xuất:
+Các màn hình dưới đây là consumer dự kiến của backend. Việc xây dựng giao diện không thuộc phạm vi triển khai của backend plan này.
 
 ### 10.1 Analytics Overview
 
@@ -665,14 +681,14 @@ Các màn hình đề xuất:
 - candidate distance distribution;
 - bảng các run thất bại/chậm để điều tra.
 
-### 10.4 UX và contract
+### 10.4 Yêu cầu contract khi bàn giao
 
 - URL lưu filter để tái lập cùng một phân tích.
 - Enum không hard-code ngoài shared types.
-- Loading, empty, partial-data và error state phải riêng biệt.
-- Không tính lại percentile ở frontend.
-- Không dùng màu duy nhất để biểu diễn trạng thái.
-- Chart phải hiển thị unit và định nghĩa metric trong tooltip/help text.
+- Response phải đủ dữ liệu để frontend phân biệt loading, empty, partial-data và error.
+- Backend trả percentile đã tính, frontend không tính lại.
+- OpenAPI/example phải ghi unit, timezone và metric semantics.
+- Handoff checklist phải nêu rõ enum, precision, freshness và pagination.
 
 ---
 
@@ -899,31 +915,30 @@ Commit đề xuất:
 feat: add materialized admin analytics read models
 ```
 
-### Phase 6 - Admin Analytics UI
+### Phase 6 - API hardening và frontend handoff
 
 Deliverables:
 
-- overview page;
-- demand chart;
-- heatmap;
-- matching performance page;
-- funnel;
-- filters và URL state;
-- loading/error/empty states;
-- frontend regression tests.
+- OpenAPI contract hoàn chỉnh;
+- response examples;
+- error/empty/partial-data semantics;
+- pagination và query guardrails;
+- frontend integration guide;
+- backward-compatibility tests;
+- API smoke collection.
 
 Acceptance criteria:
 
-- không tính metric lại ở frontend;
-- filter khớp API;
-- chart có unit và timezone;
-- heatmap không treo với dataset mục tiêu;
-- UI admin hiện tại không regression.
+- API không yêu cầu frontend tự tính metric;
+- filter, unit, timezone và precision được mô tả;
+- heatmap có payload/bounds guardrail;
+- dashboard endpoint cũ không regression;
+- tài liệu đủ để frontend tích hợp mà không đọc entity/backend code.
 
 Commit đề xuất:
 
 ```text
-feat: add admin analytics dashboards
+docs: finalize admin analytics API handoff
 ```
 
 ### Phase 7 - Dataset generator và benchmark
@@ -1001,7 +1016,7 @@ Phase 5: materialized views
               +------------------+
               |                  |
               v                  v
-Phase 6: Admin UI        Phase 7: dataset + benchmark
+Phase 6: API handoff     Phase 7: dataset + benchmark
               |                  |
               +---------+--------+
                         |
@@ -1112,7 +1127,7 @@ Không log dữ liệu vị trí chi tiết hoặc thông tin cá nhân không c
 | Timezone làm lệch bucket ngày/giờ | Cao | UTC storage, explicit reporting timezone, boundary tests |
 | Spatial query không dùng index | Cao | `EXPLAIN ANALYZE`, giới hạn cell size và bounds |
 | Dataset benchmark không đại diện | Trung bình | Nhiều profile, hotspot/peak-hour distribution, công bố limitation |
-| UI được làm trước dữ liệu | Trung bình | Data-first phase gate |
+| Consumer tích hợp trước khi contract ổn định | Trung bình | Data-first phase gate và Phase 6 handoff |
 | Phạm vi luận văn quá rộng | Cao | Forecasting/anomaly để ngoài core scope |
 
 ---
@@ -1122,7 +1137,7 @@ Không log dữ liệu vị trí chi tiết hoặc thông tin cá nhân không c
 Phân hệ chỉ được xem là hoàn thành khi:
 
 - matching run và offer telemetry được lưu bền vững, đầy đủ và idempotent;
-- metric dictionary được phản ánh nhất quán trong SQL, API, UI và báo cáo;
+- metric dictionary được phản ánh nhất quán trong SQL, API, tài liệu handoff và báo cáo;
 - có analytics theo thời gian và heatmap không gian;
 - có matching performance và matching funnel;
 - doanh thu chỉ tính từ completed payments;
@@ -1136,20 +1151,19 @@ Phân hệ chỉ được xem là hoàn thành khi:
 
 ---
 
-## 18. Điều kiện bắt đầu triển khai
+## 18. Điều kiện và nhánh triển khai
 
-Plan này chưa tự động thay đổi active phase hiện tại.
-
-Trước commit đầu tiên cần:
-
-1. Hoàn tất hoặc tạm dừng có chủ đích phạm vi Admin Web v2 hiện tại.
-2. User review và phê duyệt plan này.
-3. Cập nhật `docs/current-phase.md`.
-4. Chốt base branch do `docs/agent.md` yêu cầu bắt đầu feature từ `main`, trong khi Admin Web v2 hiện tại đang dựa trên `develop`.
-5. Tạo branch riêng, đề xuất:
+User đã chỉ định tiếp tục trên nhánh hiện tại:
 
 ```text
-codex/admin-analytics
+codex/admin-v2
 ```
 
+Quyết định này thay thế đề xuất tạo branch `codex/admin-analytics` trong bản plan ban đầu. Mỗi phase vẫn phải:
+
+1. Được ghi là active scope trong `docs/current-phase.md`.
+2. Tách thành commit nhỏ có thể review độc lập.
+3. Chạy validation phù hợp.
+4. Cập nhật implementation log sau commit.
+5. Dừng tại review checkpoint trước phase kế tiếp.
 6. Không commit `.codex-tmp/` và `deliverables/`.
