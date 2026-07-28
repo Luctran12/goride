@@ -1,6 +1,7 @@
 package com.example.goride.common.ratelimit;
 
 import com.example.goride.analytics.repository.DriverSupplySnapshotRepository;
+import com.example.goride.analytics.repository.DirectAnalyticsQueryPort;
 import com.example.goride.analytics.repository.MatchingOfferEventRepository;
 import com.example.goride.analytics.repository.MatchingRunRepository;
 import com.example.goride.booking.repository.PricingConfigRepository;
@@ -92,6 +93,9 @@ class RateLimitFilterIntegrationTests {
 
     @MockitoBean
     private DriverSupplySnapshotRepository driverSupplySnapshotRepository;
+
+    @MockitoBean
+    private DirectAnalyticsQueryPort directAnalyticsQueryPort;
 
     @Resource
     private MockMvc mockMvc;

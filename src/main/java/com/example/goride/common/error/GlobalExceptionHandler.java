@@ -12,9 +12,11 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -87,6 +89,40 @@ public class GlobalExceptionHandler {
                 request.getRequestURI()
         );
         return validationError(Map.of("requestBody", "Request body is malformed or unreadable"));
+    }
+
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ErrorResponse> handleMethodArgumentTypeMismatch(
+            MethodArgumentTypeMismatchException exception,
+            HttpServletRequest request
+    ) {
+        log.warn(
+                "Request parameter type mismatch method={} path={} parameter={}",
+                request.getMethod(),
+                request.getRequestURI(),
+                exception.getName()
+        );
+        return validationError(Map.of(
+                exception.getName(),
+                "Request parameter has an unsupported value or format"
+        ));
+    }
+
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public ResponseEntity<ErrorResponse> handleMissingRequestParameter(
+            MissingServletRequestParameterException exception,
+            HttpServletRequest request
+    ) {
+        log.warn(
+                "Required request parameter missing method={} path={} parameter={}",
+                request.getMethod(),
+                request.getRequestURI(),
+                exception.getParameterName()
+        );
+        return validationError(Map.of(
+                exception.getParameterName(),
+                "Required request parameter is missing"
+        ));
     }
 
     @ExceptionHandler(MaxUploadSizeExceededException.class)
