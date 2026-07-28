@@ -22,44 +22,36 @@ Admin Analytics Backend — Phase 0: Contracts and Architecture.
 - `git diff --check` passed.
 - User review: approved on 2026-07-28.
 
-## Active Feature
+## Completed Phase
 
 Admin Analytics Backend — Phase 1: Persistent Telemetry Schema.
 
-## Work In Review
+- Durable release SQL, entities and repositories are complete.
+- PostgreSQL constraints protect run, offer and snapshot identities and terminal states.
+- Release/repository integration tests passed against PostgreSQL/PostGIS 15.
+- Full backend regression suite passed.
+- User review: approved on 2026-07-28.
 
-- Completed the release bundle under `db/releases/20260727-admin-analytics-telemetry`.
-- Added durable entities and enums for matching runs, offer events, and driver-supply snapshots.
-- Added repositories with open-run/open-offer pessimistic-lock queries and snapshot key lookups.
-- Enforced one open run per trip, one offer per run/attempt, one accepted offer per run, terminal-state combinations, non-negative counters, and global snapshot uniqueness.
-- Kept matching runtime behavior unchanged.
+## Active Feature
 
-## Validation
+Admin Analytics Backend — Phase 2: Matching Telemetry Instrumentation.
 
-- Database release validator: passed.
-- Domain tests: 9 passed.
-- PostgreSQL/PostGIS repository and release integration tests: 5 passed.
-- Focused analytics/matching regression tests: 27 passed.
-- Full backend suite: 461 passed, 0 failures, 0 errors.
-- `git diff --check`: passed with only Windows LF/CRLF warnings.
+## Planned Scope
 
-## Manual Review
-
-- Release `precheck.sql`, `apply.sql`, and `verify.sql` execute successfully against PostgreSQL/PostGIS 15.
-- SQL constraints are stricter than application factories and protect against duplicate listener/scheduler writes.
-- Snapshot uniqueness treats a nullable service area as a real global aggregation key through `NULLS NOT DISTINCT`.
-- No service currently writes the new tables, so production matching behavior remains unchanged.
-- Rollback is safe before Phase 2; after telemetry collection begins it requires an export because it drops analytical history.
+- Add a matching telemetry port and PostgreSQL adapter.
+- Open or recover one matching run and record searches/offers at real business transitions.
+- Resolve offers and runs on accept, reject, timeout, cancellation, no-driver and unrecoverable failure.
+- Preserve retry and driver-available idempotency.
+- Add scheduled driver-supply snapshots sourced from Redis.
+- Make telemetry failures observable and avoid hidden catch-and-ignore behavior.
 
 ## Explicitly Out of Scope
 
-- Writing telemetry from the matching services.
-- Redis/SQL consistency handling.
-- Analytics controllers or queries.
+- Analytics query APIs.
+- Heatmap aggregation.
 - Materialized views.
+- Frontend work.
 
 ## Review Gate
 
-The Phase 1 patch remains uncommitted for user review.
-
-After approval, create the Phase 1 commit and start Phase 2 matching instrumentation.
+Phase 2 must be reviewed before Phase 3 adds direct-query analytics APIs.

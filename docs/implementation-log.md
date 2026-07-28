@@ -5,6 +5,51 @@
 > Tu commit `feat: add matching driver search` tro di, moi commit backend can cap nhat file nay trong cung commit.
 
 ---
+## Commit: `feat: add persistent matching telemetry schema`
+
+Branch: `codex/admin-v2`
+
+Phase: Admin Analytics Backend — Phase 1: Persistent Telemetry Schema
+
+Commit hash: `92a6bc6`
+
+### Muc tieu
+
+Tao schema PostgreSQL va persistence layer ben vung cho matching run, offer event va driver-supply snapshot ma chua thay doi matching runtime.
+
+### Noi dung da trien khai
+
+- Them release bundle `20260727-admin-analytics-telemetry` gom manifest, precheck, apply, verify va rollback.
+- Them `MatchingRun`, `MatchingOfferEvent`, `DriverSupplySnapshot` cung cac enum outcome/trigger.
+- Them repository lookup va pessimistic-lock cho open run/open offer.
+- Enforce mot open run moi trip, unique offer attempt, mot accepted offer moi run va snapshot uniqueness ke ca service area `NULL`.
+- Enforce terminal-state, timestamp, counter va driver-supply count constraints trong ca Java domain va PostgreSQL.
+- Lam ro `responded_at` la resolution timestamp cho accepted/rejected/cancelled/expired; timeout dung `expires_at`.
+- Chua co matching service nao ghi telemetry trong phase nay.
+
+### Review truoc commit
+
+- Database release validator: pass.
+- Domain tests: 9 passed.
+- PostgreSQL/PostGIS release/repository integration tests: 5 passed.
+- Focused analytics/matching regression: 27 passed.
+- Full backend suite tai checkpoint: 461 tests passed, 0 failures, 0 errors.
+- `git diff --check`: pass; chi co warning LF/CRLF tren Windows.
+- Manual review: khong thay blocker; rollback can export analytical history neu da bat dau thu thap telemetry.
+- User review: approved 2026-07-28.
+
+### Files chinh
+
+- `db/releases/20260727-admin-analytics-telemetry/*`
+- `src/main/java/com/example/goride/analytics/domain/*`
+- `src/main/java/com/example/goride/analytics/repository/*`
+- `src/test/java/com/example/goride/analytics/domain/AnalyticsTelemetryDomainTests.java`
+- `src/test/java/com/example/goride/integration/AdminAnalyticsTelemetryRepositoryIntegrationTests.java`
+- `docs/admin-analytics/metric-dictionary.md`
+- `docs/admin-analytics-phases/phase-01-telemetry-schema.md`
+- `docs/current-phase.md`
+
+---
 ## Commit: `docs: define admin analytics backend phases`
 
 Branch: `codex/admin-v2`
