@@ -5,6 +5,69 @@
 > Tu commit `feat: add matching driver search` tro di, moi commit backend can cap nhat file nay trong cung commit.
 
 ---
+## Commit: `feat: persist matching telemetry and driver-supply snapshots`
+
+Branch: `codex/admin-v2`
+
+Phase: Admin Analytics Backend — Phase 2: Matching Telemetry Instrumentation
+
+Commit hash: `510e727`
+
+### Muc tieu
+
+Gan durable telemetry vao cac business transition that cua matching, dong thoi
+lay mau nguon cung tai xe tu Redis de lam dau vao cho analytics.
+
+### Noi dung da trien khai
+
+- Them `MatchingTelemetryPort` va PostgreSQL adapter cho matching run/offer.
+- Ghi start/search/offer/accept/reject/timeout/cancel; retry va driver-available
+  tiep tuc cung mot run.
+- Commit `OFFERED` truoc khi ghi Redis va gui notification.
+- Them distributed search lock theo trip voi token va compare-and-delete de
+  ngan duplicate concurrent search.
+- Them database-backed recovery cho offer qua han khi Redis state bi mat.
+- Dong trip transition va terminal telemetry trong cung PostgreSQL transaction.
+- Them Redis supply read port, snapshot scheduler cau hinh duoc va PostgreSQL
+  upsert theo bucket/service area/vehicle type.
+- Bo qua ca bucket neu active Redis data bi malformed; zero chi duoc ghi khi
+  mau nguon hoan chinh.
+- Them Micrometer counter va structured log cho moi telemetry failure path.
+- Giu policy san pham hien tai: trip van `SEARCHING` khi tam thoi khong co
+  candidate, khong tu dong suy dien `NO_DRIVER`.
+
+### Review truoc commit
+
+- Focused matching/cancellation/supply tests: pass.
+- PostgreSQL/PostGIS + Redis telemetry integration tests: pass.
+- Booking -> offer -> accept -> routing integration tests: pass.
+- Full backend suite: 477 tests passed, 0 failures, 0 errors.
+- `git diff --check`: pass; chi co warning LF/CRLF tren Windows.
+- Manual review da phat hien va sua DB/Redis ordering race va concurrent search
+  counter race truoc khi commit.
+- User review: approved by request to continue with the next phase.
+
+### Rủi ro đã biết
+
+- Khong co transactional outbox nen van ton tai post-commit notification gap;
+  durable expired-offer recovery la co che phuc hoi hien tai.
+- Redis matching state tu deployment cu khong co telemetry tuong ung va can
+  het TTL truoc khi normal recovery tiep quan.
+
+### Files chinh
+
+- `src/main/java/com/example/goride/analytics/service/*`
+- `src/main/java/com/example/goride/matching/telemetry/*`
+- `src/main/java/com/example/goride/matching/service/MatchingService.java`
+- `src/main/java/com/example/goride/matching/service/DriverOfferResponseService.java`
+- `src/main/java/com/example/goride/matching/service/MatchingOfferTimeoutService.java`
+- `src/main/java/com/example/goride/booking/service/BookingService.java`
+- `src/test/java/com/example/goride/analytics/service/*`
+- `src/test/java/com/example/goride/integration/AdminAnalyticsTelemetryRepositoryIntegrationTests.java`
+- `docs/admin-analytics/adr/ADR-001-matching-telemetry-consistency.md`
+- `docs/admin-analytics-phases/phase-02-matching-instrumentation.md`
+
+---
 ## Commit: `feat: add persistent matching telemetry schema`
 
 Branch: `codex/admin-v2`
