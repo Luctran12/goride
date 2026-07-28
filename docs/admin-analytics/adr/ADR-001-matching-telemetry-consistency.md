@@ -2,7 +2,9 @@
 
 Date: 2026-07-28
 
-Status: Proposed
+Status: Accepted
+
+Approval: Phase 0 review approved by the user on 2026-07-28.
 
 ## Context
 
@@ -82,6 +84,8 @@ Updates use conditional SQL/entity guards so duplicate listener or scheduler exe
 ### Transaction Boundaries
 
 - Trip terminal transitions and matching telemetry terminal updates use the same PostgreSQL transaction when both are changed by one service operation.
+- Search allocation and `OFFERED` persistence use short `REQUIRES_NEW` transactions so the durable offer commits before Redis trip-matching state is written.
+- A tokenized Redis search lock serializes the start/search/offer pipeline per trip; release uses compare-and-delete so an expired lock owner cannot delete a newer lock.
 - Driver notification is dispatched only after the `OFFERED` record commits.
 - Passenger/status notifications remain after-commit actions.
 - Redis cannot participate in the PostgreSQL transaction. Redis mutations require explicit compensation or reconciliation when a database transaction fails.
@@ -93,9 +97,11 @@ If a candidate lock succeeds but creation of the run/offer telemetry fails:
 
 1. Do not notify the driver.
 2. Release the candidate lock.
-3. Clear temporary trip matching state created for that attempt.
+3. Do not create Redis trip-matching state for that attempt.
 4. Emit a telemetry failure metric and structured log.
 5. Leave the trip eligible for a later retry/recovery.
+
+After the offer commits, Redis trip-matching state is written. If that operational write fails, the driver is not notified, the candidate lock is released, and the durable open offer remains available to database-backed timeout recovery.
 
 ### Accept Failure
 
@@ -182,4 +188,3 @@ Deferred as a future reliability enhancement. It can be introduced later without
 ## Implementation Gate
 
 Phase 02 cannot start until this ADR is approved or replaced by a newer ADR.
-

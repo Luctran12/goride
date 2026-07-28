@@ -1,5 +1,9 @@
 package com.example.goride.integration;
 
+import com.example.goride.analytics.domain.MatchingOfferOutcome;
+import com.example.goride.analytics.domain.MatchingRunOutcome;
+import com.example.goride.analytics.repository.MatchingOfferEventRepository;
+import com.example.goride.analytics.repository.MatchingRunRepository;
 import com.example.goride.tracking.dto.DriverLocationUpdateRequest;
 import com.example.goride.tracking.service.TripLocationTrackingService;
 import com.example.goride.user.domain.User;
@@ -53,6 +57,12 @@ class BookingMatchingRoutingIntegrationTests extends PostgresRedisIntegrationTes
 
     @Autowired
     private TripLocationTrackingService tripLocationTrackingService;
+
+    @Autowired
+    private MatchingRunRepository matchingRunRepository;
+
+    @Autowired
+    private MatchingOfferEventRepository matchingOfferEventRepository;
 
     @DynamicPropertySource
     static void routingProperties(DynamicPropertyRegistry registry) {
@@ -121,6 +131,17 @@ class BookingMatchingRoutingIntegrationTests extends PostgresRedisIntegrationTes
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.tripId").value(tripId))
                 .andExpect(jsonPath("$.data.status").value("ACCEPTED"));
+
+        var matchingRun = matchingRunRepository.findByTripIdAndOutcome(
+                tripId,
+                MatchingRunOutcome.MATCHED
+        ).orElseThrow();
+        assertThat(matchingRun.getSearchCount()).isEqualTo(1);
+        assertThat(matchingRun.getOfferCount()).isEqualTo(1);
+        assertThat(matchingOfferEventRepository
+                .findByMatchingRunIdAndAttemptNo(matchingRun.getId(), 1)
+                .orElseThrow()
+                .getOutcome()).isEqualTo(MatchingOfferOutcome.ACCEPTED);
 
         mockMvc.perform(post("/api/v1/drivers/trips/{tripId}/route", tripId)
                         .header("Authorization", bearer(driver.accessToken()))

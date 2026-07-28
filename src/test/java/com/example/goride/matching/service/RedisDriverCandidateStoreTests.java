@@ -104,6 +104,27 @@ class RedisDriverCandidateStoreTests {
     }
 
     @Test
+    void matchingSearchLockUsesUniqueTokenAndCompareDeleteRelease() {
+        Duration ttl = Duration.ofSeconds(30);
+        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
+        when(valueOperations.setIfAbsent(
+                eq("trip:99:matching-search-lock"),
+                any(String.class),
+                eq(ttl)
+        )).thenReturn(true);
+
+        var token = candidateStore.tryLockMatchingSearch(99L, ttl);
+        candidateStore.releaseMatchingSearchLock(99L, token.orElseThrow());
+
+        assertThat(token).isPresent();
+        verify(redisTemplate).execute(
+                any(org.springframework.data.redis.core.script.RedisScript.class),
+                eq(List.of("trip:99:matching-search-lock")),
+                eq(token.get())
+        );
+    }
+
+    @Test
     @SuppressWarnings("unchecked")
     void recordTripMatchingWritesOfferStateWithTtl() {
         Duration ttl = Duration.ofMinutes(5);

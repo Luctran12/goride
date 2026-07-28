@@ -16,6 +16,9 @@ public interface MatchingRunRepository extends JpaRepository<MatchingRun, Long> 
     boolean existsByTripIdAndOutcome(Long tripId, MatchingRunOutcome outcome);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
+    Optional<MatchingRun> findFirstByTripIdOrderByStartedAtDescIdDesc(Long tripId);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""
             select run
             from MatchingRun run

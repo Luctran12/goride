@@ -21,6 +21,8 @@ import com.example.goride.booking.service.SurgePricingService.SurgePricingQuote;
 import com.example.goride.common.error.BusinessException;
 import com.example.goride.common.error.ErrorCode;
 import com.example.goride.driver.domain.VehicleType;
+import com.example.goride.matching.telemetry.MatchingTelemetryPort;
+import com.example.goride.matching.telemetry.MatchingTelemetryFailureReporter;
 import com.example.goride.payment.service.PaymentMethodService;
 import com.example.goride.servicearea.service.ServiceAreaService;
 import com.example.goride.user.domain.User;
@@ -86,6 +88,12 @@ class BookingServiceTests {
 
     @Mock
     private Clock clock;
+
+    @Mock
+    private MatchingTelemetryPort matchingTelemetry;
+
+    @Mock
+    private MatchingTelemetryFailureReporter matchingTelemetryFailureReporter;
 
     @InjectMocks
     private BookingService bookingService;
@@ -372,6 +380,7 @@ class BookingServiceTests {
         ArgumentCaptor<TripStatusHistory> historyCaptor = ArgumentCaptor.forClass(TripStatusHistory.class);
         ArgumentCaptor<BookingCancelledEvent> eventCaptor = ArgumentCaptor.forClass(BookingCancelledEvent.class);
         verify(tripStatusHistoryRepository).save(historyCaptor.capture());
+        verify(matchingTelemetry).cancelRun(eq(99L), any(Instant.class));
         verify(eventPublisher).publishEvent(eventCaptor.capture());
         assertThat(response.status()).isEqualTo(TripStatus.CANCELLED);
         assertThat(response.cancelReason()).isEqualTo("Changed plan");

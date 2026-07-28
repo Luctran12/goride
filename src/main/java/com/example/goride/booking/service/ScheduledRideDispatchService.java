@@ -83,7 +83,7 @@ public class ScheduledRideDispatchService {
                 scheduledPickupTime
         );
         runAfterCommit(() -> {
-            eventPublisher.publishEvent(BookingCreatedEvent.from(savedTrip));
+            eventPublisher.publishEvent(BookingCreatedEvent.fromScheduledDispatch(savedTrip));
             tripRealtimeNotifier.broadcastTripStatus(tripId, TripStatusNotification.from(savedTrip));
         });
     }

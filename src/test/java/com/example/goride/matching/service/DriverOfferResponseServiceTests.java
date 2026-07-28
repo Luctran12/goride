@@ -17,6 +17,9 @@ import com.example.goride.matching.domain.MatchingRequest;
 import com.example.goride.matching.domain.TripMatchingState;
 import com.example.goride.matching.notification.DriverOfferNotification;
 import com.example.goride.matching.notification.DriverOfferNotifier;
+import com.example.goride.matching.telemetry.MatchingTelemetryOfferOutcome;
+import com.example.goride.matching.telemetry.MatchingTelemetryFailureReporter;
+import com.example.goride.matching.telemetry.MatchingTelemetryPort;
 import com.example.goride.notification.dto.TripStatusNotification;
 import com.example.goride.notification.dto.UserNotification;
 import com.example.goride.notification.service.TripRealtimeNotifier;
@@ -35,6 +38,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
+import java.time.Clock;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.Set;
@@ -73,6 +77,12 @@ class DriverOfferResponseServiceTests {
     @Mock
     private TripRealtimeNotifier tripRealtimeNotifier;
 
+    @Mock
+    private MatchingTelemetryPort matchingTelemetry;
+
+    @Mock
+    private MatchingTelemetryFailureReporter matchingTelemetryFailureReporter;
+
     private DriverOfferResponseService service;
 
     @BeforeEach
@@ -84,7 +94,10 @@ class DriverOfferResponseServiceTests {
                 candidateStore,
                 matchingService,
                 driverOfferNotifier,
-                tripRealtimeNotifier
+                tripRealtimeNotifier,
+                matchingTelemetry,
+                matchingTelemetryFailureReporter,
+                Clock.systemUTC()
         );
     }
 
@@ -104,6 +117,7 @@ class DriverOfferResponseServiceTests {
         verify(candidateStore).markCandidateBusy(20L);
         verify(candidateStore).releaseCandidateLock(20L);
         verify(candidateStore).clearTripMatching(99L);
+        verify(matchingTelemetry).acceptOfferAndCompleteRun(eq(99L), eq(1), eq(20L), any(Instant.class));
         verifyPassengerNotification(TripStatus.ACCEPTED);
         assertThat(response.tripId()).isEqualTo(99L);
         assertThat(response.status()).isEqualTo(TripStatus.ACCEPTED);
@@ -135,6 +149,12 @@ class DriverOfferResponseServiceTests {
                 ArgumentCaptor.forClass(DriverOfferNotification.class);
         verify(candidateStore).releaseCandidateLock(20L);
         verify(candidateStore).clearTripMatching(99L);
+        verify(matchingTelemetry).resolveOffer(
+                eq(99L),
+                eq(1),
+                eq(MatchingTelemetryOfferOutcome.REJECTED),
+                any(Instant.class)
+        );
         verify(matchingService).findAndLockDriver(any(MatchingRequest.class), eq(2), rejectedCaptor.capture());
         verify(driverOfferNotifier).notifyDriver(eq(21L), notificationCaptor.capture());
         verify(tripRepository, never()).save(any());
@@ -213,6 +233,7 @@ class DriverOfferResponseServiceTests {
                 );
         verify(candidateStore).releaseCandidateLock(20L);
         verify(candidateStore).clearTripMatching(99L);
+        verify(matchingTelemetry).expireOffer(eq(99L), eq(1), any(Instant.class));
         verifyNoInteractions(tripRepository);
     }
 

@@ -21,6 +21,8 @@ import com.example.goride.booking.service.distance.DistanceService;
 import com.example.goride.booking.service.SurgePricingService.SurgePricingQuote;
 import com.example.goride.common.error.BusinessException;
 import com.example.goride.common.error.ErrorCode;
+import com.example.goride.matching.telemetry.MatchingTelemetryPort;
+import com.example.goride.matching.telemetry.MatchingTelemetryFailureReporter;
 import com.example.goride.payment.service.PaymentMethodService;
 import com.example.goride.servicearea.service.ServiceAreaService;
 import com.example.goride.user.domain.User;
@@ -61,6 +63,8 @@ public class BookingService {
     private final ApplicationEventPublisher eventPublisher;
     private final ScheduledRideProperties scheduledRideProperties;
     private final Clock clock;
+    private final MatchingTelemetryPort matchingTelemetry;
+    private final MatchingTelemetryFailureReporter matchingTelemetryFailureReporter;
 
     public BookingService(
             UserRepository userRepository,
@@ -73,7 +77,9 @@ public class BookingService {
             ServiceAreaService serviceAreaService,
             ApplicationEventPublisher eventPublisher,
             ScheduledRideProperties scheduledRideProperties,
-            Clock clock
+            Clock clock,
+            MatchingTelemetryPort matchingTelemetry,
+            MatchingTelemetryFailureReporter matchingTelemetryFailureReporter
     ) {
         this.userRepository = userRepository;
         this.pricingConfigRepository = pricingConfigRepository;
@@ -86,6 +92,8 @@ public class BookingService {
         this.eventPublisher = eventPublisher;
         this.scheduledRideProperties = scheduledRideProperties;
         this.clock = clock;
+        this.matchingTelemetry = matchingTelemetry;
+        this.matchingTelemetryFailureReporter = matchingTelemetryFailureReporter;
     }
 
     @Transactional(readOnly = true)
@@ -194,8 +202,18 @@ public class BookingService {
                 user,
                 savedTrip.getCancelReason()
         ));
+        cancelMatchingRun(savedTrip);
         publishAfterCommit(BookingCancelledEvent.from(savedTrip));
         return TripResponse.from(savedTrip);
+    }
+
+    private void cancelMatchingRun(Trip trip) {
+        try {
+            matchingTelemetry.cancelRun(trip.getId(), trip.getCancelledAt());
+        } catch (RuntimeException exception) {
+            matchingTelemetryFailureReporter.report("cancel_run", trip.getId(), exception);
+            throw exception;
+        }
     }
 
     private Trip createTrip(User passenger, BookingCreateRequest request, FareCalculation calculation) {

@@ -33,3 +33,9 @@ app:
       enabled: true
       fixed-delay-ms: 5000
       initial-delay-ms: 10000
+  analytics:
+    telemetry:
+      supply-snapshot-enabled: true
+      supply-snapshot-interval-seconds: 300
+      supply-snapshot-fixed-delay-ms: 300000
+      supply-snapshot-initial-delay-ms: 30000

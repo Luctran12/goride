@@ -1,10 +1,12 @@
 package com.example.goride.matching.service;
 
 import com.example.goride.booking.event.BookingCreatedEvent;
+import com.example.goride.booking.event.BookingMatchingTrigger;
 import com.example.goride.matching.domain.DriverOffer;
 import com.example.goride.matching.domain.MatchingRequest;
 import com.example.goride.matching.notification.DriverOfferNotification;
 import com.example.goride.matching.notification.DriverOfferNotifier;
+import com.example.goride.matching.telemetry.MatchingTelemetryTrigger;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.event.EventListener;
@@ -15,19 +17,26 @@ public class BookingCreatedMatchingListener {
     private static final Logger log = LoggerFactory.getLogger(BookingCreatedMatchingListener.class);
 
     private final MatchingService matchingService;
+    private final DriverCandidateStore candidateStore;
     private final DriverOfferNotifier driverOfferNotifier;
 
     public BookingCreatedMatchingListener(
             MatchingService matchingService,
+            DriverCandidateStore candidateStore,
             DriverOfferNotifier driverOfferNotifier
     ) {
         this.matchingService = matchingService;
+        this.candidateStore = candidateStore;
         this.driverOfferNotifier = driverOfferNotifier;
     }
 
     @EventListener
     public void onBookingCreated(BookingCreatedEvent event) {
-        matchingService.findAndLockDriver(MatchingRequest.from(event))
+        if (candidateStore.findTripMatching(event.tripId()).isPresent()) {
+            log.info("Duplicate matching start skipped because an offer is active tripId={}", event.tripId());
+            return;
+        }
+        matchingService.findAndLockDriver(MatchingRequest.from(event), telemetryTrigger(event))
                 .ifPresentOrElse(
                         offer -> notifyDriver(event, offer),
                         () -> log.info(
@@ -49,5 +58,11 @@ public class BookingCreatedMatchingListener {
                 offer.candidate().driverId(),
                 DriverOfferNotification.from(event, offer)
         );
+    }
+
+    private MatchingTelemetryTrigger telemetryTrigger(BookingCreatedEvent event) {
+        return event.matchingTrigger() == BookingMatchingTrigger.SCHEDULED_DISPATCH
+                ? MatchingTelemetryTrigger.SCHEDULED_DISPATCH
+                : MatchingTelemetryTrigger.BOOKING_CREATED;
     }
 }

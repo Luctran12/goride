@@ -9,6 +9,9 @@ import com.example.goride.analytics.domain.MatchingTriggerType;
 import com.example.goride.analytics.repository.DriverSupplySnapshotRepository;
 import com.example.goride.analytics.repository.MatchingOfferEventRepository;
 import com.example.goride.analytics.repository.MatchingRunRepository;
+import com.example.goride.matching.telemetry.MatchingTelemetryOfferOutcome;
+import com.example.goride.matching.telemetry.MatchingTelemetryPort;
+import com.example.goride.matching.telemetry.MatchingTelemetryTrigger;
 import com.example.goride.booking.domain.PaymentMethod;
 import com.example.goride.booking.domain.PricingConfig;
 import com.example.goride.booking.domain.Trip;
@@ -72,6 +75,9 @@ class AdminAnalyticsTelemetryRepositoryIntegrationTests extends PostgresRedisInt
 
     @Autowired
     private DriverSupplySnapshotRepository driverSupplySnapshotRepository;
+
+    @Autowired
+    private MatchingTelemetryPort matchingTelemetry;
 
     @BeforeAll
     void applyReleaseSql() throws IOException {
@@ -270,6 +276,207 @@ class AdminAnalyticsTelemetryRepositoryIntegrationTests extends PostgresRedisInt
                 Timestamp.from(Instant.parse("2026-07-28T04:00:00Z")),
                 Timestamp.from(Instant.parse("2026-07-28T04:00:10Z"))
         )).isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    @Test
+    void telemetryAdapterKeepsRetriesInOneRunAndResolvesIdempotently() {
+        Seed seed = seed();
+        Instant startedAt = Instant.parse("2026-07-28T05:00:00Z");
+
+        assertThat(matchingTelemetry.beginSearch(
+                seed.trip().getId(),
+                MatchingTelemetryTrigger.BOOKING_CREATED,
+                null,
+                3,
+                startedAt
+        )).hasValue(1);
+        assertThat(matchingTelemetry.recordOffer(
+                seed.trip().getId(),
+                seed.driver().getId(),
+                1,
+                1,
+                250.0,
+                startedAt.plusSeconds(1),
+                startedAt.plusSeconds(31)
+        )).isTrue();
+        assertThat(matchingTelemetry.recordOffer(
+                seed.trip().getId(),
+                seed.driver().getId(),
+                1,
+                1,
+                250.0,
+                startedAt.plusSeconds(1),
+                startedAt.plusSeconds(31)
+        )).isFalse();
+
+        matchingTelemetry.resolveOffer(
+                seed.trip().getId(),
+                1,
+                MatchingTelemetryOfferOutcome.REJECTED,
+                startedAt.plusSeconds(5)
+        );
+        matchingTelemetry.resolveOffer(
+                seed.trip().getId(),
+                1,
+                MatchingTelemetryOfferOutcome.REJECTED,
+                startedAt.plusSeconds(5)
+        );
+
+        assertThat(matchingTelemetry.beginSearch(
+                seed.trip().getId(),
+                MatchingTelemetryTrigger.RECOVERY,
+                2,
+                1,
+                startedAt.plusSeconds(6)
+        )).hasValue(2);
+        assertThat(matchingTelemetry.recordOffer(
+                seed.trip().getId(),
+                seed.driver().getId(),
+                2,
+                1,
+                175.0,
+                startedAt.plusSeconds(7),
+                startedAt.plusSeconds(37)
+        )).isTrue();
+        matchingTelemetry.acceptOfferAndCompleteRun(
+                seed.trip().getId(),
+                2,
+                seed.driver().getId(),
+                startedAt.plusSeconds(12)
+        );
+        matchingTelemetry.acceptOfferAndCompleteRun(
+                seed.trip().getId(),
+                2,
+                seed.driver().getId(),
+                startedAt.plusSeconds(12)
+        );
+
+        MatchingRun run = matchingRunRepository.findByTripIdAndOutcome(
+                seed.trip().getId(),
+                MatchingRunOutcome.MATCHED
+        ).orElseThrow();
+        assertThat(run.getTriggerType()).isEqualTo(MatchingTriggerType.BOOKING_CREATED);
+        assertThat(run.getSearchCount()).isEqualTo(2);
+        assertThat(run.getCandidateCount()).isEqualTo(4);
+        assertThat(run.getOfferCount()).isEqualTo(2);
+        assertThat(run.getMatchedDriver().getId()).isEqualTo(seed.driver().getId());
+        assertThat(matchingOfferEventRepository
+                .findByMatchingRunIdAndAttemptNo(run.getId(), 1)
+                .orElseThrow()
+                .getOutcome()).isEqualTo(MatchingOfferOutcome.REJECTED);
+        assertThat(matchingOfferEventRepository
+                .findByMatchingRunIdAndAttemptNo(run.getId(), 2)
+                .orElseThrow()
+                .getOutcome()).isEqualTo(MatchingOfferOutcome.ACCEPTED);
+    }
+
+    @Test
+    void telemetryAdapterFindsExpiredOfferForDatabaseRecovery() {
+        Seed seed = seed();
+        Instant startedAt = Instant.parse("2026-07-28T06:00:00Z");
+        matchingTelemetry.beginSearch(
+                seed.trip().getId(),
+                MatchingTelemetryTrigger.BOOKING_CREATED,
+                null,
+                1,
+                startedAt
+        );
+        matchingTelemetry.recordOffer(
+                seed.trip().getId(),
+                seed.driver().getId(),
+                1,
+                1,
+                100.0,
+                startedAt.plusSeconds(1),
+                startedAt.plusSeconds(31)
+        );
+
+        assertThat(matchingTelemetry.beginSearch(
+                seed.trip().getId(),
+                MatchingTelemetryTrigger.RECOVERY,
+                null,
+                1,
+                startedAt.plusSeconds(32)
+        )).isEmpty();
+        assertThat(matchingTelemetry.findExpiredOffers(startedAt.plusSeconds(32), 10))
+                .singleElement()
+                .satisfies(offer -> {
+                    assertThat(offer.tripId()).isEqualTo(seed.trip().getId());
+                    assertThat(offer.driverId()).isEqualTo(seed.driver().getId());
+                    assertThat(offer.attempt()).isEqualTo(1);
+                    assertThat(offer.excludedDriverIds()).containsExactly(seed.driver().getId());
+                });
+    }
+
+    @Test
+    void telemetryAdapterCancelsOpenOfferAndRunIdempotently() {
+        Seed seed = seed();
+        Instant startedAt = Instant.parse("2026-07-28T06:30:00Z");
+        matchingTelemetry.beginSearch(
+                seed.trip().getId(),
+                MatchingTelemetryTrigger.BOOKING_CREATED,
+                null,
+                1,
+                startedAt
+        );
+        matchingTelemetry.recordOffer(
+                seed.trip().getId(),
+                seed.driver().getId(),
+                1,
+                1,
+                125.0,
+                startedAt.plusSeconds(1),
+                startedAt.plusSeconds(31)
+        );
+
+        matchingTelemetry.cancelRun(seed.trip().getId(), startedAt.plusSeconds(10));
+        matchingTelemetry.cancelRun(seed.trip().getId(), startedAt.plusSeconds(10));
+
+        MatchingRun run = matchingRunRepository.findByTripIdAndOutcome(
+                seed.trip().getId(),
+                MatchingRunOutcome.CANCELLED
+        ).orElseThrow();
+        assertThat(run.getFinishedAt()).isEqualTo(startedAt.plusSeconds(10));
+        assertThat(matchingOfferEventRepository
+                .findByMatchingRunIdAndAttemptNo(run.getId(), 1)
+                .orElseThrow()
+                .getOutcome()).isEqualTo(MatchingOfferOutcome.CANCELLED);
+    }
+
+    @Test
+    void supplySnapshotUpsertReplacesCountsForSameGlobalBucket() {
+        Instant bucketStart = Instant.parse("2026-07-28T07:00:00Z");
+        transactionTemplate.executeWithoutResult(status -> {
+            driverSupplySnapshotRepository.upsertSnapshot(
+                    bucketStart,
+                    null,
+                    VehicleType.MOTORBIKE.name(),
+                    4,
+                    3,
+                    1,
+                    bucketStart.plusSeconds(1)
+            );
+            driverSupplySnapshotRepository.upsertSnapshot(
+                    bucketStart,
+                    null,
+                    VehicleType.MOTORBIKE.name(),
+                    6,
+                    4,
+                    2,
+                    bucketStart.plusSeconds(2)
+            );
+        });
+
+        DriverSupplySnapshot snapshot = driverSupplySnapshotRepository
+                .findByBucketStartAndServiceAreaIsNullAndVehicleType(
+                        bucketStart,
+                        VehicleType.MOTORBIKE
+                )
+                .orElseThrow();
+        assertThat(snapshot.getOnlineDrivers()).isEqualTo(6);
+        assertThat(snapshot.getAvailableDrivers()).isEqualTo(4);
+        assertThat(snapshot.getBusyDrivers()).isEqualTo(2);
+        assertThat(snapshot.getSampledAt()).isEqualTo(bucketStart.plusSeconds(2));
     }
 
     private Seed seed() {

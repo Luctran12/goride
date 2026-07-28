@@ -1,5 +1,8 @@
 package com.example.goride.common.ratelimit;
 
+import com.example.goride.analytics.repository.DriverSupplySnapshotRepository;
+import com.example.goride.analytics.repository.MatchingOfferEventRepository;
+import com.example.goride.analytics.repository.MatchingRunRepository;
 import com.example.goride.booking.repository.PricingConfigRepository;
 import com.example.goride.booking.repository.SurgePricingRuleRepository;
 import com.example.goride.booking.repository.TripRepository;
@@ -80,6 +83,15 @@ class RateLimitFilterIntegrationTests {
 
     @MockitoBean
     private TripMessageRepository tripMessageRepository;
+
+    @MockitoBean
+    private MatchingRunRepository matchingRunRepository;
+
+    @MockitoBean
+    private MatchingOfferEventRepository matchingOfferEventRepository;
+
+    @MockitoBean
+    private DriverSupplySnapshotRepository driverSupplySnapshotRepository;
 
     @Resource
     private MockMvc mockMvc;

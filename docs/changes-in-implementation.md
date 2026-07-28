@@ -4,6 +4,45 @@
 
 ---
 
+## 2026-07-28 - Matching analytics preserves open-ended rematching
+
+- Date: 2026-07-28
+- Branch: `codex/admin-v2`
+- Affected feature: Admin Analytics Phase 2 matching telemetry
+- Approval source: existing reviewed matching behavior recorded in `docs/implementation-log.md`
+
+### TDD expectation
+
+The Admin Analytics implementation plan initially described closing a matching
+run as `NO_DRIVER` when candidates or a configured attempt budget were
+exhausted.
+
+### Implemented behavior
+
+The current backend keeps the trip in `SEARCHING` after an initial no-candidate
+result, driver rejection, or offer timeout when no next driver is immediately
+available. Driver-online and heartbeat events may rematch that trip later.
+Telemetry therefore keeps the same matching run `IN_PROGRESS`; it closes the
+run only when a driver accepts (`MATCHED`) or the booking is cancelled
+(`CANCELLED`). `NO_DRIVER` remains in the schema as a reserved outcome but is
+not inferred from a temporary lack of Redis candidates.
+
+### Reason
+
+Candidate availability is transient. Treating one empty search as terminal
+would regress the approved passenger flow and prevent the existing
+driver-available listener from completing a later match.
+
+### Impact
+
+- Retry and driver-available searches accumulate in the same durable run.
+- Open runs are excluded from terminal matching success/failure rates.
+- Analytics must not interpret a long-running `IN_PROGRESS` run as a
+  `NO_DRIVER` outcome.
+- A future product decision may add an explicit time or policy threshold that
+  closes a run as `NO_DRIVER`; that change will require a separate reviewed
+  transition and telemetry test.
+
 ## 2026-07-23 - Admin Web v2 uses the current backend contract
 
 - Date: 2026-07-23

@@ -7,10 +7,10 @@ import com.example.goride.matching.domain.DriverOffer;
 import com.example.goride.matching.domain.MatchingRequest;
 import com.example.goride.matching.notification.DriverOfferNotification;
 import com.example.goride.matching.notification.DriverOfferNotifier;
+import com.example.goride.matching.telemetry.MatchingTelemetryTrigger;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Optional;
 
@@ -35,7 +35,6 @@ public class SearchingTripMatchingService {
         this.driverOfferNotifier = driverOfferNotifier;
     }
 
-    @Transactional(readOnly = true)
     public void matchOpenSearchingTrips(Long availableDriverId) {
         tripRepository.findByStatusAndDeletedAtIsNullOrderByRequestedAtAsc(TripStatus.SEARCHING)
                 .forEach(trip -> matchTripIfNoActiveOffer(availableDriverId, trip));
@@ -46,7 +45,10 @@ public class SearchingTripMatchingService {
             return;
         }
 
-        Optional<DriverOffer> offer = matchingService.findAndLockDriver(MatchingRequest.from(trip));
+        Optional<DriverOffer> offer = matchingService.findAndLockDriver(
+                MatchingRequest.from(trip),
+                MatchingTelemetryTrigger.RECOVERY
+        );
         offer.ifPresentOrElse(
                 nextOffer -> notifyDriver(trip, nextOffer),
                 () -> log.info(
