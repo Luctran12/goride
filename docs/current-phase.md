@@ -7,6 +7,7 @@
 
 - Base development commit: `e6aba60`.
 - Latest approved implementation commit: `510e727` (`feat: persist matching telemetry and driver-supply snapshots`).
+- Latest implemented commit awaiting user review: `c02effa` (`feat: add direct-query admin analytics APIs`).
 - Latest planning commit: `0c0e080` (`docs: add admin analytics implementation plan`).
 - The user explicitly selected `codex/admin-v2` for the Admin Analytics backend work.
 - User-owned `.codex-tmp/` and `deliverables/` content must remain untouched and uncommitted.
@@ -43,21 +44,29 @@ Admin Analytics Backend — Phase 2: Matching Telemetry Instrumentation.
 - Full backend regression suite passed with 477 tests.
 - User review: approved by request to continue with the next phase.
 
-## Active Feature
+## Completed Phase Awaiting Review
 
 Admin Analytics Backend — Phase 3: Direct Analytics Queries and API Baseline.
 
-## Planned Scope
+## Implemented Scope
 
-- Add a shared analytics filter with mandatory `[from, to)` range, reporting
+- Added a shared analytics filter with mandatory `[from, to)` range, reporting
   timezone, optional vehicle type and optional service-area filters.
-- Implement direct-query overview, demand timeseries, supply timeseries,
+- Implemented direct-query overview, demand timeseries, supply timeseries,
   matching performance and matching funnel.
-- Return normalized KPI values without requiring frontend recomputation.
-- Add request validation, range guardrails, response metadata and OpenAPI
+- Returned normalized KPI values without requiring frontend recomputation.
+- Added request validation, range guardrails, response metadata and OpenAPI
   examples.
-- Protect every endpoint with Admin RBAC while preserving the existing
+- Protected every endpoint with Admin RBAC while preserving the existing
   `/api/v1/admin/dashboard` contract.
+
+## Validation
+
+- Hand-calculated PostgreSQL/PostGIS fixture tests passed.
+- Admin/passenger RBAC and generated OpenAPI path tests passed.
+- Full backend regression suite passed with 489 tests, 0 failures and 0 errors.
+- `git diff --check` passed; only the existing Windows LF/CRLF warnings were
+  reported while staging.
 
 ## Explicitly Out of Scope
 
@@ -68,5 +77,5 @@ Admin Analytics Backend — Phase 3: Direct Analytics Queries and API Baseline.
 
 ## Review Gate
 
-Phase 3 must establish a manually verifiable direct-query correctness baseline
-before Phase 4 adds spatial demand analytics.
+Phase 3 implementation is complete and awaits user approval. Phase 4 spatial
+and supply analytics must not start before this review gate is approved.

@@ -5,6 +5,71 @@
 > Tu commit `feat: add matching driver search` tro di, moi commit backend can cap nhat file nay trong cung commit.
 
 ---
+## Commit: `feat: add direct-query admin analytics APIs`
+
+Branch: `codex/admin-v2`
+
+Phase: Admin Analytics Backend — Phase 3: Direct Analytics Queries and API Baseline
+
+Commit hash: `c02effa`
+
+### Muc tieu
+
+Xay dung correctness baseline cho Admin Analytics bang truy van truc tiep cac
+bang operational va telemetry truoc khi them spatial aggregation hoac
+materialized read model.
+
+### Noi dung da trien khai
+
+- Them nam Admin Analytics endpoint cho overview, demand timeseries, supply
+  timeseries, matching performance va matching funnel.
+- Them filter dung chung voi khoang `[from, to)`, IANA reporting timezone,
+  vehicle type va service area tuy chon.
+- Them JDBC/PostgreSQL direct-query adapter voi completed-payment revenue,
+  terminal-run percentile, offer outcome va run/trip funnel semantics theo
+  metric dictionary.
+- Tao bucket lien tuc theo timezone, zero-fill bucket rong, ratio an toan khi
+  denominator bang zero va metadata `DIRECT`/`freshnessAt`.
+- Them supply snapshot coverage va danh dau bucket khong du do tin cay khi
+  coverage duoi 80%.
+- Them range guardrail toi da 366 ngay, service-area validation va response
+  validation envelope dong nhat.
+- Bao ve toan bo controller bang Admin RBAC, bo sung OpenAPI operation metadata
+  va giu nguyen `/api/v1/admin/dashboard`.
+- Tach direct-query adapter bang property de cac context test khong co
+  PostgreSQL van khoi dong doc lap.
+
+### Review truoc commit
+
+- Service/controller focused tests: pass.
+- PostgreSQL/PostGIS hand-calculated fixture tests: pass.
+- HTTP Admin/passenger RBAC va generated OpenAPI path tests: pass.
+- Full backend suite: 489 tests passed, 0 failures, 0 errors.
+- `git diff --check`: pass; chi co warning LF/CRLF tren Windows khi stage.
+- Manual review da xac nhan completed revenue chi dung payment `COMPLETED`,
+  percentile loai open run, funnel offer dua tren event ton tai va range dung
+  `[from, to)`.
+- User review: pending; Phase 4 chua duoc bat dau.
+
+### Rui ro da biet
+
+- Direct queries la correctness baseline va co the cham tren khoang du lieu lon;
+  Phase 5 moi them materialized read model va benchmark.
+- Supply coverage phu thuoc tan suat snapshot cau hinh tai runtime; bucket thieu
+  mau duoc tra ve voi `reliable = false`.
+
+### Files chinh
+
+- `src/main/java/com/example/goride/analytics/controller/AdminAnalyticsController.java`
+- `src/main/java/com/example/goride/analytics/service/AdminAnalyticsQueryService.java`
+- `src/main/java/com/example/goride/analytics/repository/DirectAnalyticsQueryPort.java`
+- `src/main/java/com/example/goride/analytics/repository/JdbcDirectAnalyticsQueryAdapter.java`
+- `src/main/java/com/example/goride/analytics/dto/*`
+- `src/test/java/com/example/goride/analytics/*`
+- `src/test/java/com/example/goride/integration/AdminAnalyticsDirectQueryIntegrationTests.java`
+- `docs/current-phase.md`
+
+---
 ## Commit: `feat: persist matching telemetry and driver-supply snapshots`
 
 Branch: `codex/admin-v2`
