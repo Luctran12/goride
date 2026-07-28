@@ -265,6 +265,8 @@ The cohort rule prevents mixing completed timestamps from older requests with ne
 - Time field: `COALESCE(responded_at, expires_at)`.
 - Unit: offers.
 - `OFFERED` is excluded.
+- `responded_at` stores the resolution timestamp for `ACCEPTED`, `REJECTED`, `CANCELLED` and `EXPIRED`.
+- `TIMEOUT` keeps `responded_at = null`; its resolution timestamp is `expires_at`.
 
 ### `acceptedOffers`
 

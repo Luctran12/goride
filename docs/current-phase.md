@@ -26,13 +26,30 @@ Admin Analytics Backend — Phase 0: Contracts and Architecture.
 
 Admin Analytics Backend — Phase 1: Persistent Telemetry Schema.
 
-## Planned Scope
+## Work In Review
 
-- Complete the versioned release bundle under `db/releases/20260727-admin-analytics-telemetry`.
-- Add matching run, matching offer event, and driver supply snapshot enums/entities.
-- Add repositories required by the later telemetry adapter and analytics query phases.
-- Add entity mapping tests and PostgreSQL repository/constraint integration tests.
-- Validate the release SQL and run focused regressions.
+- Completed the release bundle under `db/releases/20260727-admin-analytics-telemetry`.
+- Added durable entities and enums for matching runs, offer events, and driver-supply snapshots.
+- Added repositories with open-run/open-offer pessimistic-lock queries and snapshot key lookups.
+- Enforced one open run per trip, one offer per run/attempt, one accepted offer per run, terminal-state combinations, non-negative counters, and global snapshot uniqueness.
+- Kept matching runtime behavior unchanged.
+
+## Validation
+
+- Database release validator: passed.
+- Domain tests: 9 passed.
+- PostgreSQL/PostGIS repository and release integration tests: 5 passed.
+- Focused analytics/matching regression tests: 27 passed.
+- Full backend suite: 461 passed, 0 failures, 0 errors.
+- `git diff --check`: passed with only Windows LF/CRLF warnings.
+
+## Manual Review
+
+- Release `precheck.sql`, `apply.sql`, and `verify.sql` execute successfully against PostgreSQL/PostGIS 15.
+- SQL constraints are stricter than application factories and protect against duplicate listener/scheduler writes.
+- Snapshot uniqueness treats a nullable service area as a real global aggregation key through `NULLS NOT DISTINCT`.
+- No service currently writes the new tables, so production matching behavior remains unchanged.
+- Rollback is safe before Phase 2; after telemetry collection begins it requires an export because it drops analytical history.
 
 ## Explicitly Out of Scope
 
@@ -43,4 +60,6 @@ Admin Analytics Backend — Phase 1: Persistent Telemetry Schema.
 
 ## Review Gate
 
-Phase 1 must be reviewed before Phase 2 instruments the matching runtime.
+The Phase 1 patch remains uncommitted for user review.
+
+After approval, create the Phase 1 commit and start Phase 2 matching instrumentation.

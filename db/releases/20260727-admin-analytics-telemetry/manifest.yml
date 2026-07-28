@@ -1,0 +1,36 @@
+release_id: 20260727-admin-analytics-telemetry
+title: Add durable admin analytics matching and supply telemetry
+author: Codex
+created_at: 2026-07-28
+risk: medium
+transactional: true
+requires_downtime: false
+applies_after:
+  - 20260711-payment-sandbox-uat-actor-fk
+related_commit: pending
+environments:
+  - local
+  - staging
+  - production
+objects:
+  - matching_runs
+  - matching_offer_events
+  - driver_supply_snapshots
+  - uq_matching_runs_one_open_per_trip
+  - uq_matching_offer_events_run_attempt
+  - uq_matching_offer_events_one_accepted_per_run
+  - uq_driver_supply_snapshots_bucket_area_vehicle
+pre_deploy_checks:
+  - Run precheck.sql and confirm the required source tables exist.
+  - Confirm the three telemetry tables do not already exist.
+deploy_steps:
+  - Run apply.sql in one transaction.
+post_deploy_checks:
+  - Run verify.sql and confirm all tables, constraints and indexes are present.
+rollback_plan:
+  - Run rollback.sql before Phase 2 writes production telemetry.
+  - After telemetry collection starts, export the three tables before rollback because rollback drops collected analytical history.
+notes:
+  - PostgreSQL is the durable telemetry source; Redis remains operational matching state.
+  - Snapshot uniqueness uses NULLS NOT DISTINCT so a global service-area bucket cannot be duplicated.
+  - This release adds persistence only and does not instrument the matching runtime.
