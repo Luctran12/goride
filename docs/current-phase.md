@@ -6,8 +6,7 @@
 ## Repository Status
 
 - Base development commit: `e6aba60`.
-- Latest approved implementation commit: `05b96e0` (`feat: add PostGIS demand and supply analytics`).
-- Latest implemented commit awaiting user review: `4060b6b`
+- Latest approved implementation commit: `4060b6b`
   (`feat: add materialized admin analytics read models`).
 - Latest planning commit: `0c0e080` (`docs: add admin analytics implementation plan`).
 - The user explicitly selected `codex/admin-v2` for the Admin Analytics backend work.
@@ -118,7 +117,7 @@ Admin Analytics Backend — Phase 4: Spatial Demand and Supply Analytics.
 Phase 4 was approved by the user's request to continue with the next phase on
 2026-07-29.
 
-## Implemented Phase - Awaiting User Review
+## Completed Phase
 
 Admin Analytics Backend — Phase 5: Materialized Analytical Read Models.
 
@@ -166,5 +165,29 @@ Admin Analytics Backend — Phase 5: Materialized Analytical Read Models.
 
 ## Review Gate
 
-Phase 5 implementation is complete at `4060b6b` and requires user review.
-Phase 6 must not start until this gate is approved.
+Phase 5 was approved by the user's request to continue with the next phase on
+2026-07-29.
+
+## Active Feature
+
+Admin Analytics Backend — Phase 6: API Hardening and Frontend Handoff.
+
+## Planned Scope
+
+- Finalize OpenAPI descriptions, examples and shared response semantics.
+- Make units, precision, timezone, freshness, enum and nullable-field behavior
+  explicit.
+- Document empty, partial-data and error behavior plus every query guardrail.
+- Add an executable API smoke collection and a frontend integration guide.
+- Add backward-compatibility tests for the legacy Admin dashboard contract.
+
+## Explicitly Out of Scope
+
+- React/Vite implementation, chart styling and page layout.
+- Dataset generation, performance benchmarks or selecting the default query
+  variant.
+
+## Review Gate
+
+The Admin Analytics backend contract must be frozen and consumer examples must
+pass before Phase 7 begins.

@@ -67,6 +67,7 @@ da duoc duyet.
   theo object.
 - Khong phat hien blocker sau review. Dang cho user review Phase 5; Phase 6
   chua duoc bat dau.
+- User review: approved by request to continue with Phase 6 on 2026-07-29.
 
 ### Rui ro da biet
 
