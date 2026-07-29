@@ -7,6 +7,8 @@
 
 - Base development commit: `e6aba60`.
 - Latest approved implementation commit: `05b96e0` (`feat: add PostGIS demand and supply analytics`).
+- Latest implemented commit awaiting user review: `4060b6b`
+  (`feat: add materialized admin analytics read models`).
 - Latest planning commit: `0c0e080` (`docs: add admin analytics implementation plan`).
 - The user explicitly selected `codex/admin-v2` for the Admin Analytics backend work.
 - User-owned `.codex-tmp/` and `deliverables/` content must remain untouched and uncommitted.
@@ -116,25 +118,53 @@ Admin Analytics Backend — Phase 4: Spatial Demand and Supply Analytics.
 Phase 4 was approved by the user's request to continue with the next phase on
 2026-07-29.
 
-## Active Feature
+## Implemented Phase - Awaiting User Review
 
 Admin Analytics Backend — Phase 5: Materialized Analytical Read Models.
 
-## Planned Scope
+## Implemented Scope
 
-- Add the `analytics` schema and four materialized analytical read models.
-- Add unique indexes required for concurrent refresh.
-- Implement refresh scheduling, freshness state and observable failure paths.
-- Add internal direct/materialized selection with safe direct fallback.
-- Verify direct/materialized equivalence at one refresh cutoff.
+- Added the `analytics` schema, refresh-state table and four materialized
+  analytical read models for trips/revenue, spatial demand, supply and matching.
+- Added qualifying unique indexes and a scheduler-backed refresh service with a
+  PostgreSQL advisory lock.
+- The first refresh is non-concurrent; later refreshes use
+  `REFRESH MATERIALIZED VIEW CONCURRENTLY` while existing reads remain
+  available.
+- Added freshness metadata, refresh duration/outcome metrics, persisted failure
+  state and safe direct-query fallback.
+- Added an internal query router. `DIRECT` remains the default; `MATERIALIZED`
+  must be explicitly enabled and is selected only for compatible timezone,
+  metadata and temporal boundaries.
+- Verified direct/materialized equivalence for global and service-area filters,
+  hour/day series, matching metrics and the re-aggregated PostGIS heatmap.
+- Added reversible release SQL; rollback removes only Phase 5 objects and
+  preserves unrelated objects in a shared `analytics` schema.
+
+## Validation
+
+- Focused Admin Analytics suite: 22 tests passed before the final review
+  hardening.
+- Materialized PostgreSQL/PostGIS integration suite: 3 tests passed, including
+  initial/concurrent refresh, stale snapshot semantics, failure fallback,
+  service-area equivalence and rollback preservation.
+- Full backend regression suite: 500 tests passed, 0 failures, 0 errors and
+  0 skipped.
+- Release precheck, apply, verify and rollback SQL executed successfully against
+  PostgreSQL/PostGIS 15.
+- `git diff --check` passed; only existing Windows LF/CRLF warnings were
+  reported.
 
 ## Explicitly Out of Scope
 
 - Choosing `MATERIALIZED` as the production default before benchmark evidence.
 - Frontend integration and API handoff.
 - Benchmark dataset generation and latency reporting.
+- Materialized handling for partial-day overview/matching filters or heatmap
+  bounding boxes; these requests intentionally fall back to direct SQL to
+  preserve exact semantics.
 
 ## Review Gate
 
-Phase 5 must prove correctness, refresh availability and freshness semantics
-before Phase 6 hardens the frontend-facing contract.
+Phase 5 implementation is complete at `4060b6b` and requires user review.
+Phase 6 must not start until this gate is approved.

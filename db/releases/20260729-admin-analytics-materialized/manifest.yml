@@ -7,7 +7,7 @@ transactional: true
 requires_downtime: false
 applies_after:
   - 20260729-admin-analytics-spatial-indexes
-related_commit: pending
+related_commit: 4060b6b
 environments:
   - staging
   - production

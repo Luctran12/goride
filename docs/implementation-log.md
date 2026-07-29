@@ -5,6 +5,95 @@
 > Tu commit `feat: add matching driver search` tro di, moi commit backend can cap nhat file nay trong cung commit.
 
 ---
+## Commit: `feat: add materialized admin analytics read models`
+
+Branch: `codex/admin-v2`
+
+Phase: Admin Analytics Backend — Phase 5: Materialized Analytical Read Models
+
+Commit hash: `4060b6b`
+
+### Muc tieu
+
+Bo sung analytical read-model variant tren PostgreSQL/PostGIS sau khi
+direct-query correctness baseline cua Phase 3 va spatial baseline cua Phase 4
+da duoc duyet.
+
+### Noi dung da trien khai
+
+- Tao schema `analytics`, singleton refresh-state table va bon materialized
+  views: `mv_trip_daily`, `mv_demand_hourly_cell`, `mv_supply_hourly` va
+  `mv_matching_daily`.
+- Luu trip/revenue theo ngay, demand theo gio va projected cell 250 m, supply
+  theo gio, matching metrics theo ngay; dimension gom vehicle type va service
+  area.
+- Them unique index khong predicate va `NULLS NOT DISTINCT` cho tung view de
+  PostgreSQL cho phep concurrent refresh.
+- Refresh dau tien dung non-concurrent mode cho view `WITH NO DATA`; cac refresh
+  tiep theo dung `REFRESH MATERIALIZED VIEW CONCURRENTLY`.
+- Dung transaction-level advisory lock de chi mot node refresh; ghi cutoff,
+  duration, trang thai `SUCCESS`/`FAILED`, Micrometer counters va structured
+  logs.
+- Them scheduler co interval cau hinh duoc va tat mac dinh.
+- Them materialized JDBC adapter va internal router. Router chi chon
+  `MATERIALIZED` khi feature duoc bat, snapshot thanh cong, metadata
+  timezone/SRID/base-cell khop va filter nam tren boundary ma read model co the
+  tra chinh xac.
+- Giu `DIRECT` lam production default. Partial-day overview/matching, timezone
+  khac, metadata khong khop va heatmap co bounding box se fallback ve direct
+  SQL; co the cau hinh fail-closed bang `ANALYTICS_DATA_UNAVAILABLE`.
+- Toan bo response tiep tuc tra `sourceVariant` va `dataFreshnessAt`; query
+  source va freshness duoc doc trong cung repeatable-read transaction.
+- Them release precheck/apply/verify/rollback. Verify kiem tra unique index hop
+  le; rollback khong dung `CASCADE` va bao toan object ngoai Phase 5 trong
+  schema dung chung.
+
+### Review truoc commit
+
+- Focused Admin Analytics suite: 22 tests passed, 0 failures, 0 errors.
+- Materialized integration suite: 3 tests passed tren PostgreSQL/PostGIS 15.
+- Direct/materialized result bang nhau cho global va service-area filter,
+  overview, demand/supply HOUR va DAY, matching performance, matching funnel
+  va heatmap re-aggregation 1.000 m.
+- Xac nhan first refresh non-concurrent, second refresh concurrent, stale
+  snapshot van on dinh, refresh failure duoc ghi `FAILED` va router fallback
+  sang `DIRECT`.
+- Release precheck/apply/verify/rollback chay thanh cong; rollback test xac nhan
+  object khong thuoc Phase 5 khong bi xoa.
+- Full backend suite: 500 tests passed, 0 failures, 0 errors, 0 skipped.
+- `git diff --check`: pass; chi co warning LF/CRLF tren Windows.
+- Manual review da sua verify index de kiem tra `indisunique`, `indisvalid` va
+  no-predicate; dong thoi thay rollback `DROP SCHEMA ... CASCADE` bang rollback
+  theo object.
+- Khong phat hien blocker sau review. Dang cho user review Phase 5; Phase 6
+  chua duoc bat dau.
+
+### Rui ro da biet
+
+- Read models co dinh reporting timezone `Asia/Ho_Chi_Minh`, EPSG:32648 va base
+  cell 250 m. Router fallback direct neu runtime metadata khong khop.
+- Daily views khong the tra chinh xac partial-day range; hourly spatial views
+  khong the crop partial cells theo bounding box. Direct fallback la chu y de
+  giu metric semantics.
+- Array samples trong `mv_matching_daily` bao toan exact percentile va distinct
+  completed-trip funnel, nhung kich thuoc view can duoc do tren dataset lon o
+  Phase 7.
+- Chua co benchmark de ket luan materialized nhanh hon direct; production
+  default van la `DIRECT`.
+
+### Files chinh
+
+- `db/releases/20260729-admin-analytics-materialized/*`
+- `src/main/java/com/example/goride/analytics/repository/JdbcMaterializedAnalyticsQueryAdapter.java`
+- `src/main/java/com/example/goride/analytics/service/AnalyticsQueryRouter.java`
+- `src/main/java/com/example/goride/analytics/service/MaterializedAnalyticsRefreshService.java`
+- `src/main/java/com/example/goride/analytics/service/MaterializedAnalyticsRefreshScheduler.java`
+- `src/main/java/com/example/goride/analytics/config/AnalyticsMaterializedProperties.java`
+- `src/test/java/com/example/goride/analytics/service/AnalyticsQueryRouterTests.java`
+- `src/test/java/com/example/goride/integration/AdminAnalyticsMaterializedIntegrationTests.java`
+- `docs/current-phase.md`
+
+---
 ## Commit: `feat: add PostGIS demand and supply analytics`
 
 Branch: `codex/admin-v2`
