@@ -1,13 +1,12 @@
 # GoRide Current Phase
 
-> Last updated: 2026-07-28
+> Last updated: 2026-07-29
 > Active branch: `codex/admin-v2`
 
 ## Repository Status
 
 - Base development commit: `e6aba60`.
-- Latest approved implementation commit: `510e727` (`feat: persist matching telemetry and driver-supply snapshots`).
-- Latest implemented commit awaiting user review: `c02effa` (`feat: add direct-query admin analytics APIs`).
+- Latest approved implementation commit: `c02effa` (`feat: add direct-query admin analytics APIs`).
 - Latest planning commit: `0c0e080` (`docs: add admin analytics implementation plan`).
 - The user explicitly selected `codex/admin-v2` for the Admin Analytics backend work.
 - User-owned `.codex-tmp/` and `deliverables/` content must remain untouched and uncommitted.
@@ -44,7 +43,7 @@ Admin Analytics Backend — Phase 2: Matching Telemetry Instrumentation.
 - Full backend regression suite passed with 477 tests.
 - User review: approved by request to continue with the next phase.
 
-## Completed Phase Awaiting Review
+## Completed Phase
 
 Admin Analytics Backend — Phase 3: Direct Analytics Queries and API Baseline.
 
@@ -77,5 +76,30 @@ Admin Analytics Backend — Phase 3: Direct Analytics Queries and API Baseline.
 
 ## Review Gate
 
-Phase 3 implementation is complete and awaits user approval. Phase 4 spatial
-and supply analytics must not start before this review gate is approved.
+Phase 3 was approved by the user's request to continue with the next phase on
+2026-07-29.
+
+## Active Feature
+
+Admin Analytics Backend — Phase 4: Spatial Demand and Supply Analytics.
+
+## Planned Scope
+
+- Add bounded PostGIS square-grid aggregation for trip pickup demand.
+- Return EPSG:4326 GeoJSON with stable cell identifiers.
+- Enforce the 31-day range, cell-size whitelist, bounding-box and payload
+  guardrails.
+- Apply time, vehicle, service-area and optional bounding-box filters together.
+- Verify boundary semantics, demand/supply alignment and spatial query plans.
+
+## Explicitly Out of Scope
+
+- Materialized views and refresh scheduling.
+- H3 or another spatial extension.
+- Frontend heatmap rendering.
+- Benchmark dataset generation.
+
+## Review Gate
+
+Phase 4 must provide spatial correctness and `EXPLAIN` evidence before Phase 5
+adds materialized analytical read models.

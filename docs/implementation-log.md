@@ -49,7 +49,7 @@ materialized read model.
 - Manual review da xac nhan completed revenue chi dung payment `COMPLETED`,
   percentile loai open run, funnel offer dua tren event ton tai va range dung
   `[from, to)`.
-- User review: pending; Phase 4 chua duoc bat dau.
+- User review: approved by request to continue with Phase 4 on 2026-07-29.
 
 ### Rui ro da biet
 
