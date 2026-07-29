@@ -6,8 +6,7 @@
 ## Repository Status
 
 - Base development commit: `e6aba60`.
-- Latest approved implementation commit: `c02effa` (`feat: add direct-query admin analytics APIs`).
-- Latest implemented commit awaiting user review: `05b96e0` (`feat: add PostGIS demand and supply analytics`).
+- Latest approved implementation commit: `05b96e0` (`feat: add PostGIS demand and supply analytics`).
 - Latest planning commit: `0c0e080` (`docs: add admin analytics implementation plan`).
 - The user explicitly selected `codex/admin-v2` for the Admin Analytics backend work.
 - User-owned `.codex-tmp/` and `deliverables/` content must remain untouched and uncommitted.
@@ -80,7 +79,7 @@ Admin Analytics Backend — Phase 3: Direct Analytics Queries and API Baseline.
 Phase 3 was approved by the user's request to continue with the next phase on
 2026-07-29.
 
-## Completed Phase Awaiting Review
+## Completed Phase
 
 Admin Analytics Backend — Phase 4: Spatial Demand and Supply Analytics.
 
@@ -114,6 +113,28 @@ Admin Analytics Backend — Phase 4: Spatial Demand and Supply Analytics.
 
 ## Review Gate
 
-Phase 4 implementation is complete and awaits user approval. Phase 5
-materialized analytical read models must not start before this review gate is
-approved.
+Phase 4 was approved by the user's request to continue with the next phase on
+2026-07-29.
+
+## Active Feature
+
+Admin Analytics Backend — Phase 5: Materialized Analytical Read Models.
+
+## Planned Scope
+
+- Add the `analytics` schema and four materialized analytical read models.
+- Add unique indexes required for concurrent refresh.
+- Implement refresh scheduling, freshness state and observable failure paths.
+- Add internal direct/materialized selection with safe direct fallback.
+- Verify direct/materialized equivalence at one refresh cutoff.
+
+## Explicitly Out of Scope
+
+- Choosing `MATERIALIZED` as the production default before benchmark evidence.
+- Frontend integration and API handoff.
+- Benchmark dataset generation and latency reporting.
+
+## Review Gate
+
+Phase 5 must prove correctness, refresh availability and freshness semantics
+before Phase 6 hardens the frontend-facing contract.

@@ -50,7 +50,7 @@ gate cho demand/supply alignment truoc khi xay dung materialized read models.
 - Full backend suite: 493 tests passed, 0 failures, 0 errors.
 - `git diff --check`: pass; chi co warning LF/CRLF tren Windows khi stage.
 - Manual review khong phat hien blocker; Phase 5 chua duoc bat dau.
-- User review: pending.
+- User review: approved by request to continue with Phase 5 on 2026-07-29.
 
 ### Rui ro da biet
 
