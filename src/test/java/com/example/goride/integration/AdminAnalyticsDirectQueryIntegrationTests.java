@@ -12,6 +12,8 @@ import com.example.goride.driver.domain.VehicleType;
 import com.example.goride.user.domain.User;
 import com.example.goride.user.domain.UserRole;
 import com.example.goride.user.repository.UserRepository;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.GeometryFactory;
@@ -24,12 +26,20 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.annotation.DirtiesContext;
+import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.ZoneId;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -70,6 +80,9 @@ class AdminAnalyticsDirectQueryIntegrationTests extends PostgresRedisIntegration
 
     @Autowired
     private PasswordEncoder passwordEncoder;
+
+    @Autowired
+    private ObjectMapper objectMapper;
 
     @Test
     void directQueriesMatchHandCalculatedFixture() {
@@ -179,7 +192,7 @@ class AdminAnalyticsDirectQueryIntegrationTests extends PostgresRedisIntegration
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.error.code").value("FORBIDDEN"));
 
-        mockMvc.perform(get("/api/v1/admin/analytics/overview")
+        MvcResult emptyOverviewResult = mockMvc.perform(get("/api/v1/admin/analytics/overview")
                         .header("Authorization", "Bearer " + adminToken)
                         .param("from", "2026-07-01T00:00:00Z")
                         .param("to", "2026-07-02T00:00:00Z"))
@@ -187,7 +200,13 @@ class AdminAnalyticsDirectQueryIntegrationTests extends PostgresRedisIntegration
                 .andExpect(jsonPath("$.data.sourceVariant").value("DIRECT"))
                 .andExpect(jsonPath("$.data.reportingTimezone").value("Asia/Ho_Chi_Minh"))
                 .andExpect(jsonPath("$.data.tripRequests").value(0))
-                .andExpect(jsonPath("$.data.completionRate").doesNotExist());
+                .andExpect(jsonPath("$.data.completionRate").doesNotExist())
+                .andReturn();
+        JsonNode emptyOverview = objectMapper.readTree(
+                emptyOverviewResult.getResponse().getContentAsString()
+        );
+        assertThat(emptyOverview.at("/data").has("completionRate")).isTrue();
+        assertThat(emptyOverview.at("/data/completionRate").isNull()).isTrue();
 
         mockMvc.perform(get("/api/v1/admin/analytics/demand/timeseries")
                         .header("Authorization", "Bearer " + adminToken)
@@ -209,6 +228,138 @@ class AdminAnalyticsDirectQueryIntegrationTests extends PostgresRedisIntegration
                 .andExpect(jsonPath(
                         "$.paths['/api/v1/admin/analytics/demand/heatmap'].get.summary"
                 ).value("Get spatial demand heatmap"));
+    }
+
+    @Test
+    void openApiFreezesSecurityErrorsGuardrailsUnitsAndNullSemantics() throws Exception {
+        MvcResult result = mockMvc.perform(get("/v3/api-docs"))
+                .andExpect(status().isOk())
+                .andReturn();
+        JsonNode openApi = objectMapper.readTree(result.getResponse().getContentAsString());
+
+        assertThat(openApi.at("/components/securitySchemes/bearerAuth/type").asText())
+                .isEqualTo("http");
+        assertThat(openApi.at("/components/securitySchemes/bearerAuth/scheme").asText())
+                .isEqualTo("bearer");
+
+        JsonNode overview = operation(
+                openApi,
+                "/api/v1/admin/analytics/overview"
+        );
+        assertThat(overview.path("security").get(0).has("bearerAuth")).isTrue();
+        assertThat(overview.at("/responses/200/content/application~1json/schema/$ref").asText())
+                .endsWith("/AnalyticsOverviewEnvelope");
+        assertThat(overview.at("/responses/400/content/application~1json/schema/$ref").asText())
+                .endsWith("/ErrorResponse");
+        assertThat(overview.at("/responses/503/description").asText())
+                .contains("ANALYTICS_DATA_UNAVAILABLE");
+        assertThat(parameter(overview, "from").path("description").asText())
+                .contains("Inclusive");
+        assertThat(parameter(overview, "to").path("description").asText())
+                .contains("Exclusive", "366 days");
+
+        JsonNode heatmap = operation(
+                openApi,
+                "/api/v1/admin/analytics/demand/heatmap"
+        );
+        assertThat(parameter(heatmap, "cellSizeMeters")
+                .path("schema")
+                .path("type")
+                .asText()).isEqualTo("integer");
+        assertThat(parameter(heatmap, "cellSizeMeters")
+                .path("description")
+                .asText()).contains("250", "500", "1000", "2000");
+        assertThat(heatmap.path("description").asText())
+                .contains("5,000", "31 days", "EPSG:4326");
+
+        JsonNode overviewSchema = openApi.at("/components/schemas/AnalyticsOverview");
+        assertThat(overviewSchema.path("example").isObject()).isTrue();
+        assertThat(overviewSchema.at("/properties/completedRevenue/description").asText())
+                .contains("Unit:", "VND");
+        assertThat(overviewSchema.at("/properties/completionRate/description").asText())
+                .contains("scale: 4", "null when");
+        assertThat(overviewSchema.at("/properties/completionRate/type").toString())
+                .contains("number", "null");
+        assertThat(overviewSchema.path("required").toString())
+                .contains("completionRate", "p95MatchingDurationMs");
+        assertThat(openApi.at(
+                "/components/schemas/SupplyTimeseriesPoint/properties/"
+                        + "snapshotCoverage/description"
+        ).asText()).contains("partial", "null");
+        assertThat(openApi.at(
+                "/components/schemas/MatchingPerformance/properties/"
+                        + "p95MatchingDurationMs/description"
+        ).asText()).contains("P95", "milliseconds", "null");
+        JsonNode funnelNames = openApi.at(
+                "/components/schemas/MatchingFunnelStep/properties/name/enum"
+        );
+        assertThat(funnelNames.size()).isEqualTo(5);
+        assertThat(funnelNames.toString()).contains(
+                "RUN_STARTED",
+                "CANDIDATE_FOUND",
+                "OFFER_SENT",
+                "OFFER_ACCEPTED",
+                "TRIP_COMPLETED"
+        );
+    }
+
+    @Test
+    void postmanConsumerSmokeCollectionExecutesAgainstBackend() throws Exception {
+        int sequence = SEQUENCE.incrementAndGet();
+        String adminPhone = "096%07d".formatted(sequence);
+        userRepository.save(User.create(
+                "Analytics Smoke Admin",
+                adminPhone,
+                "analytics.smoke.admin.%d@example.com".formatted(sequence),
+                passwordEncoder.encode("password123"),
+                Set.of(UserRole.ADMIN)
+        ));
+        String adminToken = login(adminPhone);
+        JsonNode collection = objectMapper.readTree(Files.readString(Path.of(
+                "docs",
+                "admin-analytics",
+                "admin-analytics-smoke.postman_collection.json"
+        )));
+        assertThat(collection.at("/info/schema").asText()).endsWith(
+                "/v2.1.0/collection.json"
+        );
+        assertThat(collection.path("item").size()).isEqualTo(6);
+        Map<String, String> variables = collectionVariables(collection);
+
+        for (JsonNode item : collection.path("item")) {
+            String name = item.path("name").asText();
+            JsonNode request = item.path("request");
+            assertThat(request.path("method").asText()).as(name).isEqualTo("GET");
+            List<String> pathSegments = new ArrayList<>();
+            request.at("/url/path").forEach(segment ->
+                    pathSegments.add(segment.asText())
+            );
+            String path = "/" + String.join("/", pathSegments);
+            MockHttpServletRequestBuilder builder = get(path)
+                    .header("Authorization", "Bearer " + adminToken)
+                    .accept(MediaType.APPLICATION_JSON);
+            for (JsonNode query : request.at("/url/query")) {
+                builder.param(
+                        query.path("key").asText(),
+                        resolveVariables(query.path("value").asText(), variables)
+                );
+            }
+
+            MvcResult smokeResult = mockMvc.perform(builder)
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.success").value(true))
+                    .andReturn();
+            JsonNode response = objectMapper.readTree(
+                    smokeResult.getResponse().getContentAsString()
+            );
+            JsonNode data = response.path("data");
+            if ("Demand heatmap".equals(name)) {
+                assertThat(data.path("type").asText()).isEqualTo("FeatureCollection");
+                assertThat(data.at("/metadata/dataFreshnessAt").isTextual()).isTrue();
+            } else {
+                assertThat(data.path("dataFreshnessAt").isTextual()).as(name).isTrue();
+            }
+        }
     }
 
     private Fixture seedFixture() {
@@ -569,6 +720,39 @@ class AdminAnalyticsDirectQueryIntegrationTests extends PostgresRedisIntegration
 
     private static Instant instant(String value) {
         return Instant.parse(value);
+    }
+
+    private JsonNode operation(JsonNode openApi, String path) {
+        return openApi.path("paths").path(path).path("get");
+    }
+
+    private JsonNode parameter(JsonNode operation, String name) {
+        for (JsonNode parameter : operation.path("parameters")) {
+            if (name.equals(parameter.path("name").asText())) {
+                return parameter;
+            }
+        }
+        throw new AssertionError("OpenAPI parameter is missing: " + name);
+    }
+
+    private Map<String, String> collectionVariables(JsonNode collection) {
+        Map<String, String> variables = new LinkedHashMap<>();
+        collection.path("variable").forEach(variable -> variables.put(
+                variable.path("key").asText(),
+                variable.path("value").asText()
+        ));
+        return variables;
+    }
+
+    private String resolveVariables(String value, Map<String, String> variables) {
+        String resolved = value;
+        for (Map.Entry<String, String> variable : variables.entrySet()) {
+            resolved = resolved.replace(
+                    "{{" + variable.getKey() + "}}",
+                    variable.getValue()
+            );
+        }
+        return resolved;
     }
 
     private record Fixture(Trip tripAtExclusiveBoundary) {

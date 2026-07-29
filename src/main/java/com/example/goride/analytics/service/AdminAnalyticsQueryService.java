@@ -9,8 +9,10 @@ import com.example.goride.analytics.dto.MatchingFunnelResponse;
 import com.example.goride.analytics.dto.MatchingPerformanceResponse;
 import com.example.goride.analytics.dto.SupplyTimeseriesResponse;
 import com.example.goride.analytics.model.AnalyticsBucket;
+import com.example.goride.analytics.model.AnalyticsCountUnit;
 import com.example.goride.analytics.model.AnalyticsFilter;
 import com.example.goride.analytics.model.AnalyticsQueryOperation;
+import com.example.goride.analytics.model.MatchingFunnelStepName;
 import com.example.goride.analytics.model.SpatialBounds;
 import com.example.goride.analytics.repository.DirectAnalyticsQueryPort.DemandBucketStats;
 import com.example.goride.analytics.repository.DirectAnalyticsQueryPort.FunnelStats;
@@ -344,11 +346,31 @@ public class AdminAnalyticsQueryService {
         );
         FunnelStats stats = selection.queryPort().matchingFunnel(filter);
         List<MatchingFunnelResponse.Step> steps = List.of(
-                new MatchingFunnelResponse.Step("RUN_STARTED", "RUN", stats.runStarted()),
-                new MatchingFunnelResponse.Step("CANDIDATE_FOUND", "RUN", stats.candidateFound()),
-                new MatchingFunnelResponse.Step("OFFER_SENT", "RUN", stats.offerSent()),
-                new MatchingFunnelResponse.Step("OFFER_ACCEPTED", "RUN", stats.offerAccepted()),
-                new MatchingFunnelResponse.Step("TRIP_COMPLETED", "TRIP", stats.tripCompleted())
+                new MatchingFunnelResponse.Step(
+                        MatchingFunnelStepName.RUN_STARTED,
+                        AnalyticsCountUnit.RUN,
+                        stats.runStarted()
+                ),
+                new MatchingFunnelResponse.Step(
+                        MatchingFunnelStepName.CANDIDATE_FOUND,
+                        AnalyticsCountUnit.RUN,
+                        stats.candidateFound()
+                ),
+                new MatchingFunnelResponse.Step(
+                        MatchingFunnelStepName.OFFER_SENT,
+                        AnalyticsCountUnit.RUN,
+                        stats.offerSent()
+                ),
+                new MatchingFunnelResponse.Step(
+                        MatchingFunnelStepName.OFFER_ACCEPTED,
+                        AnalyticsCountUnit.RUN,
+                        stats.offerAccepted()
+                ),
+                new MatchingFunnelResponse.Step(
+                        MatchingFunnelStepName.TRIP_COMPLETED,
+                        AnalyticsCountUnit.TRIP,
+                        stats.tripCompleted()
+                )
         );
         return new MatchingFunnelResponse(
                 filter.from(),

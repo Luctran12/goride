@@ -1,10 +1,10 @@
 # Admin Analytics Metric Dictionary
 
-> Version: 1.0-draft
+> Version: 1.0
 >
-> Phase: 00 - Contracts and Architecture
+> Phase: 06 - API Hardening and Frontend Handoff
 >
-> Status: Proposed for review
+> Status: Frozen metric semantics; pending Phase 6 review
 
 ## 1. Shared Conventions
 
@@ -49,6 +49,17 @@ An omitted dimension means all valid values are included.
 - Duration values use milliseconds.
 - Distance values use meters.
 - API calculations must not use binary floating point for monetary values.
+
+### API Presentation Precision
+
+- Ratios and rates use scale `4` with `HALF_UP` rounding.
+- Averages and distances use scale `2` with `HALF_UP` rounding.
+- Durations are rounded `HALF_UP` to whole milliseconds.
+- Revenue uses the decimal precision stored by the payment domain; the current
+  deployment currency is VND.
+- Nullable derived metrics serialize as JSON `null`.
+- Frontend consumers may format values for display, but must not reproduce KPI
+  formulas, matching percentiles or coverage suppression rules.
 
 ### Terminal Matching States
 
@@ -418,3 +429,6 @@ Metric changes require:
 3. Updated SQL/repository tests.
 4. Updated OpenAPI examples.
 5. Updated benchmark query version.
+
+Version `1.0` freezes the formulas, cohort rules, units, precision and
+null/zero behavior for the Phase 6 Admin Web handoff.

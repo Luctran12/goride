@@ -4,6 +4,8 @@ import com.example.goride.analytics.config.AnalyticsMaterializedProperties;
 import com.example.goride.analytics.config.AnalyticsSpatialProperties;
 import com.example.goride.analytics.config.AnalyticsTelemetryProperties;
 import com.example.goride.analytics.model.AnalyticsBucket;
+import com.example.goride.analytics.model.AnalyticsCountUnit;
+import com.example.goride.analytics.model.MatchingFunnelStepName;
 import com.example.goride.analytics.model.SpatialBounds;
 import com.example.goride.analytics.repository.DirectAnalyticsQueryPort;
 import com.example.goride.analytics.repository.DirectAnalyticsQueryPort.DemandBucketStats;
@@ -339,8 +341,22 @@ class AdminAnalyticsQueryServiceTests {
                 null
         );
 
+        assertThat(response.steps()).extracting(step -> step.name())
+                .containsExactly(
+                        MatchingFunnelStepName.RUN_STARTED,
+                        MatchingFunnelStepName.CANDIDATE_FOUND,
+                        MatchingFunnelStepName.OFFER_SENT,
+                        MatchingFunnelStepName.OFFER_ACCEPTED,
+                        MatchingFunnelStepName.TRIP_COMPLETED
+                );
         assertThat(response.steps()).extracting(step -> step.unit())
-                .containsExactly("RUN", "RUN", "RUN", "RUN", "TRIP");
+                .containsExactly(
+                        AnalyticsCountUnit.RUN,
+                        AnalyticsCountUnit.RUN,
+                        AnalyticsCountUnit.RUN,
+                        AnalyticsCountUnit.RUN,
+                        AnalyticsCountUnit.TRIP
+                );
         assertThat(response.steps()).extracting(step -> step.count())
                 .containsExactly(10L, 9L, 8L, 7L, 6L);
     }

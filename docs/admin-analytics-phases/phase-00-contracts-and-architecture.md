@@ -13,7 +13,7 @@ Freeze the analytical semantics and architecture before changing schema or match
 ## Deliverables
 
 - [`metric-dictionary.md`](../admin-analytics/metric-dictionary.md)
-- [`api-contract-draft.md`](../admin-analytics/api-contract-draft.md)
+- [`api-contract.md`](../admin-analytics/api-contract.md)
 - [`benchmark-protocol.md`](../admin-analytics/benchmark-protocol.md)
 - [`ADR-001-matching-telemetry-consistency.md`](../admin-analytics/adr/ADR-001-matching-telemetry-consistency.md)
 - Updated `docs/current-phase.md`.

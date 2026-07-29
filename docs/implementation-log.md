@@ -369,7 +369,7 @@ Chot semantic KPI, kien truc telemetry, API draft va benchmark protocol truoc kh
 - `docs/admin-analytics-backend-implementation-plan.md`
 - `docs/admin-analytics-phases/*`
 - `docs/admin-analytics/metric-dictionary.md`
-- `docs/admin-analytics/api-contract-draft.md`
+- `docs/admin-analytics/api-contract.md`
 - `docs/admin-analytics/benchmark-protocol.md`
 - `docs/admin-analytics/adr/ADR-001-matching-telemetry-consistency.md`
 - `docs/current-phase.md`
