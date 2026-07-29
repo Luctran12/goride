@@ -5,6 +5,75 @@
 > Tu commit `feat: add matching driver search` tro di, moi commit backend can cap nhat file nay trong cung commit.
 
 ---
+## Commit: `feat: add PostGIS demand and supply analytics`
+
+Branch: `codex/admin-v2`
+
+Phase: Admin Analytics Backend — Phase 4: Spatial Demand and Supply Analytics
+
+Commit hash: `05b96e0`
+
+### Muc tieu
+
+Bo sung spatial demand correctness baseline bang PostGIS, dong thoi dong review
+gate cho demand/supply alignment truoc khi xay dung materialized read models.
+
+### Noi dung da trien khai
+
+- Them `GET /api/v1/admin/analytics/demand/heatmap` tra GeoJSON
+  `FeatureCollection` trong EPSG:4326.
+- Gom pickup point vao luoi vuong on dinh bang phep chieu EPSG:32648 va quy tac
+  `floor`; diem dung bien thuoc cell co canh tay/duoi trung voi bien do.
+- Cell ID bao gom projected SRID, cell size va grid coordinate de on dinh giua
+  cac request co bounding box khac nhau.
+- Ap dung dong thoi khoang `[from, to)`, vehicle type, service area va optional
+  WGS84 bounding box.
+- Them whitelist cell `250/500/1000/2000` met, maximum range 31 ngay, maximum
+  5.000 cell va maximum bounding-box area cau hinh duoc.
+- Query chi lay toi `maximumCells + 1` de phat hien payload vuot nguong va tra
+  `ANALYTICS_RESULT_TOO_LARGE`.
+- Them release SQL co precheck/apply/verify/rollback cho partial temporal index
+  va partial GiST pickup index.
+- Giu demand/supply bucket alignment va nguong coverage 0,80 da co tu Phase 3;
+  ratio van bi suppress khi snapshot coverage thap.
+- Bo sung OpenAPI route, validation envelope va integration fixture cho spatial
+  boundary/filter/index-plan semantics.
+
+### Review truoc commit
+
+- Focused service/controller tests: pass.
+- Phase 3–4 API/OpenAPI va PostgreSQL/PostGIS integration tests: pass.
+- Spatial release precheck, apply va verify SQL: pass.
+- `EXPLAIN ANALYZE` voi fixture nho xac nhan
+  `idx_trips_analytics_requested_at` va `idx_trips_pickup_location_gist` co the
+  duoc planner su dung.
+- Full backend suite: 493 tests passed, 0 failures, 0 errors.
+- `git diff --check`: pass; chi co warning LF/CRLF tren Windows khi stage.
+- Manual review khong phat hien blocker; Phase 5 chua duoc bat dau.
+- User review: pending.
+
+### Rui ro da biet
+
+- EPSG:32648 phu hop service area hien tai o Thanh pho Ho Chi Minh; khi mo rong
+  ra ngoai UTM zone 48N phai doi `app.analytics.spatial.projected-srid` va kiem
+  tra lai cell correctness.
+- Release dung transactional `CREATE INDEX`; staging/production can review
+  table size va release window de tranh write lock keo dai.
+- Query-plan test dung fixture nho va tat sequential scan de xac nhan index
+  eligibility; benchmark planner tren dataset lon nam trong Phase 7.
+
+### Files chinh
+
+- `src/main/java/com/example/goride/analytics/controller/AdminAnalyticsController.java`
+- `src/main/java/com/example/goride/analytics/service/AdminAnalyticsQueryService.java`
+- `src/main/java/com/example/goride/analytics/repository/JdbcDirectAnalyticsQueryAdapter.java`
+- `src/main/java/com/example/goride/analytics/dto/DemandHeatmapResponse.java`
+- `src/main/java/com/example/goride/analytics/config/AnalyticsSpatialProperties.java`
+- `db/releases/20260729-admin-analytics-spatial-indexes/*`
+- `src/test/java/com/example/goride/integration/AdminAnalyticsSpatialIntegrationTests.java`
+- `docs/current-phase.md`
+
+---
 ## Commit: `feat: add direct-query admin analytics APIs`
 
 Branch: `codex/admin-v2`

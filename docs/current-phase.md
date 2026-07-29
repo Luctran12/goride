@@ -7,6 +7,7 @@
 
 - Base development commit: `e6aba60`.
 - Latest approved implementation commit: `c02effa` (`feat: add direct-query admin analytics APIs`).
+- Latest implemented commit awaiting user review: `05b96e0` (`feat: add PostGIS demand and supply analytics`).
 - Latest planning commit: `0c0e080` (`docs: add admin analytics implementation plan`).
 - The user explicitly selected `codex/admin-v2` for the Admin Analytics backend work.
 - User-owned `.codex-tmp/` and `deliverables/` content must remain untouched and uncommitted.
@@ -79,18 +80,30 @@ Admin Analytics Backend — Phase 3: Direct Analytics Queries and API Baseline.
 Phase 3 was approved by the user's request to continue with the next phase on
 2026-07-29.
 
-## Active Feature
+## Completed Phase Awaiting Review
 
 Admin Analytics Backend — Phase 4: Spatial Demand and Supply Analytics.
 
-## Planned Scope
+## Implemented Scope
 
-- Add bounded PostGIS square-grid aggregation for trip pickup demand.
-- Return EPSG:4326 GeoJSON with stable cell identifiers.
-- Enforce the 31-day range, cell-size whitelist, bounding-box and payload
+- Added bounded PostGIS square-grid aggregation for trip pickup demand.
+- Returned EPSG:4326 GeoJSON with stable cell identifiers.
+- Enforced the 31-day range, cell-size whitelist, bounding-box and payload
   guardrails.
-- Apply time, vehicle, service-area and optional bounding-box filters together.
-- Verify boundary semantics, demand/supply alignment and spatial query plans.
+- Applied time, vehicle, service-area and optional bounding-box filters together.
+- Added partial temporal and GiST pickup indexes through a reversible database
+  release.
+- Verified boundary semantics, demand/supply alignment and spatial query plans.
+
+## Validation
+
+- Projected-cell, boundary, service-area, vehicle, time and bounding-box fixture
+  tests passed against PostgreSQL/PostGIS 15.
+- Release precheck, apply and verify SQL passed.
+- `EXPLAIN ANALYZE` confirmed the temporal and pickup GiST indexes are usable.
+- Admin RBAC and generated OpenAPI coverage remain active for the heatmap route.
+- Full backend regression suite passed with 493 tests, 0 failures and 0 errors.
+- `git diff --check` passed; only Windows LF/CRLF staging warnings were reported.
 
 ## Explicitly Out of Scope
 
@@ -101,5 +114,6 @@ Admin Analytics Backend — Phase 4: Spatial Demand and Supply Analytics.
 
 ## Review Gate
 
-Phase 4 must provide spatial correctness and `EXPLAIN` evidence before Phase 5
-adds materialized analytical read models.
+Phase 4 implementation is complete and awaits user approval. Phase 5
+materialized analytical read models must not start before this review gate is
+approved.
