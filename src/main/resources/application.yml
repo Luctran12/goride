@@ -39,3 +39,13 @@ app:
       supply-snapshot-interval-seconds: 300
       supply-snapshot-fixed-delay-ms: 300000
       supply-snapshot-initial-delay-ms: 30000
+    spatial:
+      allowed-cell-sizes-meters:
+        - 250
+        - 500
+        - 1000
+        - 2000
+      projected-srid: 32648
+      maximum-range-days: 31
+      maximum-cells: 5000
+      maximum-bounding-box-area-square-km: 25000

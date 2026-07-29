@@ -1,12 +1,15 @@
 package com.example.goride.analytics.service;
 
+import com.example.goride.analytics.config.AnalyticsSpatialProperties;
 import com.example.goride.analytics.config.AnalyticsTelemetryProperties;
 import com.example.goride.analytics.model.AnalyticsBucket;
+import com.example.goride.analytics.model.SpatialBounds;
 import com.example.goride.analytics.repository.DirectAnalyticsQueryPort;
 import com.example.goride.analytics.repository.DirectAnalyticsQueryPort.DemandBucketStats;
 import com.example.goride.analytics.repository.DirectAnalyticsQueryPort.FunnelStats;
 import com.example.goride.analytics.repository.DirectAnalyticsQueryPort.MatchingPerformanceStats;
 import com.example.goride.analytics.repository.DirectAnalyticsQueryPort.OverviewStats;
+import com.example.goride.analytics.repository.DirectAnalyticsQueryPort.SpatialCellStats;
 import com.example.goride.analytics.repository.DirectAnalyticsQueryPort.SupplyBucketStats;
 import com.example.goride.common.error.BusinessException;
 import com.example.goride.common.error.ErrorCode;
@@ -44,15 +47,18 @@ class AdminAnalyticsQueryServiceTests {
     private ServiceAreaRepository serviceAreaRepository;
 
     private AdminAnalyticsQueryService service;
+    private AnalyticsSpatialProperties spatialProperties;
 
     @BeforeEach
     void setUp() {
         AnalyticsTelemetryProperties telemetryProperties = new AnalyticsTelemetryProperties();
         telemetryProperties.setSupplySnapshotIntervalSeconds(300);
+        spatialProperties = new AnalyticsSpatialProperties();
         service = new AdminAnalyticsQueryService(
                 queryPort,
                 serviceAreaRepository,
                 telemetryProperties,
+                spatialProperties,
                 Clock.fixed(FRESHNESS_AT, ZoneOffset.UTC)
         );
     }
@@ -198,6 +204,123 @@ class AdminAnalyticsQueryServiceTests {
     }
 
     @Test
+    void heatmapMapsGeoJsonAndPassesBoundedSpatialQuery() {
+        when(queryPort.demandHeatmap(
+                any(),
+                eq(1000),
+                eq(32648),
+                any(),
+                eq(5001)
+        )).thenReturn(List.of(new SpatialCellStats(
+                "32648:1000:686:1191",
+                List.of(
+                        coordinate("106.60", "10.70"),
+                        coordinate("106.61", "10.70"),
+                        coordinate("106.61", "10.71"),
+                        coordinate("106.60", "10.71"),
+                        coordinate("106.60", "10.70")
+                ),
+                5,
+                4
+        )));
+
+        var response = service.getDemandHeatmap(
+                offset("2026-07-01T00:00:00Z"),
+                offset("2026-07-08T00:00:00Z"),
+                "UTC",
+                null,
+                null,
+                1000,
+                new BigDecimal("106.5"),
+                new BigDecimal("10.6"),
+                new BigDecimal("106.9"),
+                new BigDecimal("10.9")
+        );
+
+        assertThat(response.type()).isEqualTo("FeatureCollection");
+        assertThat(response.metadata().cellSizeMeters()).isEqualTo(1000);
+        assertThat(response.features()).singleElement().satisfies(feature -> {
+            assertThat(feature.type()).isEqualTo("Feature");
+            assertThat(feature.geometry().type()).isEqualTo("Polygon");
+            assertThat(feature.geometry().coordinates().get(0)).hasSize(5);
+            assertThat(feature.properties().cellId()).isEqualTo("32648:1000:686:1191");
+            assertThat(feature.properties().completionRate()).isEqualByComparingTo("0.8000");
+        });
+
+        ArgumentCaptor<SpatialBounds> boundsCaptor = ArgumentCaptor.forClass(SpatialBounds.class);
+        verify(queryPort).demandHeatmap(
+                any(),
+                eq(1000),
+                eq(32648),
+                boundsCaptor.capture(),
+                eq(5001)
+        );
+        assertThat(boundsCaptor.getValue().minLongitude()).isEqualByComparingTo("106.5");
+    }
+
+    @Test
+    void heatmapRejectsUnsafeRangeCellBoundsAndPayload() {
+        assertThatThrownBy(() -> service.getDemandHeatmap(
+                offset("2026-07-01T00:00:00Z"),
+                offset("2026-08-02T00:00:00Z"),
+                "UTC",
+                null,
+                null,
+                1000,
+                null,
+                null,
+                null,
+                null
+        )).isInstanceOfSatisfying(BusinessException.class, exception ->
+                assertThat(exception.errorCode()).isEqualTo(ErrorCode.ANALYTICS_RANGE_TOO_LARGE));
+
+        assertThatThrownBy(() -> service.getDemandHeatmap(
+                offset("2026-07-01T00:00:00Z"),
+                offset("2026-07-02T00:00:00Z"),
+                "UTC",
+                null,
+                null,
+                300,
+                null,
+                null,
+                null,
+                null
+        )).isInstanceOfSatisfying(BusinessException.class, exception ->
+                assertThat(exception.errorCode()).isEqualTo(ErrorCode.VALIDATION_ERROR));
+
+        assertThatThrownBy(() -> service.getDemandHeatmap(
+                offset("2026-07-01T00:00:00Z"),
+                offset("2026-07-02T00:00:00Z"),
+                "UTC",
+                null,
+                null,
+                1000,
+                new BigDecimal("106.5"),
+                null,
+                new BigDecimal("106.9"),
+                new BigDecimal("10.9")
+        )).isInstanceOfSatisfying(BusinessException.class, exception ->
+                assertThat(exception.errorCode()).isEqualTo(ErrorCode.VALIDATION_ERROR));
+
+        spatialProperties.setMaximumCells(1);
+        when(queryPort.demandHeatmap(any(), eq(1000), eq(32648), eq(null), eq(2)))
+                .thenReturn(List.of(emptyCell("first"), emptyCell("second")));
+        assertThatThrownBy(() -> service.getDemandHeatmap(
+                offset("2026-07-01T00:00:00Z"),
+                offset("2026-07-02T00:00:00Z"),
+                "UTC",
+                null,
+                null,
+                1000,
+                null,
+                null,
+                null,
+                null
+        )).isInstanceOfSatisfying(BusinessException.class, exception ->
+                assertThat(exception.errorCode()).isEqualTo(ErrorCode.ANALYTICS_RESULT_TOO_LARGE));
+    }
+
+    @Test
     void funnelKeepsRunAndTripUnitsExplicit() {
         when(queryPort.matchingFunnel(any())).thenReturn(new FunnelStats(10, 9, 8, 7, 6));
 
@@ -302,6 +425,25 @@ class AdminAnalyticsQueryServiceTests {
                 null,
                 null
         );
+    }
+
+    private SpatialCellStats emptyCell(String cellId) {
+        return new SpatialCellStats(
+                cellId,
+                List.of(
+                        coordinate("0", "0"),
+                        coordinate("1", "0"),
+                        coordinate("1", "1"),
+                        coordinate("0", "1"),
+                        coordinate("0", "0")
+                ),
+                1,
+                0
+        );
+    }
+
+    private List<BigDecimal> coordinate(String longitude, String latitude) {
+        return List.of(new BigDecimal(longitude), new BigDecimal(latitude));
     }
 
     private OffsetDateTime offset(String value) {

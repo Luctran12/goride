@@ -1,0 +1,28 @@
+release_id: 20260729-admin-analytics-spatial-indexes
+title: Add direct analytics temporal and pickup spatial indexes
+author: Codex
+created_at: 2026-07-29
+risk: medium
+transactional: true
+requires_downtime: false
+applies_after:
+  - 20260727-admin-analytics-telemetry
+related_commit: pending
+environments:
+  - staging
+  - production
+objects:
+  - idx_trips_analytics_requested_at
+  - idx_trips_pickup_location_gist
+pre_deploy_checks:
+  - Confirm PostGIS is installed and trips.pickup_location is geometry(Point,4326).
+  - Review index build duration and table size before the release window.
+deploy_steps:
+  - Run apply.sql before enabling the demand heatmap endpoint.
+post_deploy_checks:
+  - Run verify.sql and inspect EXPLAIN evidence for temporal and bounding-box filters.
+rollback_plan:
+  - Run rollback.sql to remove only the analytics-specific indexes.
+notes:
+  - The indexes are partial because soft-deleted trips are excluded from analytics.
+  - The application query remains correct without these indexes but may be slower.

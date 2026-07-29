@@ -2,6 +2,7 @@ package com.example.goride.analytics.repository;
 
 import com.example.goride.analytics.model.AnalyticsBucket;
 import com.example.goride.analytics.model.AnalyticsFilter;
+import com.example.goride.analytics.model.SpatialBounds;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -13,6 +14,14 @@ public interface DirectAnalyticsQueryPort {
     List<DemandBucketStats> demandTimeseries(AnalyticsFilter filter, AnalyticsBucket bucket);
 
     List<SupplyBucketStats> supplyTimeseries(AnalyticsFilter filter, AnalyticsBucket bucket);
+
+    List<SpatialCellStats> demandHeatmap(
+            AnalyticsFilter filter,
+            int cellSizeMeters,
+            int projectedSrid,
+            SpatialBounds bounds,
+            int resultLimit
+    );
 
     MatchingPerformanceStats matchingPerformance(AnalyticsFilter filter);
 
@@ -49,6 +58,17 @@ public interface DirectAnalyticsQueryPort {
             BigDecimal averageBusyDrivers,
             long observedBuckets
     ) {
+    }
+
+    record SpatialCellStats(
+            String cellId,
+            List<List<BigDecimal>> exteriorRing,
+            long tripRequests,
+            long completedTripsByRequestCohort
+    ) {
+        public SpatialCellStats {
+            exteriorRing = List.copyOf(exteriorRing);
+        }
     }
 
     record MatchingPerformanceStats(

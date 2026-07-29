@@ -1,6 +1,7 @@
 package com.example.goride.analytics.controller;
 
 import com.example.goride.analytics.dto.AnalyticsOverviewResponse;
+import com.example.goride.analytics.dto.DemandHeatmapResponse;
 import com.example.goride.analytics.dto.DemandTimeseriesResponse;
 import com.example.goride.analytics.dto.MatchingFunnelResponse;
 import com.example.goride.analytics.dto.MatchingPerformanceResponse;
@@ -19,6 +20,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.OffsetDateTime;
+import java.math.BigDecimal;
 
 @RestController
 @RequestMapping("/api/v1/admin/analytics")
@@ -78,6 +80,45 @@ public class AdminAnalyticsController {
                 vehicleType,
                 serviceAreaId,
                 bucket
+        ));
+    }
+
+    @GetMapping("/demand/heatmap")
+    @Operation(
+            summary = "Get spatial demand heatmap",
+            description = "Returns a bounded EPSG:4326 GeoJSON square-grid aggregation of pickup demand."
+    )
+    public ApiResponse<DemandHeatmapResponse> getDemandHeatmap(
+            @Parameter(example = "2026-07-01T00:00:00+07:00")
+            @RequestParam OffsetDateTime from,
+            @Parameter(example = "2026-07-08T00:00:00+07:00")
+            @RequestParam OffsetDateTime to,
+            @Parameter(example = "Asia/Ho_Chi_Minh")
+            @RequestParam(defaultValue = AdminAnalyticsQueryService.DEFAULT_TIMEZONE) String timezone,
+            @RequestParam(required = false) VehicleType vehicleType,
+            @RequestParam(required = false) Long serviceAreaId,
+            @Parameter(example = "1000")
+            @RequestParam Integer cellSizeMeters,
+            @Parameter(example = "106.60")
+            @RequestParam(name = "minLng", required = false) BigDecimal minLongitude,
+            @Parameter(example = "10.70")
+            @RequestParam(name = "minLat", required = false) BigDecimal minLatitude,
+            @Parameter(example = "106.80")
+            @RequestParam(name = "maxLng", required = false) BigDecimal maxLongitude,
+            @Parameter(example = "10.90")
+            @RequestParam(name = "maxLat", required = false) BigDecimal maxLatitude
+    ) {
+        return ApiResponse.ok(analyticsService.getDemandHeatmap(
+                from,
+                to,
+                timezone,
+                vehicleType,
+                serviceAreaId,
+                cellSizeMeters,
+                minLongitude,
+                minLatitude,
+                maxLongitude,
+                maxLatitude
         ));
     }
 

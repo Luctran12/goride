@@ -2,7 +2,12 @@ package com.example.goride.analytics.repository;
 
 import com.example.goride.analytics.model.AnalyticsBucket;
 import com.example.goride.analytics.model.AnalyticsFilter;
+import com.example.goride.analytics.model.SpatialBounds;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.jdbc.core.ResultSetExtractor;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
@@ -37,9 +42,14 @@ public class JdbcDirectAnalyticsQueryAdapter implements DirectAnalyticsQueryPort
             """;
 
     private final NamedParameterJdbcTemplate jdbcTemplate;
+    private final ObjectMapper objectMapper;
 
-    public JdbcDirectAnalyticsQueryAdapter(NamedParameterJdbcTemplate jdbcTemplate) {
+    public JdbcDirectAnalyticsQueryAdapter(
+            NamedParameterJdbcTemplate jdbcTemplate,
+            ObjectMapper objectMapper
+    ) {
         this.jdbcTemplate = jdbcTemplate;
+        this.objectMapper = objectMapper;
     }
 
     @Override
@@ -275,6 +285,126 @@ public class JdbcDirectAnalyticsQueryAdapter implements DirectAnalyticsQueryPort
     }
 
     @Override
+    public List<SpatialCellStats> demandHeatmap(
+            AnalyticsFilter filter,
+            int cellSizeMeters,
+            int projectedSrid,
+            SpatialBounds bounds,
+            int resultLimit
+    ) {
+        String sql = """
+                WITH filtered_pickups AS (
+                    SELECT
+                        t.status,
+                        ST_Transform(t.pickup_location, :projectedSrid) AS projected_pickup
+                    FROM trips t
+                    WHERE t.deleted_at IS NULL
+                      AND t.requested_at >= :from
+                      AND t.requested_at < :to
+                      %s
+                      AND (
+                          :boundsEnabled = FALSE
+                          OR (
+                              t.pickup_location && ST_MakeEnvelope(
+                                  :minLongitude,
+                                  :minLatitude,
+                                  :maxLongitude,
+                                  :maxLatitude,
+                                  4326
+                              )
+                              AND ST_Covers(
+                                  ST_MakeEnvelope(
+                                      :minLongitude,
+                                      :minLatitude,
+                                      :maxLongitude,
+                                      :maxLatitude,
+                                      4326
+                                  ),
+                                  t.pickup_location
+                              )
+                          )
+                      )
+                ),
+                cell_membership AS (
+                    SELECT
+                        status,
+                        FLOOR(ST_X(projected_pickup) / :cellSizeMeters)::BIGINT AS grid_x,
+                        FLOOR(ST_Y(projected_pickup) / :cellSizeMeters)::BIGINT AS grid_y
+                    FROM filtered_pickups
+                ),
+                aggregated_cells AS (
+                    SELECT
+                        grid_x,
+                        grid_y,
+                        COUNT(*) AS trip_requests,
+                        COUNT(*) FILTER (WHERE status = 'COMPLETED')
+                            AS completed_request_cohort
+                    FROM cell_membership
+                    GROUP BY grid_x, grid_y
+                )
+                SELECT
+                    CONCAT(
+                        :projectedSrid,
+                        ':',
+                        :cellSizeMeters,
+                        ':',
+                        grid_x,
+                        ':',
+                        grid_y
+                    ) AS cell_id,
+                    ST_AsGeoJSON(
+                        ST_Transform(
+                            ST_MakeEnvelope(
+                                grid_x * :cellSizeMeters,
+                                grid_y * :cellSizeMeters,
+                                (grid_x + 1) * :cellSizeMeters,
+                                (grid_y + 1) * :cellSizeMeters,
+                                :projectedSrid
+                            ),
+                            4326
+                        ),
+                        9
+                    ) AS geometry_json,
+                    trip_requests,
+                    completed_request_cohort
+                FROM aggregated_cells
+                ORDER BY trip_requests DESC, cell_id
+                LIMIT :resultLimit
+                """.formatted(TRIP_DIMENSION_FILTER);
+        MapSqlParameterSource parameters = parameters(filter)
+                .addValue("cellSizeMeters", cellSizeMeters, Types.INTEGER)
+                .addValue("projectedSrid", projectedSrid, Types.INTEGER)
+                .addValue("resultLimit", resultLimit, Types.INTEGER)
+                .addValue("boundsEnabled", bounds != null, Types.BOOLEAN)
+                .addValue(
+                        "minLongitude",
+                        bounds == null ? null : bounds.minLongitude(),
+                        Types.NUMERIC
+                )
+                .addValue(
+                        "minLatitude",
+                        bounds == null ? null : bounds.minLatitude(),
+                        Types.NUMERIC
+                )
+                .addValue(
+                        "maxLongitude",
+                        bounds == null ? null : bounds.maxLongitude(),
+                        Types.NUMERIC
+                )
+                .addValue(
+                        "maxLatitude",
+                        bounds == null ? null : bounds.maxLatitude(),
+                        Types.NUMERIC
+                );
+        return jdbcTemplate.query(sql, parameters, (resultSet, rowNumber) -> new SpatialCellStats(
+                resultSet.getString("cell_id"),
+                exteriorRing(resultSet.getString("geometry_json")),
+                resultSet.getLong("trip_requests"),
+                resultSet.getLong("completed_request_cohort")
+        ));
+    }
+
+    @Override
     public MatchingPerformanceStats matchingPerformance(AnalyticsFilter filter) {
         String sql = """
                 WITH terminal_runs AS (
@@ -447,6 +577,21 @@ public class JdbcDirectAnalyticsQueryAdapter implements DirectAnalyticsQueryPort
             return new BigDecimal(number.toString());
         }
         return new BigDecimal(value.toString());
+    }
+
+    private List<List<BigDecimal>> exteriorRing(String geometryJson) {
+        try {
+            return objectMapper.convertValue(
+                    objectMapper.readTree(geometryJson).path("coordinates").path(0),
+                    new TypeReference<>() {
+                    }
+            );
+        } catch (JsonProcessingException | IllegalArgumentException exception) {
+            throw new DataAccessResourceFailureException(
+                    "PostGIS returned invalid heatmap GeoJSON",
+                    exception
+            );
+        }
     }
 
     private static <T> ResultSetExtractor<T> singleRow(SqlRowMapper<T> mapper) {

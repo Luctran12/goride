@@ -205,7 +205,10 @@ class AdminAnalyticsDirectQueryIntegrationTests extends PostgresRedisIntegration
                 ).value("Get analytics overview"))
                 .andExpect(jsonPath(
                         "$.paths['/api/v1/admin/analytics/matching/funnel'].get"
-                ).exists());
+                ).exists())
+                .andExpect(jsonPath(
+                        "$.paths['/api/v1/admin/analytics/demand/heatmap'].get.summary"
+                ).value("Get spatial demand heatmap"));
     }
 
     private Fixture seedFixture() {

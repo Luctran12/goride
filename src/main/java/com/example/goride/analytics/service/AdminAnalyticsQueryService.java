@@ -1,7 +1,9 @@
 package com.example.goride.analytics.service;
 
+import com.example.goride.analytics.config.AnalyticsSpatialProperties;
 import com.example.goride.analytics.config.AnalyticsTelemetryProperties;
 import com.example.goride.analytics.dto.AnalyticsOverviewResponse;
+import com.example.goride.analytics.dto.DemandHeatmapResponse;
 import com.example.goride.analytics.dto.DemandTimeseriesResponse;
 import com.example.goride.analytics.dto.MatchingFunnelResponse;
 import com.example.goride.analytics.dto.MatchingPerformanceResponse;
@@ -9,11 +11,13 @@ import com.example.goride.analytics.dto.SupplyTimeseriesResponse;
 import com.example.goride.analytics.model.AnalyticsBucket;
 import com.example.goride.analytics.model.AnalyticsFilter;
 import com.example.goride.analytics.model.AnalyticsSourceVariant;
+import com.example.goride.analytics.model.SpatialBounds;
 import com.example.goride.analytics.repository.DirectAnalyticsQueryPort;
 import com.example.goride.analytics.repository.DirectAnalyticsQueryPort.DemandBucketStats;
 import com.example.goride.analytics.repository.DirectAnalyticsQueryPort.FunnelStats;
 import com.example.goride.analytics.repository.DirectAnalyticsQueryPort.MatchingPerformanceStats;
 import com.example.goride.analytics.repository.DirectAnalyticsQueryPort.OverviewStats;
+import com.example.goride.analytics.repository.DirectAnalyticsQueryPort.SpatialCellStats;
 import com.example.goride.analytics.repository.DirectAnalyticsQueryPort.SupplyBucketStats;
 import com.example.goride.common.error.BusinessException;
 import com.example.goride.common.error.ErrorCode;
@@ -48,21 +52,25 @@ public class AdminAnalyticsQueryService {
     private static final BigDecimal MINIMUM_SUPPLY_COVERAGE = new BigDecimal("0.80");
     private static final int RATIO_SCALE = 4;
     private static final int AVERAGE_SCALE = 2;
+    private static final double EARTH_RADIUS_KM = 6371.0088;
 
     private final DirectAnalyticsQueryPort queryPort;
     private final ServiceAreaRepository serviceAreaRepository;
     private final AnalyticsTelemetryProperties telemetryProperties;
+    private final AnalyticsSpatialProperties spatialProperties;
     private final Clock clock;
 
     public AdminAnalyticsQueryService(
             DirectAnalyticsQueryPort queryPort,
             ServiceAreaRepository serviceAreaRepository,
             AnalyticsTelemetryProperties telemetryProperties,
+            AnalyticsSpatialProperties spatialProperties,
             Clock clock
     ) {
         this.queryPort = queryPort;
         this.serviceAreaRepository = serviceAreaRepository;
         this.telemetryProperties = telemetryProperties;
+        this.spatialProperties = spatialProperties;
         this.clock = clock;
     }
 
@@ -180,6 +188,75 @@ public class AdminAnalyticsQueryService {
                 AnalyticsSourceVariant.DIRECT,
                 freshnessAt,
                 points
+        );
+    }
+
+    public DemandHeatmapResponse getDemandHeatmap(
+            OffsetDateTime from,
+            OffsetDateTime to,
+            String timezone,
+            VehicleType vehicleType,
+            Long serviceAreaId,
+            Integer cellSizeMeters,
+            BigDecimal minLongitude,
+            BigDecimal minLatitude,
+            BigDecimal maxLongitude,
+            BigDecimal maxLatitude
+    ) {
+        Instant freshnessAt = clock.instant();
+        AnalyticsFilter filter = normalizeFilter(from, to, timezone, vehicleType, serviceAreaId);
+        validateHeatmapRange(filter);
+        int normalizedCellSize = normalizeCellSize(cellSizeMeters);
+        SpatialBounds bounds = normalizeBounds(
+                minLongitude,
+                minLatitude,
+                maxLongitude,
+                maxLatitude
+        );
+        int maximumCells = spatialProperties.getMaximumCells();
+        List<SpatialCellStats> cells = queryPort.demandHeatmap(
+                filter,
+                normalizedCellSize,
+                spatialProperties.getProjectedSrid(),
+                bounds,
+                maximumCells + 1
+        );
+        if (cells.size() > maximumCells) {
+            throw new BusinessException(
+                    ErrorCode.ANALYTICS_RESULT_TOO_LARGE,
+                    "Heatmap exceeds the maximum number of cells",
+                    Map.of("maximumCells", maximumCells)
+            );
+        }
+        List<DemandHeatmapResponse.Feature> features = cells.stream()
+                .map(cell -> new DemandHeatmapResponse.Feature(
+                        "Feature",
+                        new DemandHeatmapResponse.Polygon(
+                                "Polygon",
+                                List.of(cell.exteriorRing())
+                        ),
+                        new DemandHeatmapResponse.Properties(
+                                cell.cellId(),
+                                cell.tripRequests(),
+                                cell.completedTripsByRequestCohort(),
+                                ratio(
+                                        cell.completedTripsByRequestCohort(),
+                                        cell.tripRequests()
+                                )
+                        )
+                ))
+                .toList();
+        return new DemandHeatmapResponse(
+                "FeatureCollection",
+                new DemandHeatmapResponse.Metadata(
+                        filter.from(),
+                        filter.to(),
+                        filter.reportingTimezone().getId(),
+                        normalizedCellSize,
+                        AnalyticsSourceVariant.DIRECT,
+                        freshnessAt
+                ),
+                features
         );
     }
 
@@ -329,6 +406,98 @@ public class AdminAnalyticsQueryService {
                 tripRequests,
                 requestToAvailableRatio
         );
+    }
+
+    private void validateHeatmapRange(AnalyticsFilter filter) {
+        int maximumDays = spatialProperties.getMaximumRangeDays();
+        if (Duration.between(filter.from(), filter.to())
+                .compareTo(Duration.ofDays(maximumDays)) > 0) {
+            throw new BusinessException(
+                    ErrorCode.ANALYTICS_RANGE_TOO_LARGE,
+                    "Heatmap range must not exceed " + maximumDays + " days",
+                    Map.of("maximumDays", maximumDays)
+            );
+        }
+    }
+
+    private int normalizeCellSize(Integer cellSizeMeters) {
+        if (cellSizeMeters == null) {
+            throw validation("cellSizeMeters", "cellSizeMeters is required");
+        }
+        if (!spatialProperties.getAllowedCellSizesMeters().contains(cellSizeMeters)) {
+            throw validation(
+                    "cellSizeMeters",
+                    "cellSizeMeters must be one of "
+                            + spatialProperties.getAllowedCellSizesMeters()
+            );
+        }
+        return cellSizeMeters;
+    }
+
+    private SpatialBounds normalizeBounds(
+            BigDecimal minLongitude,
+            BigDecimal minLatitude,
+            BigDecimal maxLongitude,
+            BigDecimal maxLatitude
+    ) {
+        int provided = 0;
+        provided += minLongitude == null ? 0 : 1;
+        provided += minLatitude == null ? 0 : 1;
+        provided += maxLongitude == null ? 0 : 1;
+        provided += maxLatitude == null ? 0 : 1;
+        if (provided == 0) {
+            return null;
+        }
+        if (provided != 4) {
+            throw validation(
+                    "bounds",
+                    "minLng, minLat, maxLng and maxLat must be provided together"
+            );
+        }
+        if (minLongitude.compareTo(BigDecimal.valueOf(-180)) < 0
+                || maxLongitude.compareTo(BigDecimal.valueOf(180)) > 0
+                || minLatitude.compareTo(BigDecimal.valueOf(-90)) < 0
+                || maxLatitude.compareTo(BigDecimal.valueOf(90)) > 0) {
+            throw validation("bounds", "bounding coordinates are outside WGS84 limits");
+        }
+        if (minLongitude.compareTo(maxLongitude) >= 0
+                || minLatitude.compareTo(maxLatitude) >= 0) {
+            throw validation("bounds", "minimum coordinates must be less than maximum coordinates");
+        }
+        double areaSquareKm = boundingBoxAreaSquareKm(
+                minLongitude.doubleValue(),
+                minLatitude.doubleValue(),
+                maxLongitude.doubleValue(),
+                maxLatitude.doubleValue()
+        );
+        if (areaSquareKm > spatialProperties.getMaximumBoundingBoxAreaSquareKm()) {
+            throw validation(
+                    "bounds",
+                    "bounding-box area exceeds "
+                            + spatialProperties.getMaximumBoundingBoxAreaSquareKm()
+                            + " square kilometres"
+            );
+        }
+        return new SpatialBounds(
+                minLongitude,
+                minLatitude,
+                maxLongitude,
+                maxLatitude
+        );
+    }
+
+    private double boundingBoxAreaSquareKm(
+            double minLongitude,
+            double minLatitude,
+            double maxLongitude,
+            double maxLatitude
+    ) {
+        double middleLatitudeRadians = Math.toRadians((minLatitude + maxLatitude) / 2);
+        double widthKm = EARTH_RADIUS_KM
+                * Math.toRadians(maxLongitude - minLongitude)
+                * Math.cos(middleLatitudeRadians);
+        double heightKm = EARTH_RADIUS_KM * Math.toRadians(maxLatitude - minLatitude);
+        return Math.abs(widthKm * heightKm);
     }
 
     private Map<LocalDateTime, DemandBucketStats> indexDemand(List<DemandBucketStats> stats) {

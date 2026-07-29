@@ -113,5 +113,12 @@ class AdminAnalyticsControllerTests {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error.code").value("VALIDATION_ERROR"))
                 .andExpect(jsonPath("$.error.details.bucket").exists());
+
+        mockMvc.perform(get("/api/v1/admin/analytics/demand/heatmap")
+                        .param("from", "2026-07-01T00:00:00Z")
+                        .param("to", "2026-07-02T00:00:00Z"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.error.details.cellSizeMeters").exists());
     }
 }

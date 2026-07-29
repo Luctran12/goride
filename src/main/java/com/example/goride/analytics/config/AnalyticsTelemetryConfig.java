@@ -4,6 +4,9 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Configuration;
 
 @Configuration
-@EnableConfigurationProperties(AnalyticsTelemetryProperties.class)
+@EnableConfigurationProperties({
+        AnalyticsTelemetryProperties.class,
+        AnalyticsSpatialProperties.class
+})
 public class AnalyticsTelemetryConfig {
 }
