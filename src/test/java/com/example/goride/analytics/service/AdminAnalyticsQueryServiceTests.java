@@ -1,5 +1,6 @@
 package com.example.goride.analytics.service;
 
+import com.example.goride.analytics.config.AnalyticsMaterializedProperties;
 import com.example.goride.analytics.config.AnalyticsSpatialProperties;
 import com.example.goride.analytics.config.AnalyticsTelemetryProperties;
 import com.example.goride.analytics.model.AnalyticsBucket;
@@ -14,6 +15,7 @@ import com.example.goride.analytics.repository.DirectAnalyticsQueryPort.SupplyBu
 import com.example.goride.common.error.BusinessException;
 import com.example.goride.common.error.ErrorCode;
 import com.example.goride.servicearea.repository.ServiceAreaRepository;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -54,8 +56,13 @@ class AdminAnalyticsQueryServiceTests {
         AnalyticsTelemetryProperties telemetryProperties = new AnalyticsTelemetryProperties();
         telemetryProperties.setSupplySnapshotIntervalSeconds(300);
         spatialProperties = new AnalyticsSpatialProperties();
+        AnalyticsQueryRouter queryRouter = new AnalyticsQueryRouter(
+                List.of(queryPort),
+                new AnalyticsMaterializedProperties(),
+                new SimpleMeterRegistry()
+        );
         service = new AdminAnalyticsQueryService(
-                queryPort,
+                queryRouter,
                 serviceAreaRepository,
                 telemetryProperties,
                 spatialProperties,

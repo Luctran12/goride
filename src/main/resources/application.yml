@@ -49,3 +49,13 @@ app:
       maximum-range-days: 31
       maximum-cells: 5000
       maximum-bounding-box-area-square-km: 25000
+    materialized:
+      enabled: false
+      query-variant: DIRECT
+      fallback-enabled: true
+      reporting-timezone: Asia/Ho_Chi_Minh
+      projected-srid: 32648
+      base-cell-size-meters: 250
+      refresh-enabled: false
+      refresh-fixed-delay-ms: 900000
+      refresh-initial-delay-ms: 60000

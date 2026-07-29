@@ -10,9 +10,8 @@ import com.example.goride.analytics.dto.MatchingPerformanceResponse;
 import com.example.goride.analytics.dto.SupplyTimeseriesResponse;
 import com.example.goride.analytics.model.AnalyticsBucket;
 import com.example.goride.analytics.model.AnalyticsFilter;
-import com.example.goride.analytics.model.AnalyticsSourceVariant;
+import com.example.goride.analytics.model.AnalyticsQueryOperation;
 import com.example.goride.analytics.model.SpatialBounds;
-import com.example.goride.analytics.repository.DirectAnalyticsQueryPort;
 import com.example.goride.analytics.repository.DirectAnalyticsQueryPort.DemandBucketStats;
 import com.example.goride.analytics.repository.DirectAnalyticsQueryPort.FunnelStats;
 import com.example.goride.analytics.repository.DirectAnalyticsQueryPort.MatchingPerformanceStats;
@@ -24,6 +23,7 @@ import com.example.goride.common.error.ErrorCode;
 import com.example.goride.driver.domain.VehicleType;
 import com.example.goride.servicearea.repository.ServiceAreaRepository;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
@@ -45,7 +45,7 @@ import java.util.List;
 import java.util.Map;
 
 @Service
-@Transactional(readOnly = true, timeout = 15)
+@Transactional(readOnly = true, timeout = 15, isolation = Isolation.REPEATABLE_READ)
 public class AdminAnalyticsQueryService {
     public static final String DEFAULT_TIMEZONE = "Asia/Ho_Chi_Minh";
     private static final Duration MAX_GENERAL_RANGE = Duration.ofDays(366);
@@ -54,20 +54,20 @@ public class AdminAnalyticsQueryService {
     private static final int AVERAGE_SCALE = 2;
     private static final double EARTH_RADIUS_KM = 6371.0088;
 
-    private final DirectAnalyticsQueryPort queryPort;
+    private final AnalyticsQueryRouter queryRouter;
     private final ServiceAreaRepository serviceAreaRepository;
     private final AnalyticsTelemetryProperties telemetryProperties;
     private final AnalyticsSpatialProperties spatialProperties;
     private final Clock clock;
 
     public AdminAnalyticsQueryService(
-            DirectAnalyticsQueryPort queryPort,
+            AnalyticsQueryRouter queryRouter,
             ServiceAreaRepository serviceAreaRepository,
             AnalyticsTelemetryProperties telemetryProperties,
             AnalyticsSpatialProperties spatialProperties,
             Clock clock
     ) {
-        this.queryPort = queryPort;
+        this.queryRouter = queryRouter;
         this.serviceAreaRepository = serviceAreaRepository;
         this.telemetryProperties = telemetryProperties;
         this.spatialProperties = spatialProperties;
@@ -83,13 +83,19 @@ public class AdminAnalyticsQueryService {
     ) {
         Instant freshnessAt = clock.instant();
         AnalyticsFilter filter = normalizeFilter(from, to, timezone, vehicleType, serviceAreaId);
-        OverviewStats stats = queryPort.overview(filter);
+        AnalyticsQueryRouter.Selection selection = queryRouter.select(
+                filter,
+                AnalyticsQueryOperation.OVERVIEW,
+                null,
+                freshnessAt
+        );
+        OverviewStats stats = selection.queryPort().overview(filter);
         return new AnalyticsOverviewResponse(
                 filter.from(),
                 filter.to(),
                 filter.reportingTimezone().getId(),
-                AnalyticsSourceVariant.DIRECT,
-                freshnessAt,
+                selection.sourceVariant(),
+                selection.freshnessAt(),
                 stats.tripRequests(),
                 stats.completedTrips(),
                 stats.completedTripsByRequestCohort(),
@@ -118,8 +124,14 @@ public class AdminAnalyticsQueryService {
         Instant freshnessAt = clock.instant();
         AnalyticsFilter filter = normalizeFilter(from, to, timezone, vehicleType, serviceAreaId);
         AnalyticsBucket normalizedBucket = requireBucket(bucket);
+        AnalyticsQueryRouter.Selection selection = queryRouter.select(
+                filter,
+                AnalyticsQueryOperation.DEMAND_TIMESERIES,
+                normalizedBucket,
+                freshnessAt
+        );
         Map<LocalDateTime, DemandBucketStats> statsByBucket = indexDemand(
-                queryPort.demandTimeseries(filter, normalizedBucket)
+                selection.queryPort().demandTimeseries(filter, normalizedBucket)
         );
         List<DemandTimeseriesResponse.Point> points = bucketStarts(filter, normalizedBucket).stream()
                 .map(bucketStart -> {
@@ -139,8 +151,8 @@ public class AdminAnalyticsQueryService {
                 filter.to(),
                 filter.reportingTimezone().getId(),
                 normalizedBucket,
-                AnalyticsSourceVariant.DIRECT,
-                freshnessAt,
+                selection.sourceVariant(),
+                selection.freshnessAt(),
                 points
         );
     }
@@ -159,13 +171,19 @@ public class AdminAnalyticsQueryService {
         if (!normalizedBucket.supportsSupply()) {
             throw validation("bucket", "Supply timeseries supports only HOUR or DAY");
         }
+        AnalyticsQueryRouter.Selection selection = queryRouter.select(
+                filter,
+                AnalyticsQueryOperation.SUPPLY_TIMESERIES,
+                normalizedBucket,
+                freshnessAt
+        );
 
-        Map<LocalDateTime, SupplyBucketStats> supplyByBucket = queryPort
+        Map<LocalDateTime, SupplyBucketStats> supplyByBucket = selection.queryPort()
                 .supplyTimeseries(filter, normalizedBucket)
                 .stream()
                 .collect(LinkedHashMap::new, (map, stats) -> map.put(stats.bucketStart(), stats), Map::putAll);
         Map<LocalDateTime, DemandBucketStats> demandByBucket = indexDemand(
-                queryPort.demandTimeseries(filter, normalizedBucket)
+                selection.queryPort().demandTimeseries(filter, normalizedBucket)
         );
         Map<LocalDateTime, Long> expectedByBucket = expectedSnapshotBuckets(
                 filter,
@@ -185,8 +203,8 @@ public class AdminAnalyticsQueryService {
                 filter.to(),
                 filter.reportingTimezone().getId(),
                 normalizedBucket,
-                AnalyticsSourceVariant.DIRECT,
-                freshnessAt,
+                selection.sourceVariant(),
+                selection.freshnessAt(),
                 points
         );
     }
@@ -214,7 +232,14 @@ public class AdminAnalyticsQueryService {
                 maxLatitude
         );
         int maximumCells = spatialProperties.getMaximumCells();
-        List<SpatialCellStats> cells = queryPort.demandHeatmap(
+        AnalyticsQueryRouter.Selection selection = queryRouter.select(
+                filter,
+                AnalyticsQueryOperation.DEMAND_HEATMAP,
+                null,
+                freshnessAt,
+                bounds == null
+        );
+        List<SpatialCellStats> cells = selection.queryPort().demandHeatmap(
                 filter,
                 normalizedCellSize,
                 spatialProperties.getProjectedSrid(),
@@ -253,8 +278,8 @@ public class AdminAnalyticsQueryService {
                         filter.to(),
                         filter.reportingTimezone().getId(),
                         normalizedCellSize,
-                        AnalyticsSourceVariant.DIRECT,
-                        freshnessAt
+                        selection.sourceVariant(),
+                        selection.freshnessAt()
                 ),
                 features
         );
@@ -269,13 +294,19 @@ public class AdminAnalyticsQueryService {
     ) {
         Instant freshnessAt = clock.instant();
         AnalyticsFilter filter = normalizeFilter(from, to, timezone, vehicleType, serviceAreaId);
-        MatchingPerformanceStats stats = queryPort.matchingPerformance(filter);
+        AnalyticsQueryRouter.Selection selection = queryRouter.select(
+                filter,
+                AnalyticsQueryOperation.MATCHING_PERFORMANCE,
+                null,
+                freshnessAt
+        );
+        MatchingPerformanceStats stats = selection.queryPort().matchingPerformance(filter);
         return new MatchingPerformanceResponse(
                 filter.from(),
                 filter.to(),
                 filter.reportingTimezone().getId(),
-                AnalyticsSourceVariant.DIRECT,
-                freshnessAt,
+                selection.sourceVariant(),
+                selection.freshnessAt(),
                 stats.matchingRuns(),
                 stats.terminalRuns(),
                 stats.matchedRuns(),
@@ -305,7 +336,13 @@ public class AdminAnalyticsQueryService {
     ) {
         Instant freshnessAt = clock.instant();
         AnalyticsFilter filter = normalizeFilter(from, to, timezone, vehicleType, serviceAreaId);
-        FunnelStats stats = queryPort.matchingFunnel(filter);
+        AnalyticsQueryRouter.Selection selection = queryRouter.select(
+                filter,
+                AnalyticsQueryOperation.MATCHING_FUNNEL,
+                null,
+                freshnessAt
+        );
+        FunnelStats stats = selection.queryPort().matchingFunnel(filter);
         List<MatchingFunnelResponse.Step> steps = List.of(
                 new MatchingFunnelResponse.Step("RUN_STARTED", "RUN", stats.runStarted()),
                 new MatchingFunnelResponse.Step("CANDIDATE_FOUND", "RUN", stats.candidateFound()),
@@ -317,8 +354,8 @@ public class AdminAnalyticsQueryService {
                 filter.from(),
                 filter.to(),
                 filter.reportingTimezone().getId(),
-                AnalyticsSourceVariant.DIRECT,
-                freshnessAt,
+                selection.sourceVariant(),
+                selection.freshnessAt(),
                 steps
         );
     }
