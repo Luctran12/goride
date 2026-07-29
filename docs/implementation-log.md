@@ -5,6 +5,81 @@
 > Tu commit `feat: add matching driver search` tro di, moi commit backend can cap nhat file nay trong cung commit.
 
 ---
+## Commit: `feat: harden admin analytics API handoff`
+
+Branch: `codex/admin-v2`
+
+Phase: Admin Analytics Backend — Phase 6: API Hardening and Frontend Handoff
+
+Commit hash: `140c70a`
+
+### Muc tieu
+
+Dong bang backend contract de Admin Web co the tich hop qua OpenAPI va consumer
+examples ma khong doc entity, sao chep cong thuc KPI hoac tu tinh percentile.
+
+### Noi dung da trien khai
+
+- Bo sung HTTP Bearer JWT security scheme, role requirement, concrete success
+  envelopes va shared error responses cho sau Admin Analytics endpoint.
+- Hoan thien OpenAPI 3.1 descriptions/examples cho range, timezone, units,
+  precision, freshness, empty/partial data, nullable fields va heatmap
+  guardrails.
+- Danh dau cac response properties la required trong schema; cac derived metric
+  khong xac dinh van co kieu `number|null` hoac `integer|null` va serialize
+  thanh JSON `null`.
+- Chuyen funnel `name` va `unit` tu chuoi tu do sang enum co kieu, giu nguyen
+  JSON values va thu tu nam buoc.
+- Dong bang metric/API contract v1.0, thay API draft bang tai lieu final va
+  them frontend integration guide.
+- Them Postman 2.1 smoke collection cho du sau endpoint. Integration test doc,
+  resolve variables va thuc thi chinh collection nay qua MockMvc voi Admin JWT
+  tren PostgreSQL/PostGIS.
+- Them backward-compatibility test dong bang route, generic return type va
+  record shape cua `GET /api/v1/admin/dashboard`.
+
+### Review truoc commit
+
+- Focused Phase 6 suite: 17 tests passed, 0 failures, 0 errors, 0 skipped.
+- Full backend regression suite: 503 tests passed, 0 failures, 0 errors,
+  0 skipped.
+- Consumer smoke da goi du overview, demand, supply, heatmap, matching
+  performance va matching funnel; tat ca tra `200` va dung metadata/GeoJSON
+  shape.
+- Generated OpenAPI xac nhan concrete endpoint envelopes, `ErrorResponse`,
+  Bearer security, enum cardinality, required nullable fields va heatmap
+  guardrails.
+- Tat ca relative Markdown links resolve; Postman collection parse thanh cong.
+- `git diff --check`: pass; chi co warning LF/CRLF tren Windows.
+- Manual review da phat hien va sua numeric `cellSizeMeters` enum bi Springdoc
+  serialize thanh string; schema final giu dung `integer` va ghi whitelist
+  trong description/backend validation.
+- Manual review khong phat hien blocker. Runtime metric semantics va legacy
+  dashboard response khong bi thay doi.
+
+### Files chinh
+
+- `src/main/java/com/example/goride/analytics/controller/AdminAnalyticsController.java`
+- `src/main/java/com/example/goride/analytics/dto/*`
+- `src/main/java/com/example/goride/analytics/model/AnalyticsCountUnit.java`
+- `src/main/java/com/example/goride/analytics/model/MatchingFunnelStepName.java`
+- `src/main/java/com/example/goride/common/api/ErrorResponse.java`
+- `src/test/java/com/example/goride/integration/AdminAnalyticsDirectQueryIntegrationTests.java`
+- `src/test/java/com/example/goride/analytics/controller/AdminAnalyticsBackwardCompatibilityTests.java`
+- `docs/admin-analytics/api-contract.md`
+- `docs/admin-analytics/metric-dictionary.md`
+- `docs/admin-analytics/frontend-integration-guide.md`
+- `docs/admin-analytics/admin-analytics-smoke.postman_collection.json`
+
+### Rui ro da biet va viec tiep theo
+
+- Concrete OpenAPI envelope records chi phuc vu contract generation; runtime
+  van dung generic `ApiResponse<T>` va da duoc consumer test xac nhan cung
+  shape.
+- Phase 6 dang cho user review. Khong bat dau Phase 7 dataset/benchmark va
+  khong chon `MATERIALIZED` lam production default truoc khi duoc phe duyet.
+
+---
 ## Commit: `feat: add materialized admin analytics read models`
 
 Branch: `codex/admin-v2`

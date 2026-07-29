@@ -6,6 +6,8 @@
 ## Repository Status
 
 - Base development commit: `e6aba60`.
+- Latest completed implementation commit: `140c70a`
+  (`feat: harden admin analytics API handoff`).
 - Latest approved implementation commit: `4060b6b`
   (`feat: add materialized admin analytics read models`).
 - Latest planning commit: `0c0e080` (`docs: add admin analytics implementation plan`).
@@ -172,14 +174,32 @@ Phase 5 was approved by the user's request to continue with the next phase on
 
 Admin Analytics Backend — Phase 6: API Hardening and Frontend Handoff.
 
-## Planned Scope
+## Implementation Status
 
-- Finalize OpenAPI descriptions, examples and shared response semantics.
-- Make units, precision, timezone, freshness, enum and nullable-field behavior
-  explicit.
-- Document empty, partial-data and error behavior plus every query guardrail.
-- Add an executable API smoke collection and a frontend integration guide.
-- Add backward-compatibility tests for the legacy Admin dashboard contract.
+Implementation is complete and awaiting user review.
+
+## Implemented Scope
+
+- Finalized OpenAPI 3.1 descriptions, concrete success/error envelopes, examples
+  and Bearer JWT security requirements.
+- Made units, precision, timezone, freshness, enum, required-property and
+  nullable-field behavior explicit.
+- Froze API and metric contracts at version 1.0, including empty, partial-data,
+  error and guardrail behavior.
+- Added an executable six-request Postman collection and frontend integration
+  guide.
+- Added consumer-contract and backward-compatibility tests for the legacy
+  Admin dashboard.
+
+## Validation
+
+- Focused Phase 6 suite: 17 tests passed.
+- Full backend regression suite: 503 tests passed, 0 failures, 0 errors and
+  0 skipped.
+- All relative Markdown links resolve and the Postman collection parses.
+- `git diff --check` passed; only existing Windows LF/CRLF warnings were
+  reported while staging.
+- Manual review found no remaining blocker.
 
 ## Explicitly Out of Scope
 
@@ -189,5 +209,5 @@ Admin Analytics Backend — Phase 6: API Hardening and Frontend Handoff.
 
 ## Review Gate
 
-The Admin Analytics backend contract must be frozen and consumer examples must
-pass before Phase 7 begins.
+User review is required. Phase 7 dataset generation and benchmarking must not
+begin until Phase 6 is approved.
