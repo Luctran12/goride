@@ -1,8 +1,8 @@
 spring:
   datasource:
-    url: jdbc:postgresql://db.dmhwnkhuoweigudvkjcf.supabase.co:5432/postgres?sslmode=require
-    username: postgres
-    password: thiennga54102004
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/goride}
+    username: ${DATABASE_USERNAME:goride}
+    password: ${DATABASE_PASSWORD:goride}
   jpa:
     hibernate:
       ddl-auto: update
@@ -11,8 +11,8 @@ spring:
         format_sql: true
   data:
     redis:
-      host: localhost
-      port: 6379
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
 
 app:
   jwt:

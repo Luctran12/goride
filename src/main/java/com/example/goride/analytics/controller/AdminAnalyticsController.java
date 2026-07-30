@@ -9,7 +9,10 @@ import com.example.goride.analytics.dto.MatchingFunnelResponse;
 import com.example.goride.analytics.dto.MatchingPerformanceResponse;
 import com.example.goride.analytics.dto.SupplyTimeseriesResponse;
 import com.example.goride.analytics.model.AnalyticsBucket;
+import com.example.goride.analytics.model.AnalyticsQueryOperation;
+import com.example.goride.analytics.model.AnalyticsSourceVariant;
 import com.example.goride.analytics.service.AdminAnalyticsQueryService;
+import com.example.goride.analytics.service.AnalyticsQueryObservation;
 import com.example.goride.common.api.ApiResponse;
 import com.example.goride.common.api.ErrorResponse;
 import com.example.goride.driver.domain.VehicleType;
@@ -27,7 +30,10 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.OffsetDateTime;
+import java.util.function.Function;
+import java.util.function.Supplier;
 
 @RestController
 @RequestMapping("/api/v1/admin/analytics")
@@ -87,9 +93,14 @@ import java.time.OffsetDateTime;
 })
 public class AdminAnalyticsController {
     private final AdminAnalyticsQueryService analyticsService;
+    private final AnalyticsQueryObservation queryObservation;
 
-    public AdminAnalyticsController(AdminAnalyticsQueryService analyticsService) {
+    public AdminAnalyticsController(
+            AdminAnalyticsQueryService analyticsService,
+            AnalyticsQueryObservation queryObservation
+    ) {
         this.analyticsService = analyticsService;
+        this.queryObservation = queryObservation;
     }
 
     @GetMapping("/overview")
@@ -142,13 +153,24 @@ public class AdminAnalyticsController {
             )
             @RequestParam(required = false) Long serviceAreaId
     ) {
-        return ApiResponse.ok(analyticsService.getOverview(
+        return observe(
+                AnalyticsQueryOperation.OVERVIEW,
                 from,
                 to,
                 timezone,
-                vehicleType,
-                serviceAreaId
-        ));
+                () -> analyticsService.getOverview(
+                        from,
+                        to,
+                        timezone,
+                        vehicleType,
+                        serviceAreaId
+                ),
+                response -> new QueryResultMetadata(
+                        response.sourceVariant(),
+                        response.dataFreshnessAt(),
+                        1
+                )
+        );
     }
 
     @GetMapping("/demand/timeseries")
@@ -205,14 +227,25 @@ public class AdminAnalyticsController {
             )
             @RequestParam AnalyticsBucket bucket
     ) {
-        return ApiResponse.ok(analyticsService.getDemandTimeseries(
+        return observe(
+                AnalyticsQueryOperation.DEMAND_TIMESERIES,
                 from,
                 to,
                 timezone,
-                vehicleType,
-                serviceAreaId,
-                bucket
-        ));
+                () -> analyticsService.getDemandTimeseries(
+                        from,
+                        to,
+                        timezone,
+                        vehicleType,
+                        serviceAreaId,
+                        bucket
+                ),
+                response -> new QueryResultMetadata(
+                        response.sourceVariant(),
+                        response.dataFreshnessAt(),
+                        response.points().size()
+                )
+        );
     }
 
     @GetMapping("/demand/heatmap")
@@ -299,18 +332,29 @@ public class AdminAnalyticsController {
             )
             @RequestParam(name = "maxLat", required = false) BigDecimal maxLatitude
     ) {
-        return ApiResponse.ok(analyticsService.getDemandHeatmap(
+        return observe(
+                AnalyticsQueryOperation.DEMAND_HEATMAP,
                 from,
                 to,
                 timezone,
-                vehicleType,
-                serviceAreaId,
-                cellSizeMeters,
-                minLongitude,
-                minLatitude,
-                maxLongitude,
-                maxLatitude
-        ));
+                () -> analyticsService.getDemandHeatmap(
+                        from,
+                        to,
+                        timezone,
+                        vehicleType,
+                        serviceAreaId,
+                        cellSizeMeters,
+                        minLongitude,
+                        minLatitude,
+                        maxLongitude,
+                        maxLatitude
+                ),
+                response -> new QueryResultMetadata(
+                        response.metadata().sourceVariant(),
+                        response.metadata().dataFreshnessAt(),
+                        response.features().size()
+                )
+        );
     }
 
     @GetMapping("/supply/timeseries")
@@ -367,14 +411,25 @@ public class AdminAnalyticsController {
             )
             @RequestParam AnalyticsBucket bucket
     ) {
-        return ApiResponse.ok(analyticsService.getSupplyTimeseries(
+        return observe(
+                AnalyticsQueryOperation.SUPPLY_TIMESERIES,
                 from,
                 to,
                 timezone,
-                vehicleType,
-                serviceAreaId,
-                bucket
-        ));
+                () -> analyticsService.getSupplyTimeseries(
+                        from,
+                        to,
+                        timezone,
+                        vehicleType,
+                        serviceAreaId,
+                        bucket
+                ),
+                response -> new QueryResultMetadata(
+                        response.sourceVariant(),
+                        response.dataFreshnessAt(),
+                        response.points().size()
+                )
+        );
     }
 
     @GetMapping("/matching/performance")
@@ -425,13 +480,24 @@ public class AdminAnalyticsController {
             )
             @RequestParam(required = false) Long serviceAreaId
     ) {
-        return ApiResponse.ok(analyticsService.getMatchingPerformance(
+        return observe(
+                AnalyticsQueryOperation.MATCHING_PERFORMANCE,
                 from,
                 to,
                 timezone,
-                vehicleType,
-                serviceAreaId
-        ));
+                () -> analyticsService.getMatchingPerformance(
+                        from,
+                        to,
+                        timezone,
+                        vehicleType,
+                        serviceAreaId
+                ),
+                response -> new QueryResultMetadata(
+                        response.sourceVariant(),
+                        response.dataFreshnessAt(),
+                        1
+                )
+        );
     }
 
     @GetMapping("/matching/funnel")
@@ -482,12 +548,56 @@ public class AdminAnalyticsController {
             )
             @RequestParam(required = false) Long serviceAreaId
     ) {
-        return ApiResponse.ok(analyticsService.getMatchingFunnel(
+        return observe(
+                AnalyticsQueryOperation.MATCHING_FUNNEL,
                 from,
                 to,
                 timezone,
-                vehicleType,
-                serviceAreaId
-        ));
+                () -> analyticsService.getMatchingFunnel(
+                        from,
+                        to,
+                        timezone,
+                        vehicleType,
+                        serviceAreaId
+                ),
+                response -> new QueryResultMetadata(
+                        response.sourceVariant(),
+                        response.dataFreshnessAt(),
+                        response.steps().size()
+                )
+        );
+    }
+
+    private <T> ApiResponse<T> observe(
+            AnalyticsQueryOperation operation,
+            OffsetDateTime from,
+            OffsetDateTime to,
+            String timezone,
+            Supplier<T> query,
+            Function<T, QueryResultMetadata> metadataExtractor
+    ) {
+        AnalyticsQueryObservation.Scope observation =
+                queryObservation.start(operation, from, to, timezone);
+        try {
+            T result = query.get();
+            QueryResultMetadata metadata = metadataExtractor.apply(result);
+            observation.success(
+                    metadata.sourceVariant(),
+                    metadata.freshnessAt(),
+                    metadata.resultRowCount()
+            );
+            return ApiResponse.ok(result);
+        }
+        catch (RuntimeException exception) {
+            observation.failure(exception);
+            throw exception;
+        }
+    }
+
+    private record QueryResultMetadata(
+            AnalyticsSourceVariant sourceVariant,
+            Instant freshnessAt,
+            long resultRowCount
+    ) {
     }
 }

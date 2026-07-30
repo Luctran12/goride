@@ -41,11 +41,13 @@ public class MaterializedAnalyticsRefreshService {
     private final Counter failureCounter;
     private final Counter skippedCounter;
     private final Timer durationTimer;
+    private final AnalyticsQueryObservation queryObservation;
 
     public MaterializedAnalyticsRefreshService(
             JdbcTemplate jdbcTemplate,
             PlatformTransactionManager transactionManager,
-            MeterRegistry meterRegistry
+            MeterRegistry meterRegistry,
+            AnalyticsQueryObservation queryObservation
     ) {
         this.jdbcTemplate = jdbcTemplate;
         this.refreshTransaction = new TransactionTemplate(transactionManager);
@@ -73,6 +75,7 @@ public class MaterializedAnalyticsRefreshService {
         this.durationTimer = Timer.builder("goride.analytics.materialized.refresh.duration")
                 .description("Materialized analytics refresh duration")
                 .register(meterRegistry);
+        this.queryObservation = queryObservation;
     }
 
     public RefreshResult refresh() {
@@ -87,6 +90,7 @@ public class MaterializedAnalyticsRefreshService {
             recordDuration(startedNanos);
             if (result.refreshed()) {
                 successCounter.increment();
+                queryObservation.observeMaterializedFreshness(result.cutoff());
                 log.info(
                         "Materialized analytics refresh completed cutoff={} concurrent={} durationMs={}",
                         result.cutoff(),
