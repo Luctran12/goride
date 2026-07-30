@@ -4,7 +4,7 @@
 >
 > Phase: 06 - API Hardening and Frontend Handoff
 >
-> Status: Frozen backend contract; pending Phase 6 review
+> Status: Frozen backend contract; Phase 6 approved
 
 ## 1. Common Contract
 

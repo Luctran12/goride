@@ -78,6 +78,7 @@ examples ma khong doc entity, sao chep cong thuc KPI hoac tu tinh percentile.
   shape.
 - Phase 6 dang cho user review. Khong bat dau Phase 7 dataset/benchmark va
   khong chon `MATERIALIZED` lam production default truoc khi duoc phe duyet.
+- User review: approved by request to implement Phase 7 on 2026-07-30.
 
 ---
 ## Commit: `feat: add materialized admin analytics read models`

@@ -1,6 +1,6 @@
 # GoRide Current Phase
 
-> Last updated: 2026-07-29
+> Last updated: 2026-07-30
 > Active branch: `codex/admin-v2`
 
 ## Repository Status
@@ -170,13 +170,14 @@ Admin Analytics Backend — Phase 5: Materialized Analytical Read Models.
 Phase 5 was approved by the user's request to continue with the next phase on
 2026-07-29.
 
-## Active Feature
+## Completed Phase
 
 Admin Analytics Backend — Phase 6: API Hardening and Frontend Handoff.
 
 ## Implementation Status
 
-Implementation is complete and awaiting user review.
+Implementation is complete and approved by the user's request to implement
+Phase 7 on 2026-07-30.
 
 ## Implemented Scope
 
@@ -209,5 +210,30 @@ Implementation is complete and awaiting user review.
 
 ## Review Gate
 
-User review is required. Phase 7 dataset generation and benchmarking must not
-begin until Phase 6 is approved.
+Phase 6 is approved.
+
+## Active Feature
+
+Admin Analytics Backend — Phase 7: Reproducible Dataset and Benchmark.
+
+## Planned Scope
+
+- Add deterministic smoke, medium and thesis dataset profiles with fixed seeds.
+- Generate valid operational, telemetry, spatial, supply and payment data
+  without using real user information.
+- Add an opt-in benchmark runner with a direct/materialized correctness gate.
+- Separate warm-up and measured iterations and retain every raw sample.
+- Capture environment, dataset, refresh, storage and query-plan artifacts.
+- Summarize average, P50, P95 and standard deviation from raw CSV samples.
+- Commit a small reproducible example; keep large generated runs out of Git.
+
+## Explicitly Out of Scope
+
+- Performance tuning or changing the production query variant.
+- Publishing a thesis performance claim before raw artifacts are reviewed.
+- Frontend implementation.
+
+## Review Gate
+
+Dataset methodology, raw artifacts and derived summaries require user review
+before Phase 8 begins.

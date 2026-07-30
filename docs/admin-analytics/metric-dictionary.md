@@ -4,7 +4,7 @@
 >
 > Phase: 06 - API Hardening and Frontend Handoff
 >
-> Status: Frozen metric semantics; pending Phase 6 review
+> Status: Frozen metric semantics; Phase 6 approved
 
 ## 1. Shared Conventions
 
