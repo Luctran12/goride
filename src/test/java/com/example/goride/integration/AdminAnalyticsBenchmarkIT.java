@@ -138,7 +138,13 @@ class AdminAnalyticsBenchmarkIT extends PostgresRedisIntegrationTest {
                 refreshEvidence.get(1).cutoff()
         );
         artifacts.writeJson("environment.json", environment);
-        artifacts.writeJson("storage.json", storageEvidence());
+        Map<String, Object> storage = storageEvidence();
+        assertThat(storage.get("analyticsStorageOverheadBytes"))
+                .isInstanceOf(Long.class)
+                .isNotEqualTo(0L);
+        assertThat(storage.get("materializedToSourceTotalRatio"))
+                .isInstanceOf(BigDecimal.class);
+        artifacts.writeJson("storage.json", storage);
 
         List<QuerySummary> summaries = new ArrayList<>();
         List<QueryCaseManifest> caseManifests = new ArrayList<>();
@@ -401,7 +407,7 @@ class AdminAnalyticsBenchmarkIT extends PostgresRedisIntegrationTest {
         return objectMapper.readTree(json);
     }
 
-    private List<Map<String, Object>> storageEvidence() {
+    private Map<String, Object> storageEvidence() {
         List<String> sourceTables = List.of(
                 "users",
                 "trips",
@@ -421,7 +427,56 @@ class AdminAnalyticsBenchmarkIT extends PostgresRedisIntegrationTest {
         List<Map<String, Object>> evidence = new ArrayList<>();
         sourceTables.forEach(name -> evidence.add(relationSize(name, "SOURCE_TABLE")));
         materializedViews.forEach(name -> evidence.add(relationSize(name, "MATERIALIZED_VIEW")));
-        return List.copyOf(evidence);
+        Map<String, Long> sourceTotals = storageTotals(evidence, "SOURCE_TABLE");
+        Map<String, Long> materializedTotals = storageTotals(
+                evidence,
+                "MATERIALIZED_VIEW"
+        );
+        long sourceTotalBytes = sourceTotals.get("totalBytes");
+        long overheadBytes = materializedTotals.get("totalBytes");
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("source", sourceTotals);
+        result.put("materialized", materializedTotals);
+        result.put("analyticsStorageOverheadBytes", overheadBytes);
+        result.put(
+                "materializedToSourceTotalRatio",
+                sourceTotalBytes == 0
+                        ? null
+                        : BigDecimal.valueOf(overheadBytes)
+                                .divide(
+                                        BigDecimal.valueOf(sourceTotalBytes),
+                                        6,
+                                        RoundingMode.HALF_UP
+                                )
+        );
+        result.put("relations", List.copyOf(evidence));
+        return Collections.unmodifiableMap(result);
+    }
+
+    private Map<String, Long> storageTotals(
+            List<Map<String, Object>> relations,
+            String kind
+    ) {
+        long tableBytes = 0;
+        long indexBytes = 0;
+        long totalBytes = 0;
+        for (Map<String, Object> relation : relations) {
+            if (!kind.equals(relation.get("kind"))) {
+                continue;
+            }
+            tableBytes += ((Number) relation.get("tableBytes")).longValue();
+            indexBytes += ((Number) relation.get("indexBytes")).longValue();
+            totalBytes += ((Number) relation.get("totalBytes")).longValue();
+        }
+        Map<String, Long> totals = new LinkedHashMap<>();
+        totals.put("relationCount", relations.stream()
+                .filter(relation -> kind.equals(relation.get("kind")))
+                .count());
+        totals.put("tableBytes", tableBytes);
+        totals.put("indexBytes", indexBytes);
+        totals.put("totalBytes", totalBytes);
+        return Collections.unmodifiableMap(totals);
     }
 
     private Map<String, Object> relationSize(String relation, String kind) {
