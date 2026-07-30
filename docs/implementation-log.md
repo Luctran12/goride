@@ -5,6 +5,48 @@
 > Tu commit `feat: add matching driver search` tro di, moi commit backend can cap nhat file nay trong cung commit.
 
 ---
+## Commit: `test: validate admin analytics release chain`
+
+Branch: `codex/admin-v2`
+
+Phase: Admin Analytics Backend — Phase 8: Hardening and Thesis Artifacts
+
+Commit hash: `d86cb77`
+
+### Muc tieu
+
+Xac minh ba database release cua Admin Analytics hoat dong nhu mot dependency
+chain hoan chinh va rollback duoc theo thu tu nguoc tren PostgreSQL/PostGIS sach.
+
+### Noi dung da trien khai
+
+- Them isolated Testcontainers PostgreSQL/PostGIS integration test.
+- Chay `precheck.sql`, `apply.sql`, `verify.sql` theo thu tu telemetry, spatial
+  indexes, materialized read models.
+- Kiem tra cac table, index, refresh state va bon materialized view ton tai sau
+  apply.
+- Chay rollback theo thu tu Phase 5, Phase 4, Phase 1 va kiem tra tat ca object
+  trong pham vi da duoc go bo.
+- Thay `related_commit: pending` cua telemetry va spatial release bang commit
+  code thuc te de giu traceability.
+
+### Review va validation
+
+- Repository validator `scripts/validate-db-release.ps1 -All`: pass cho template
+  va 11 release folders.
+- Isolated PostgreSQL/PostGIS release-chain integration: 1 test passed.
+- Manual review xac nhan apply/rollback dung dependency order, test database
+  cach ly va cleanup duoc chay trong `finally`.
+- `git diff --check`: pass; chi co warning LF/CRLF tren Windows.
+
+### Rui ro da biet
+
+- Validator folder la static validation; integration test moi la evidence cho
+  SQL execution.
+- Production deployment van phai backup, luu output precheck/verify va uoc luong
+  index/initial refresh duration trong release window.
+
+---
 ## Commit: `feat: harden admin analytics operations`
 
 Branch: `codex/admin-v2`

@@ -6,8 +6,8 @@
 ## Repository Status
 
 - Base development commit: `e6aba60`.
-- Latest completed implementation commit: `a77b4f2`
-  (`feat: harden admin analytics operations`).
+- Latest completed implementation commit: `d86cb77`
+  (`test: validate admin analytics release chain`).
 - Latest approved implementation commit: `aaea493`
   (`test: report benchmark storage overhead`).
 - Latest planning commit: `0c0e080` (`docs: add admin analytics implementation plan`).
@@ -278,8 +278,9 @@ Admin Analytics Backend — Phase 8: Hardening and Thesis Artifacts.
 - Operational observability and runtime configuration hardening are complete in
   `a77b4f2`.
 - Focused analytics/config validation passed with 37 tests.
-- Next commit scope: validate the complete Admin Analytics database release
-  chain, then finalize thesis traceability and evaluation documentation.
+- Complete apply/verify/reverse-rollback release-chain validation passed in
+  `d86cb77`; the repository validator also passed for every release folder.
+- Next commit scope: finalize thesis traceability and evaluation documentation.
 
 ## Explicitly Out of Scope
 

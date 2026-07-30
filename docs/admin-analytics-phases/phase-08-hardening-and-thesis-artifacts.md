@@ -25,7 +25,7 @@ Finalize backend quality, operational safety and traceability for thesis reporti
   datasource guardrails.
 - [x] Add bounded-cardinality query latency/error metrics and materialized
   freshness observation.
-- [ ] Validate the complete Admin Analytics release chain.
+- [x] Validate the complete Admin Analytics release chain.
 - [ ] Complete security/rate-limit/observability evidence.
 - [ ] Add thesis traceability, architecture/data-flow, limitations and
   future-work artifacts.
