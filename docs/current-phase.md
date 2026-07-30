@@ -8,8 +8,8 @@
 - Base development commit: `e6aba60`.
 - Latest completed implementation commit: `aaea493`
   (`test: report benchmark storage overhead`).
-- Latest approved implementation commit: `140c70a`
-  (`feat: harden admin analytics API handoff`).
+- Latest approved implementation commit: `aaea493`
+  (`test: report benchmark storage overhead`).
 - Latest planning commit: `0c0e080` (`docs: add admin analytics implementation plan`).
 - The user explicitly selected `codex/admin-v2` for the Admin Analytics backend work.
 - User-owned `.codex-tmp/` and `deliverables/` content must remain untouched and uncommitted.
@@ -212,14 +212,14 @@ Phase 7 on 2026-07-30.
 
 Phase 6 is approved.
 
-## Active Feature
+## Completed Phase
 
 Admin Analytics Backend — Phase 7: Reproducible Dataset and Benchmark.
 
 ## Implementation Status
 
-Implementation and controlled smoke evidence are complete. Phase 7 is waiting
-for user review before Phase 8 may begin.
+Implementation and controlled smoke evidence are complete and approved by the
+user's request to implement Phase 8 on 2026-07-30.
 
 ## Implemented Scope
 
@@ -251,5 +251,36 @@ for user review before Phase 8 may begin.
 
 ## Review Gate
 
-Dataset methodology, raw artifacts and derived summaries require user review
-before Phase 8 begins.
+Phase 7 is approved. The smoke output remains development evidence only and
+must not be presented as a thesis-scale performance claim.
+
+## Active Feature
+
+Admin Analytics Backend — Phase 8: Hardening and Thesis Artifacts.
+
+## Planned Scope
+
+- Review query/index evidence without changing the production query variant
+  beyond what the evidence supports.
+- Remove committed database credentials and document secure runtime
+  configuration.
+- Complete bounded-cardinality analytics query, telemetry and freshness
+  observability.
+- Verify Admin RBAC, rate limiting, query guardrails and failure behavior.
+- Validate all release folders and execute the Admin Analytics release chain
+  against PostgreSQL/PostGIS.
+- Create architecture/data-flow diagrams, a thesis traceability matrix,
+  limitations and future-work documentation.
+- Run the full applicable backend test suite and perform a final manual review.
+
+## Explicitly Out of Scope
+
+- Selecting `MATERIALIZED` as the production default from smoke evidence.
+- Publishing thesis-scale latency or storage claims before a controlled
+  `thesis` profile is run and reviewed.
+- Forecasting, anomaly detection and frontend implementation.
+
+## Review Gate
+
+Phase 8 must stop for final user review after every implementation commit has
+review notes and all acceptance criteria have evidence.

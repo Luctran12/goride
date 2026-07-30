@@ -46,6 +46,7 @@ bytes va materialized/source ratio, thay vi chi luu kich thuoc tung relation.
 - Ratio cua smoke artifact chi mo ta dung dataset va environment da ghi trong
   manifest; khong duoc ngoai suy thanh thesis-scale storage overhead.
 - Phase 7 van cho user review truoc khi Phase 8 bat dau.
+- User review: approved by request to implement Phase 8 on 2026-07-30.
 
 ---
 ## Commit: `test: add reproducible analytics benchmark`

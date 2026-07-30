@@ -85,3 +85,5 @@ The committed evidence is at
 Review methodology and raw artifacts before using results in the thesis.
 The committed smoke output is development evidence only; it is not a thesis
 performance claim. The `thesis` profile must be run and reviewed separately.
+
+Phase 7 was approved by the user's request to implement Phase 8 on 2026-07-30.
