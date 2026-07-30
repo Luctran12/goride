@@ -113,7 +113,7 @@ Test source is under
 | 5 — materialized read models | `4060b6b` |
 | 6 — API hardening and handoff | `140c70a` |
 | 7 — reproducible benchmark | `54dbb62`, `aaea493` |
-| 8 — operational hardening and release validation | `a77b4f2`, `d86cb77` |
+| 8 — operational hardening, release validation and thesis artifacts | `a77b4f2`, `d86cb77`, `191760e` |
 
 Detailed review notes are maintained in
 [the implementation log](../implementation-log.md).

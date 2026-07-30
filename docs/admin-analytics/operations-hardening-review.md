@@ -126,3 +126,15 @@ Production still requires the checklist in
 [the database release process](../database-release-process.md): backup,
 environment precheck, apply, verify output retention, API smoke test and a
 prepared rollback.
+
+## 8. Final Validation
+
+- Focused analytics/config hardening: 37 tests passed.
+- Isolated PostgreSQL/PostGIS release chain: 1 test passed.
+- Focused benchmark/thesis artifacts: 7 tests passed.
+- Full backend regression: 518 tests passed, with no failure, error or skipped
+  test.
+- The release repository validator passed for the template and all 11 release
+  folders.
+- All relative links in the Admin Analytics documentation resolve.
+- Final manual review found no unresolved correctness blocker.

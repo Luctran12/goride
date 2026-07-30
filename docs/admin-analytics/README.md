@@ -4,7 +4,7 @@
 >
 > Benchmark protocol version: 1.0
 >
-> Core scope status: Phase 8 hardening in progress
+> Core scope status: Phase 8 implementation complete; awaiting user review
 
 Use this directory as the entry point for implementation, frontend handoff and
 thesis evidence.

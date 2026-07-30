@@ -5,6 +5,52 @@
 > Tu commit `feat: add matching driver search` tro di, moi commit backend can cap nhat file nay trong cung commit.
 
 ---
+## Commit: `docs: finalize admin analytics evaluation artifacts`
+
+Branch: `codex/admin-v2`
+
+Phase: Admin Analytics Backend — Phase 8: Hardening and Thesis Artifacts
+
+Commit hash: `191760e`
+
+### Muc tieu
+
+Hoan tat bo ho so co the truy vet cho kien truc, van hanh, danh gia va gioi han
+phat bieu cua phan he Admin Analytics trong luan van.
+
+### Noi dung da trien khai
+
+- Them tai lieu tong quan lam entry point cho hop dong, van hanh va evidence.
+- Them so do kien truc, data ownership, write flow va direct/materialized query
+  routing.
+- Lap ma tran objective-metric-API-test-benchmark va trace chinh xac Q01-Q10,
+  seed, fingerprint, raw sample, query plan, storage va checksum.
+- Ghi lai ket qua security/rate-limit/observability review.
+- Phan tach ro smoke methodology evidence voi thesis-scale performance claim.
+- Ghi gioi han, quy trinh thesis-scale bat buoc va future work; forecasting va
+  anomaly detection van nam ngoai core claim.
+
+### Review va validation
+
+- Focused benchmark/thesis artifact suite: 7 tests passed.
+- Full backend regression suite: 518 tests passed, 0 failures, 0 errors va
+  0 skipped.
+- Tat ca relative link trong `docs/admin-analytics/` resolve.
+- Database release validator pass cho template va 11 release folders.
+- Manual review xac nhan moi claim co nguon evidence hoac duoc danh dau pending;
+  `DIRECT` van la production default.
+- `git diff --check`: pass; chi co warning LF/CRLF tren Windows.
+
+### Rui ro da biet
+
+- Smoke dataset chi xac minh quy trinh va khong duoc dung lam thesis-scale
+  performance claim.
+- Controlled `thesis` profile run van la buoc danh gia tiep theo neu can cong bo
+  latency/storage trong luan van.
+- Database credential cu phai duoc rotate tai provider vi van ton tai trong Git
+  history.
+
+---
 ## Commit: `test: validate admin analytics release chain`
 
 Branch: `codex/admin-v2`

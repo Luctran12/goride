@@ -6,8 +6,8 @@
 ## Repository Status
 
 - Base development commit: `e6aba60`.
-- Latest completed implementation commit: `d86cb77`
-  (`test: validate admin analytics release chain`).
+- Latest completed implementation commit: `191760e`
+  (`docs: finalize admin analytics evaluation artifacts`).
 - Latest approved implementation commit: `aaea493`
   (`test: report benchmark storage overhead`).
 - Latest planning commit: `0c0e080` (`docs: add admin analytics implementation plan`).
@@ -258,29 +258,38 @@ must not be presented as a thesis-scale performance claim.
 
 Admin Analytics Backend — Phase 8: Hardening and Thesis Artifacts.
 
-## Planned Scope
+## Implementation Status
 
-- Review query/index evidence without changing the production query variant
-  beyond what the evidence supports.
-- Remove committed database credentials and document secure runtime
-  configuration.
-- Complete bounded-cardinality analytics query, telemetry and freshness
-  observability.
-- Verify Admin RBAC, rate limiting, query guardrails and failure behavior.
-- Validate all release folders and execute the Admin Analytics release chain
-  against PostgreSQL/PostGIS.
-- Create architecture/data-flow diagrams, a thesis traceability matrix,
-  limitations and future-work documentation.
-- Run the full applicable backend test suite and perform a final manual review.
+Implementation is complete and is waiting for the user's final Phase 8 review.
 
-## Implementation Progress
+## Implemented Scope
 
-- Operational observability and runtime configuration hardening are complete in
-  `a77b4f2`.
-- Focused analytics/config validation passed with 37 tests.
-- Complete apply/verify/reverse-rollback release-chain validation passed in
-  `d86cb77`; the repository validator also passed for every release folder.
-- Next commit scope: finalize thesis traceability and evaluation documentation.
+- Removed runtime database credentials from source configuration and added
+  production datasource guardrails.
+- Added bounded-cardinality query latency/error metrics, structured query logs
+  and materialized-freshness observation.
+- Re-reviewed Admin RBAC, global rate limiting, query guardrails, timeout and
+  sensitive-log behavior.
+- Validated every database release folder and the complete Admin Analytics
+  apply/verify/reverse-rollback chain against PostgreSQL/PostGIS.
+- Recorded architecture/data-flow diagrams, security/operations review,
+  objective-to-evidence traceability, limitations and prioritized future work.
+- Reviewed the smoke benchmark evidence without changing `DIRECT` as the
+  production default or promoting smoke data to a thesis-scale claim.
+
+## Validation
+
+- Focused analytics/config hardening suite: 37 tests passed.
+- Isolated PostgreSQL/PostGIS release-chain suite: 1 test passed.
+- Focused benchmark/thesis artifact suite: 7 tests passed.
+- Full backend regression suite: 518 tests passed, 0 failures, 0 errors and
+  0 skipped.
+- Database release repository validator passed for the template and all 11
+  release folders.
+- All relative links in `docs/admin-analytics/` resolve.
+- `git diff --check` passed; only existing Windows LF/CRLF warnings were
+  reported.
+- Final manual review found no unresolved correctness blocker.
 
 ## Explicitly Out of Scope
 
@@ -291,5 +300,6 @@ Admin Analytics Backend — Phase 8: Hardening and Thesis Artifacts.
 
 ## Review Gate
 
-Phase 8 must stop for final user review after every implementation commit has
-review notes and all acceptance criteria have evidence.
+Phase 8 is waiting for final user review. The database credential removed from
+the working tree must still be rotated at the provider because it remains in
+Git history. No further phase is started automatically.
