@@ -1,10 +1,10 @@
 # Admin Analytics Benchmark Protocol
 
-> Version: 1.0-draft
+> Version: 1.0
 >
-> Phase: 00 - Contracts and Architecture
+> Phase: 07 - Reproducible Dataset and Benchmark
 >
-> Status: Proposed for review
+> Status: Implemented; methodology and raw evidence pending review
 
 ## 1. Objective
 
@@ -51,7 +51,7 @@ How does spatial heatmap latency change with date range and cell size?
 | --- | ---: | ---: | ---: | --- |
 | `smoke` | 1,000 | 2,500 | 20,000 | Local correctness and script smoke |
 | `medium` | 25,000 | 65,000 | 500,000 | Development tuning |
-| `thesis` | 100,000 | 250,000 target | 2,000,000 | Reported experiment |
+| `thesis` | 100,000 | 250,000 | 2,000,000 | Reported experiment |
 
 Each generation run records:
 
@@ -63,7 +63,10 @@ Each generation run records:
 - PostgreSQL/PostGIS version;
 - generation duration.
 
-The thesis profile uses a fixed published seed. Additional seeds may be used for sensitivity analysis but cannot replace the published baseline silently.
+The published thesis seed is `5537`. Additional seeds may be used for
+sensitivity analysis but cannot replace the published baseline silently.
+Profile definitions are versioned in
+[`profiles.json`](../../benchmarks/admin-analytics/profiles.json).
 
 ---
 
@@ -98,7 +101,8 @@ Before timing:
 
 1. Refresh materialized views to a recorded cutoff.
 2. Run direct queries with the same cutoff.
-3. Normalize ordering and numeric scale.
+3. Normalize stable ordering and numbers to 9 decimal places, which is stricter
+   than the scale of the published API metrics.
 4. Compare every metric and every returned bucket/cell.
 5. Stop the benchmark if results differ.
 
@@ -153,7 +157,8 @@ For each query and variant:
 2. Run 10 warm-up iterations.
 3. Run 50 measured iterations.
 4. Record each raw duration independently.
-5. Randomize direct/materialized execution order between repeated benchmark runs.
+5. Alternate direct/materialized execution order deterministically from the
+   dataset seed, query ID and iteration so neither variant always runs first.
 6. Record query errors; do not drop failed samples silently.
 7. Capture one representative `EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON)`.
 
@@ -229,11 +234,11 @@ benchmark-results/
     dataset-manifest.json
     correctness.json
     samples/
-      Q01_DIRECT.csv
-      Q01_MATERIALIZED.csv
+      Q01_OVERVIEW_7D_DIRECT.csv
+      Q01_OVERVIEW_7D_MATERIALIZED.csv
     explain/
-      Q01_DIRECT.json
-      Q01_MATERIALIZED.json
+      Q01_OVERVIEW_7D_DIRECT.json
+      Q01_OVERVIEW_7D_MATERIALIZED.json
     refresh/
       refresh-samples.csv
     storage.json
@@ -249,6 +254,11 @@ Generated artifacts are not committed when excessively large. The repository mus
 - example small output;
 - checksum/location instructions for thesis artifacts.
 
+The executable generator, runner and summarizer are documented in
+[`benchmarks/admin-analytics/README.md`](../../benchmarks/admin-analytics/README.md).
+The runner refuses non-empty output directories and writes SHA-256 checksums
+after every core artifact.
+
 ---
 
 ## 12. Reporting Rules
@@ -259,4 +269,3 @@ Generated artifacts are not committed when excessively large. The repository mus
 - Do not generalize beyond tested ranges.
 - Preserve failed runs and explain exclusions.
 - Link every thesis table to a query ID and raw artifact set.
-

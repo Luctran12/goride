@@ -41,3 +41,6 @@ secrets/
 
 ### Local uploads ###
 uploads/
+
+### Reproducible benchmark runs ###
+/benchmark-results/

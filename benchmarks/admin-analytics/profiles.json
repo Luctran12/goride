@@ -1,0 +1,36 @@
+{
+  "generatorVersion": "1.0",
+  "publishedThesisSeed": 5537,
+  "profiles": {
+    "smoke": {
+      "users": 100,
+      "drivers": 25,
+      "trips": 1000,
+      "matchingRuns": 1000,
+      "matchingOffers": 2500,
+      "driverSupplySnapshots": 1000,
+      "locationPoints": 20000,
+      "payments": 800
+    },
+    "medium": {
+      "users": 2500,
+      "drivers": 250,
+      "trips": 25000,
+      "matchingRuns": 25000,
+      "matchingOffers": 65000,
+      "driverSupplySnapshots": 12500,
+      "locationPoints": 500000,
+      "payments": 20000
+    },
+    "thesis": {
+      "users": 10000,
+      "drivers": 1000,
+      "trips": 100000,
+      "matchingRuns": 100000,
+      "matchingOffers": 250000,
+      "driverSupplySnapshots": 50000,
+      "locationPoints": 2000000,
+      "payments": 80000
+    }
+  }
+}
