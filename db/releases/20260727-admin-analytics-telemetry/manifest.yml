@@ -7,7 +7,7 @@ transactional: true
 requires_downtime: false
 applies_after:
   - 20260711-payment-sandbox-uat-actor-fk
-related_commit: pending
+related_commit: 92a6bc6
 environments:
   - local
   - staging

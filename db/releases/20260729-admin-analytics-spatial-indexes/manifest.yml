@@ -7,7 +7,7 @@ transactional: true
 requires_downtime: false
 applies_after:
   - 20260727-admin-analytics-telemetry
-related_commit: pending
+related_commit: 05b96e0
 environments:
   - staging
   - production
