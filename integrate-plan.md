@@ -1,6 +1,6 @@
 # GoRide Front-end Integration Plan
 
-Branch dang cap nhat: `feature/redis-rate-limit-store`
+Branch dang cap nhat: `codex/word-location-mobile`
 
 Muc tieu file nay:
 - Checklist chuc nang backend da co code va co the tich hop FE.
@@ -303,6 +303,17 @@ type PaymentSandboxUatStatus = "NOT_RUN" | "BLOCKED" | "FAILED" | "PASSED";
 - [x] Booking estimate/create reject pickup/dropoff ngoai active service area bang `LOCATION_OUT_OF_SERVICE_AREA`.
 - [x] Rollout an toan: neu chua co active service area nao, backend khong block booking hien tai.
 - [x] Neu service area bi overlap/nested, backend chap nhan booking khi pickup/dropoff co it nhat mot active area chung; FE khong can tu suy luan theo polygon dau tien.
+
+### Three-word location lookup
+
+- [x] Backend proxy service Python, mobile khong goi Flask truc tiep.
+- [x] Passenger doi `lat/lng` sang 3 tu qua `GET /api/v1/locations/to-words`.
+- [x] Response mobile doi `_` trong tu ghep thanh khoang trang de hien thi than thien, vi du `khuon_mat` -> `khuon mat`.
+- [x] Driver doi `address=word.word.word` sang `lat/lng` qua `GET /api/v1/locations/to-coordinate`.
+- [x] Hai endpoint yeu cau JWT role `PASSENGER` hoac `DRIVER`.
+- [x] Booking van dung `lat`, `lng`, street `address` lam source of truth.
+- [x] Contract React Native, UI state va error mapping nam tai `docs/three-word-location-mobile-integration.md`.
+- [x] Backend disabled mac dinh va reject response provider neu address khong khop, bounds bi dao nguoc hoac toa do nam ngoai cell.
 
 ### In-trip messaging
 
@@ -2864,7 +2875,7 @@ Payment sandbox release order:
 
 - [ ] Auth screen: register/login/refresh/logout.
 - [ ] FCM token registration sau login/refresh token.
-- [ ] Home map: chon pickup/dropoff/vehicleType, goi estimate.
+- [ ] Home map: chon pickup/dropoff/vehicleType; sau khi chon pin co nut `Lay 3 tu`, roi goi estimate bang toa do hien tai.
 - [ ] Booking confirm: goi create booking; neu dat lich gui `scheduledPickupTime` ISO-8601 UTC, neu dat ngay gui
 ull`/bo field.
 - [ ] Finding driver: subscribe trip status + notifications.
@@ -2887,6 +2898,7 @@ ull`/bo field.
 - [ ] Online toggle with current GPS.
 - [ ] Offer modal from `/user/queue/trip-requests`, including `TRIP_CANCELLED`/`DISMISS` payload to close stale offers.
 - [ ] Driver navigation: goi `POST /api/v1/drivers/trips/{tripId}/route`, ve GeoJSON route den pickup/dropoff va debounce re-route.
+- [ ] Driver three-word lookup: mo sheet `Tim bang 3 tu`, preview marker/bounds va chi dan duong sau khi driver xac nhan.
 - [ ] Chat panel: load/send/subscribe trip messages nhu passenger app.
 - [ ] Trip workflow buttons: arrived/start/complete.
 - [ ] Location sender while `IN_PROGRESS`.
@@ -2928,6 +2940,10 @@ ull`/bo field.
 | `PAYMENT_INVALID_STATUS`, `PAYMENT_NOT_FOUND` | Refresh payment/trip, tranh double confirm. |
 | `PAYMENT_PROVIDER_UNSUPPORTED` | Provider payment chua duoc backend enable; refresh/cau hinh lai payment method. |
 | `PAYMENT_PROVIDER_ERROR` | Hien loi tam thoi cua cong thanh toan, cho retry checkout; khong danh dau payment da thanh cong. |
+| `WORD_LOCATION_INVALID_ADDRESS` | Giu input, hien format `word.word.word`. |
+| `WORD_LOCATION_NOT_FOUND` | Giu input va yeu cau kiem tra lai 3 tu. |
+| `WORD_LOCATION_OUT_OF_BOUNDS` | Giu map pin va fallback ve toa do/address thuong. |
+| `WORD_LOCATION_PROVIDER_UNAVAILABLE`, `WORD_LOCATION_PROVIDER_ERROR` | Tinh nang la optional: cho retry/fallback, khong chan booking hay trip navigation. |
 | `ROUTING_PROVIDER_ERROR` | Hien khong the tinh lo trinh, giu du lieu pickup/dropoff va cho retry. |
 | `SURGE_PRICING_RULE_NOT_FOUND` | Admin refresh danh sach rule; rule da bi xoa/khong ton tai. |
 | `TRIP_ROUTE_NOT_AVAILABLE` | Dung navigation va refresh trip; status hien tai khong cho route pickup/dropoff. |

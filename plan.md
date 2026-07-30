@@ -1,19 +1,19 @@
 # GoRide Project Completion Plan
 
-Last updated: 2026-07-24, Asia/Bangkok
+Last updated: 2026-07-27, Asia/Bangkok
 
 ## Project Snapshot
 
 | Item | Status |
 | --- | --- |
-| Working branch | `feature/driver-location-bootstrap` |
-| Latest merged feature on develop | `feature/trip-surge-schema-default` via `eee3359` |
-| Develop base commit for this feature | `eee3359` (`merge: harden trip startup and offer access`) |
-| Current feature | Bootstrap passenger-visible driver location immediately after offer acceptance |
-| Test status | Targeted availability/matching/tracking suite passed 26 tests; full Maven ran 470 tests with 460 pass and 10 Docker/Testcontainers initialization errors |
+| Working branch | `codex/word-location-mobile` |
+| Latest merged feature on develop | `feature/driver-location-bootstrap` via `5b941d6` |
+| Develop base commit for this feature | `5b941d6` (`merge: driver location bootstrap`) |
+| Current feature | Custom three-word location gateway and mobile integration contract |
+| Test status | Targeted location/security suite passed 32 tests; full Maven ran 495 tests with 485 pass, 0 failures and 10 Docker/Testcontainers initialization errors |
 | Diff hygiene | `git diff --check` passed; Windows line-ending warnings only |
 | Code review | Internal review completed; CodeRabbit CLI is unavailable in PATH |
-| Publish status | Feature implementation is on its review branch and is not merged or pushed |
+| Publish status | Feature implementation approved for local develop merge; not pushed |
 | Local config | `src/main/resources/application.yml` is environment-specific and must stay uncommitted |
 
 ## Completed Backend Modules
@@ -26,6 +26,7 @@ Last updated: 2026-07-24, Asia/Bangkok
 | Driver profile and availability | Driver profile creation/update, uploaded portrait/license/ID/vehicle-registration URL metadata, admin approval flow, online/offline status, heartbeat refresh and automatic stale-driver timeout | `/api/v1/drivers/me/profile`, `/api/v1/drivers/me/status`, `POST /api/v1/drivers/me/heartbeat`, admin approval endpoints | Admin pending-driver responses include uploaded document URLs when FE submits them during onboarding. |
 | Pricing and routing | Fare estimate with base/static/dynamic surge breakdown, OSRM-compatible route distance/duration, driver navigation GeoJSON/steps, configurable estimate fallback, pricing configuration and admin surge rule management | `/api/v1/bookings/estimate`, `POST /api/v1/drivers/trips/{tripId}/route`, `/api/v1/pricing`, `/api/v1/admin/pricing`, `/api/v1/admin/pricing/surge-rules`, `/api/v1/admin/pricing/surge-status` | Estimate/create booking can use routed distance/time and demand/supply surge; assigned drivers can request pickup/dropoff routes; completed-trip fare uses actual tracking history with the booking-time surge multiplier snapshot. |
 | Service areas | Public active service area list, admin CRUD/deactivate foundation, pickup/dropoff geofence validation before fare calculation and booking creation | `GET /api/v1/service-areas`, `/api/v1/admin/service-areas`, `/api/v1/bookings/estimate`, `/api/v1/bookings` | Merged into `develop`; no active service areas means rollout remains open, once active areas exist pickup/dropoff must share at least one active area or backend returns `LOCATION_OUT_OF_SERVICE_AREA`. |
+| Three-word location | Authenticated gateway to custom Python coordinate/three-word conversion, normalized mobile DTOs and stable provider errors | `GET /api/v1/locations/to-words`, `GET /api/v1/locations/to-coordinate` | Provider is disabled by default; coordinates remain booking/routing source of truth. |
 | Booking | Create booking, scheduled booking, booking detail, passenger history/listing, cancellation rules/status updates | `/api/v1/bookings` and related detail/cancel/list endpoints | Booking lifecycle is connected to matching and trip creation; scheduled bookings stay `SCHEDULED` until dispatch window opens. |
 | Trip lifecycle | Driver response, arrived/start/complete transitions, passenger/driver trip history, payment confirmation hooks | `/api/v1/drivers/trips/{tripId}/respond`, `/status`, `/payment-confirm` | Trip completion can compute final fare from tracking history. |
 | Matching | Nearby driver lookup, offer dispatch, accept/reject handling, timeout handling, retry/no-driver flow, rematch on driver availability, scheduled ride dispatch into matching | Internal matching services, scheduled ride scheduler and driver availability events | Initial no-candidate booking remains `SEARCHING`; driver reject/offer timeout also keeps the trip searchable when no immediate next driver is available; scheduled rides open matching at the configured dispatch lead time; driver online/heartbeat events retry unmatched searching trips and dispatch offers when a candidate becomes available; passenger cancellation clears active matching state/driver lock and dismisses the stale driver offer. |
@@ -69,6 +70,7 @@ Last updated: 2026-07-24, Asia/Bangkok
 | Admin driver approval | `/api/v1/admin/drivers/pending`, approval endpoint | Review pending drivers and approve/reject with reason. |
 | Admin surge pricing | `/api/v1/admin/pricing/surge-rules`, `/api/v1/admin/pricing/surge-status` | Build CRUD/status tools for dynamic surge rules; use current status to show demand/supply and matched rule by vehicle type. |
 | Service areas | `GET /api/v1/service-areas`, `/api/v1/admin/service-areas` | Load active polygons for map hints; admin can create/update/deactivate service zones; handle `LOCATION_OUT_OF_SERVICE_AREA` from estimate/create booking by asking user to choose pickup/dropoff inside one active zone. |
+| Three-word location | `/api/v1/locations/to-words`, `/api/v1/locations/to-coordinate` | Passenger resolves a selected pin on demand; driver searches and previews a three-word result before navigation confirmation. |
 | Fare estimate | `/api/v1/bookings/estimate` | Show fare/distance/time plus `baseFare`, `surgeAmount`, static/dynamic/effective multipliers and a surge badge when `surge.surgeApplied=true`; never recalculate fare on FE. |
 | Passenger booking | `/api/v1/bookings` | Create immediate booking or scheduled booking with optional `scheduledPickupTime`, show matching progress for `SEARCHING`, show scheduled waiting state for `SCHEDULED`, display the `fareSurgeMultiplier` snapshot on trip detail if needed, allow cancel when allowed. |
 | Driver offers | Driver trip offer APIs and user-specific WebSocket notifications | Display incoming offer countdown, accept/reject, handle timeout, and close stale offer modal when `/user/queue/trip-requests` receives `TRIP_CANCELLED`/`DISMISS`. |

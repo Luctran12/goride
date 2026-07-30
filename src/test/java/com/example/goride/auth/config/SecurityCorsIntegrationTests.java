@@ -6,6 +6,7 @@ import com.example.goride.booking.repository.TripRepository;
 import com.example.goride.booking.repository.TripStatusHistoryRepository;
 import com.example.goride.chat.repository.TripMessageRepository;
 import com.example.goride.driver.repository.DriverProfileRepository;
+import com.example.goride.location.config.ThreeWordLocationProperties;
 import com.example.goride.notification.repository.NotificationRepository;
 import com.example.goride.payment.repository.PaymentRepository;
 import com.example.goride.payment.repository.PaymentSandboxE2eSessionRepository;
@@ -22,6 +23,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.http.HttpMethod.GET;
 import static org.springframework.http.HttpMethod.POST;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -78,6 +80,9 @@ class SecurityCorsIntegrationTests {
     @Resource
     private MockMvc mockMvc;
 
+    @Resource
+    private ThreeWordLocationProperties threeWordLocationProperties;
+
     @Test
     void allowsConfiguredFrontendOriginForPreflightBeforeJwtAuthentication() throws Exception {
         mockMvc.perform(options("/api/v1/notifications")
@@ -111,6 +116,20 @@ class SecurityCorsIntegrationTests {
                 .andExpect(jsonPath("$.observability.tracingEnabled").value(false))
                 .andExpect(jsonPath("$.observability.otlpExportEnabled").value(false))
                 .andExpect(jsonPath("$.observability.endpoint").doesNotExist());
+    }
+
+    @Test
+    void requiresAuthenticationForThreeWordLocationLookup() throws Exception {
+        mockMvc.perform(get("/api/v1/locations/to-words")
+                        .param("lat", "10.7769")
+                        .param("lng", "106.7009"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.error.code").value("TOKEN_INVALID"));
+    }
+
+    @Test
+    void keepsThreeWordLocationProviderDisabledByDefault() {
+        assertThat(threeWordLocationProperties.isEnabled()).isFalse();
     }
 
     @Test

@@ -6,6 +6,60 @@
 
 ---
 
+## Planned commit: `feat: integrate three-word mobile location lookup`
+
+Branch: `codex/word-location-mobile`
+
+Phase: Product expansion / mobile map location lookup
+
+### Muc tieu
+
+Tich hop hai API Python tu viet vao GoRide backend de passenger doi map pin sang cum 3 tu va driver tra cum 3 tu thanh toa do preview tren map, trong khi `lat/lng` van la source of truth cua booking/routing/matching.
+
+### Noi dung da trien khai
+
+- Them module `location` voi properties, provider interface, `RestClient` adapter, service normalization, DTO mobile va controller.
+- Expose `GET /api/v1/locations/to-words?lat=&lng=` va `GET /api/v1/locations/to-coordinate?address=` cho role `PASSENGER`/`DRIVER`.
+- Adapter doi query/response `lng` cua GoRide sang `lon` cua Flask va map array `sw/ne` thanh object `southwest/northeast`.
+- Chuan hoa input: bo `///`, trim, bat dung 3 phan, gop whitespace noi bo thanh `_`, lowercase.
+- Response API doi `_` trong tu ghep thanh khoang trang de mobile hien thi than thien, trong khi request provider van dung dang chuan hoa.
+- Validate WGS84, provider response, word list, address consistency va cell bounds.
+- Them error codes rieng cho invalid address, not found, out of bounds, provider disabled/config sai va provider timeout/HTTP/response loi.
+- Them handler chung cho query param thieu hoac sai type, tranh roi xuong HTTP 500.
+- Provider disabled mac dinh; cau hinh qua `THREE_WORD_LOCATION_ENABLED`, `THREE_WORD_LOCATION_BASE_URL`, `THREE_WORD_LOCATION_TIMEOUT_SECONDS`.
+- Khong doi booking DTO/schema. Cum 3 tu la metadata hien thi/chia se, khong thay street address hay toa do.
+- Them contract React Native va checklist UX/error tai `docs/three-word-location-mobile-integration.md`; cap nhat `integrate-plan.md`, `plan.md`, backend spec va current phase.
+- Giu nguyen thay doi local trong `src/main/resources/application.yml`.
+
+### Validation va review
+
+- `./mvnw.cmd -DskipTests compile`: pass.
+- Targeted location/security suite: pass 32 tests.
+- Full `./mvnw.cmd test`: 495 tests discovered, 485 pass, 0 failures, 10 Docker/Testcontainers initialization errors.
+- Docker root cause: `java.nio.file.AccessDeniedException: \\.\pipe\docker_engine`; khong co assertion failure.
+- `git diff --check`: pass; chi co CRLF conversion warning.
+- Manual review: da phat hien va fix default exposure, response address khong khop request, inverted bounds va provider coordinate nam ngoai cell; da them regression tests cho cac case nay.
+
+### Files chinh
+
+- `src/main/java/com/example/goride/location/**`
+- `src/main/java/com/example/goride/common/error/ErrorCode.java`
+- `src/main/java/com/example/goride/common/error/GlobalExceptionHandler.java`
+- `src/main/resources/application.properties`
+- `src/test/java/com/example/goride/location/**`
+- `src/test/java/com/example/goride/auth/config/SecurityCorsIntegrationTests.java`
+- `docs/three-word-location-mobile-integration.md`
+- `integrate-plan.md`
+- `docs/backend-implementation.md`
+- `docs/current-phase.md`
+- `plan.md`
+
+### Known risks / next checkpoint
+
+- Chua UAT end-to-end voi process Python that va thiet bi mobile; can verify network hostname, supported bounds va dictionary deployment tren staging.
+- Repo hien tai khong chua source React Native, nen screen passenger/driver chua the duoc code truc tiep trong branch backend nay.
+- User review completed; commit is being created on feature branch and merged locally into `develop`.
+
 ## Commit: `feat: bootstrap driver location after offer accept`
 
 Branch: `feature/driver-location-bootstrap`

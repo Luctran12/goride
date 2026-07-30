@@ -899,6 +899,17 @@ Implementations:
 
 Booking chi depend vao interface nay.
 
+### 11.1.1 Three-word location lookup
+
+Backend wraps the custom Python location service through two authenticated mobile APIs:
+
+- `GET /api/v1/locations/to-words?lat={lat}&lng={lng}` for passenger map selection.
+- `GET /api/v1/locations/to-coordinate?address={word.word.word}` for driver lookup.
+
+Runtime variables are `THREE_WORD_LOCATION_ENABLED`, `THREE_WORD_LOCATION_BASE_URL`, and `THREE_WORD_LOCATION_TIMEOUT_SECONDS`; the provider is disabled by default. The adapter translates GoRide `lng` to the provider's `lon` query/response field. Provider compound words are normalized with `_` internally, but API responses convert `_` back to spaces for mobile display. Coordinate lookup rejects mismatched provider addresses, inverted bounds, and points outside the returned cell bounds. Booking, routing, matching, and fare calculation continue to use coordinates as source of truth; the three-word address is optional display/share metadata.
+
+The complete React Native contract is documented in `docs/three-word-location-mobile-integration.md`.
+
 ### 11.2 Push notification
 
 MVP co the dung WebSocket notification truoc. FCM de phase sau neu thieu thoi gian.
@@ -986,6 +997,11 @@ Database:
 | `TRIP_STATUS_INVALID_TRANSITION` | 422 | State machine reject |
 | `TRIP_MESSAGE_NOT_AVAILABLE` | 422 | Trip chua/khong con cho phep chat |
 | `LOCATION_OUT_OF_SERVICE_AREA` | 422 | Ngoai vung phuc vu |
+| `WORD_LOCATION_INVALID_ADDRESS` | 400 | Cum 3 tu sai dinh dang |
+| `WORD_LOCATION_NOT_FOUND` | 404 | Khong tim thay cum 3 tu |
+| `WORD_LOCATION_OUT_OF_BOUNDS` | 422 | Toa do ngoai vung provider ho tro |
+| `WORD_LOCATION_PROVIDER_UNAVAILABLE` | 503 | Provider dang tat/cau hinh sai |
+| `WORD_LOCATION_PROVIDER_ERROR` | 502 | Provider timeout/HTTP/response loi |
 | `NO_DRIVER_AVAILABLE` | 422 | Khong co driver |
 | `INTERNAL_SERVER_ERROR` | 500 | Loi khong xac dinh |
 
