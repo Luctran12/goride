@@ -4,7 +4,8 @@
 >
 > Phase: 07 - Reproducible Dataset and Benchmark
 >
-> Status: Implemented; methodology and raw evidence pending review
+> Status: Implemented; smoke methodology and raw evidence approved as
+> development evidence, thesis-profile evidence pending
 
 ## 1. Objective
 
