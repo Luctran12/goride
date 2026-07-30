@@ -19,6 +19,18 @@ Finalize backend quality, operational safety and traceability for thesis reporti
 - Limitations and future-work documentation.
 - Final implementation log/current phase updates.
 
+## Implementation Progress
+
+- [x] Remove committed runtime database credentials and add production
+  datasource guardrails.
+- [x] Add bounded-cardinality query latency/error metrics and materialized
+  freshness observation.
+- [ ] Validate the complete Admin Analytics release chain.
+- [ ] Complete security/rate-limit/observability evidence.
+- [ ] Add thesis traceability, architecture/data-flow, limitations and
+  future-work artifacts.
+- [ ] Run the full applicable suite and complete the final manual review.
+
 ## Planned Commit
 
 ```text
@@ -38,4 +50,3 @@ docs: finalize admin analytics evaluation artifacts
 ## Completion Gate
 
 The backend feature is complete only after review notes exist for every phase commit.
-

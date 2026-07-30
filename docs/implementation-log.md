@@ -5,6 +5,56 @@
 > Tu commit `feat: add matching driver search` tro di, moi commit backend can cap nhat file nay trong cung commit.
 
 ---
+## Commit: `feat: harden admin analytics operations`
+
+Branch: `codex/admin-v2`
+
+Phase: Admin Analytics Backend — Phase 8: Hardening and Thesis Artifacts
+
+Commit hash: `a77b4f2`
+
+### Muc tieu
+
+Dong cac khoang trong van hanh cua Admin Analytics: quan sat duoc latency/loi/
+freshness, khong luu database credential trong source va fail-fast neu production
+dung cau hinh datasource khong an toan.
+
+### Noi dung da trien khai
+
+- Them timer `goride.analytics.query.duration` va counter
+  `goride.analytics.query.errors` cho sau query type.
+- Chi dung cac tag huu han `queryType`, `sourceVariant`, `outcome`; khong dung
+  trip, driver, cell, request ID hoac exception message lam metric tag.
+- Ghi structured log cho range, timezone, source, duration, row count va refresh
+  cutoff; khong ghi bounding box, toa do chi tiet hay PII.
+- Them gauge `goride.analytics.materialized.freshness.seconds`, duoc cap nhat
+  boi materialized query thanh cong va refresh thanh cong.
+- Chuyen PostgreSQL/Redis runtime config sang bien moi truong va them
+  `.env.example` cho local development.
+- Mo rong production readiness validator de chan JDBC URL loopback/embedded
+  credentials, PostgreSQL superuser va mat khau development mac dinh.
+- Them regression test ngan viec dua lai database host/credential cu vao
+  `application.yml`.
+
+### Review va validation
+
+- Focused analytics/config suite: 37 tests passed, 0 failures, 0 errors.
+- Manual review xac nhan metric cardinality bi gioi han va log khong chua
+  spatial bounds/PII.
+- Manual review xac nhan query response contract, Admin RBAC va production
+  query variant khong thay doi.
+- `git diff --check`: pass; chi co warning LF/CRLF tren Windows.
+
+### Rui ro da biet
+
+- Credential tung duoc commit van ton tai trong Git history va phai duoc rotate
+  tai database provider; xoa khoi file hien tai khong vo hieu hoa credential cu.
+- Prometheus/Actuator dang theo security policy da duoc du an phe duyet truoc
+  do; production deployment phai dat cac endpoint nay sau network perimeter.
+- Freshness gauge la gia tri moi nhat process da quan sat; persisted refresh
+  state van la source of truth sau khi process restart.
+
+---
 ## Commit: `test: report benchmark storage overhead`
 
 Branch: `codex/admin-v2`
