@@ -1,0 +1,89 @@
+{
+  "source" : {
+    "relationCount" : 8,
+    "tableBytes" : 3825664,
+    "indexBytes" : 2818048,
+    "totalBytes" : 6643712
+  },
+  "materialized" : {
+    "relationCount" : 4,
+    "tableBytes" : 614400,
+    "indexBytes" : 344064,
+    "totalBytes" : 958464
+  },
+  "analyticsStorageOverheadBytes" : 958464,
+  "materializedToSourceTotalRatio" : 0.144266,
+  "relations" : [ {
+    "totalBytes" : 122880,
+    "tableBytes" : 57344,
+    "kind" : "SOURCE_TABLE",
+    "relation" : "users",
+    "indexBytes" : 65536
+  }, {
+    "totalBytes" : 630784,
+    "tableBytes" : 352256,
+    "kind" : "SOURCE_TABLE",
+    "relation" : "trips",
+    "indexBytes" : 278528
+  }, {
+    "totalBytes" : 753664,
+    "tableBytes" : 483328,
+    "kind" : "SOURCE_TABLE",
+    "relation" : "trip_status_history",
+    "indexBytes" : 270336
+  }, {
+    "totalBytes" : 196608,
+    "tableBytes" : 114688,
+    "kind" : "SOURCE_TABLE",
+    "relation" : "payments",
+    "indexBytes" : 81920
+  }, {
+    "totalBytes" : 524288,
+    "tableBytes" : 294912,
+    "kind" : "SOURCE_TABLE",
+    "relation" : "matching_runs",
+    "indexBytes" : 229376
+  }, {
+    "totalBytes" : 729088,
+    "tableBytes" : 352256,
+    "kind" : "SOURCE_TABLE",
+    "relation" : "matching_offer_events",
+    "indexBytes" : 376832
+  }, {
+    "totalBytes" : 319488,
+    "tableBytes" : 114688,
+    "kind" : "SOURCE_TABLE",
+    "relation" : "driver_supply_snapshots",
+    "indexBytes" : 204800
+  }, {
+    "totalBytes" : 3366912,
+    "tableBytes" : 2056192,
+    "kind" : "SOURCE_TABLE",
+    "relation" : "trip_location_history",
+    "indexBytes" : 1310720
+  }, {
+    "totalBytes" : 122880,
+    "tableBytes" : 81920,
+    "kind" : "MATERIALIZED_VIEW",
+    "relation" : "analytics.mv_trip_daily",
+    "indexBytes" : 40960
+  }, {
+    "totalBytes" : 286720,
+    "tableBytes" : 147456,
+    "kind" : "MATERIALIZED_VIEW",
+    "relation" : "analytics.mv_demand_hourly_cell",
+    "indexBytes" : 139264
+  }, {
+    "totalBytes" : 327680,
+    "tableBytes" : 204800,
+    "kind" : "MATERIALIZED_VIEW",
+    "relation" : "analytics.mv_supply_hourly",
+    "indexBytes" : 122880
+  }, {
+    "totalBytes" : 221184,
+    "tableBytes" : 180224,
+    "kind" : "MATERIALIZED_VIEW",
+    "relation" : "analytics.mv_matching_daily",
+    "indexBytes" : 40960
+  } ]
+}

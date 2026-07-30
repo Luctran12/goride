@@ -60,3 +60,8 @@ Recompute a summary from retained samples with:
 
 Large benchmark artifacts must remain outside Git. Preserve thesis runs in a
 durable location and record the artifact directory/checksum in the thesis.
+
+A committed
+[`smoke` evidence example](../../docs/admin-analytics/benchmark-example/smoke-seed-5537/README.md)
+shows the complete artifact shape with 10 warm-up and 50 measured iterations.
+It validates the workflow but is not a thesis-scale performance claim.

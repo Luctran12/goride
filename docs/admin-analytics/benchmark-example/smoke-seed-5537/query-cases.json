@@ -1,0 +1,91 @@
+[ {
+  "queryId" : "Q01_OVERVIEW_7D",
+  "from" : "2026-04-25T17:00:00Z",
+  "to" : "2026-05-02T17:00:00Z",
+  "reportingTimezone" : "Asia/Ho_Chi_Minh",
+  "vehicleType" : "MOTORBIKE",
+  "serviceAreaId" : null,
+  "bucket" : null,
+  "cellSizeMeters" : null
+}, {
+  "queryId" : "Q02_OVERVIEW_30D",
+  "from" : "2026-04-02T17:00:00Z",
+  "to" : "2026-05-02T17:00:00Z",
+  "reportingTimezone" : "Asia/Ho_Chi_Minh",
+  "vehicleType" : "MOTORBIKE",
+  "serviceAreaId" : null,
+  "bucket" : null,
+  "cellSizeMeters" : null
+}, {
+  "queryId" : "Q03_DEMAND_HOURLY_7D",
+  "from" : "2026-04-25T17:00:00Z",
+  "to" : "2026-05-02T17:00:00Z",
+  "reportingTimezone" : "Asia/Ho_Chi_Minh",
+  "vehicleType" : "MOTORBIKE",
+  "serviceAreaId" : null,
+  "bucket" : "HOUR",
+  "cellSizeMeters" : null
+}, {
+  "queryId" : "Q04_DEMAND_DAILY_90D",
+  "from" : "2026-02-01T17:00:00Z",
+  "to" : "2026-05-02T17:00:00Z",
+  "reportingTimezone" : "Asia/Ho_Chi_Minh",
+  "vehicleType" : "MOTORBIKE",
+  "serviceAreaId" : null,
+  "bucket" : "DAY",
+  "cellSizeMeters" : null
+}, {
+  "queryId" : "Q05_SUPPLY_HOURLY_7D",
+  "from" : "2026-04-25T17:00:00Z",
+  "to" : "2026-05-02T17:00:00Z",
+  "reportingTimezone" : "Asia/Ho_Chi_Minh",
+  "vehicleType" : "MOTORBIKE",
+  "serviceAreaId" : null,
+  "bucket" : "HOUR",
+  "cellSizeMeters" : null
+}, {
+  "queryId" : "Q06_MATCHING_PERFORMANCE_30D",
+  "from" : "2026-04-02T17:00:00Z",
+  "to" : "2026-05-02T17:00:00Z",
+  "reportingTimezone" : "Asia/Ho_Chi_Minh",
+  "vehicleType" : "MOTORBIKE",
+  "serviceAreaId" : null,
+  "bucket" : null,
+  "cellSizeMeters" : null
+}, {
+  "queryId" : "Q07_MATCHING_FUNNEL_30D",
+  "from" : "2026-04-02T17:00:00Z",
+  "to" : "2026-05-02T17:00:00Z",
+  "reportingTimezone" : "Asia/Ho_Chi_Minh",
+  "vehicleType" : "MOTORBIKE",
+  "serviceAreaId" : null,
+  "bucket" : null,
+  "cellSizeMeters" : null
+}, {
+  "queryId" : "Q08_HEATMAP_7D_250M",
+  "from" : "2026-04-25T17:00:00Z",
+  "to" : "2026-05-02T17:00:00Z",
+  "reportingTimezone" : "Asia/Ho_Chi_Minh",
+  "vehicleType" : "MOTORBIKE",
+  "serviceAreaId" : null,
+  "bucket" : null,
+  "cellSizeMeters" : 250
+}, {
+  "queryId" : "Q09_HEATMAP_7D_1000M",
+  "from" : "2026-04-25T17:00:00Z",
+  "to" : "2026-05-02T17:00:00Z",
+  "reportingTimezone" : "Asia/Ho_Chi_Minh",
+  "vehicleType" : "MOTORBIKE",
+  "serviceAreaId" : null,
+  "bucket" : null,
+  "cellSizeMeters" : 1000
+}, {
+  "queryId" : "Q10_HEATMAP_30D_2000M",
+  "from" : "2026-04-02T17:00:00Z",
+  "to" : "2026-05-02T17:00:00Z",
+  "reportingTimezone" : "Asia/Ho_Chi_Minh",
+  "vehicleType" : "MOTORBIKE",
+  "serviceAreaId" : null,
+  "bucket" : null,
+  "cellSizeMeters" : 2000
+} ]

@@ -6,10 +6,10 @@
 ## Repository Status
 
 - Base development commit: `e6aba60`.
-- Latest completed implementation commit: `140c70a`
+- Latest completed implementation commit: `aaea493`
+  (`test: report benchmark storage overhead`).
+- Latest approved implementation commit: `140c70a`
   (`feat: harden admin analytics API handoff`).
-- Latest approved implementation commit: `4060b6b`
-  (`feat: add materialized admin analytics read models`).
 - Latest planning commit: `0c0e080` (`docs: add admin analytics implementation plan`).
 - The user explicitly selected `codex/admin-v2` for the Admin Analytics backend work.
 - User-owned `.codex-tmp/` and `deliverables/` content must remain untouched and uncommitted.
@@ -216,16 +216,32 @@ Phase 6 is approved.
 
 Admin Analytics Backend — Phase 7: Reproducible Dataset and Benchmark.
 
-## Planned Scope
+## Implementation Status
 
-- Add deterministic smoke, medium and thesis dataset profiles with fixed seeds.
-- Generate valid operational, telemetry, spatial, supply and payment data
+Implementation and controlled smoke evidence are complete. Phase 7 is waiting
+for user review before Phase 8 may begin.
+
+## Implemented Scope
+
+- Added deterministic smoke, medium and thesis dataset profiles with fixed
+  published seed.
+- Generated valid operational, telemetry, spatial, supply and payment data
   without using real user information.
-- Add an opt-in benchmark runner with a direct/materialized correctness gate.
-- Separate warm-up and measured iterations and retain every raw sample.
-- Capture environment, dataset, refresh, storage and query-plan artifacts.
-- Summarize average, P50, P95 and standard deviation from raw CSV samples.
-- Commit a small reproducible example; keep large generated runs out of Git.
+- Added an opt-in benchmark runner with a direct/materialized correctness gate.
+- Separated warm-up and measured iterations and retained every raw sample.
+- Captured environment, dataset, refresh, storage and query-plan artifacts.
+- Summarized average, P50, P95 and standard deviation from raw CSV samples.
+- Committed a reproducible 10/50 smoke example; large generated runs remain
+  outside Git.
+
+## Validation
+
+- Full backend regression suite: 509 tests passed.
+- Controlled smoke benchmark: 10 query cases, 20 variants, 1,000 successful
+  measured samples and no errors.
+- Correctness gate: 10/10 direct/materialized result hashes matched.
+- Same-seed fingerprint matched across two independent database containers.
+- Raw checksums and independently recomputed summary passed.
 
 ## Explicitly Out of Scope
 

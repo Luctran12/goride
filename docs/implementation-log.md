@@ -5,6 +5,123 @@
 > Tu commit `feat: add matching driver search` tro di, moi commit backend can cap nhat file nay trong cung commit.
 
 ---
+## Commit: `test: report benchmark storage overhead`
+
+Branch: `codex/admin-v2`
+
+Phase: Admin Analytics Backend â€” Phase 7: Reproducible Dataset and Benchmark
+
+Commit hash: `aaea493`
+
+### Muc tieu
+
+Hoan tat storage requirement cua benchmark protocol bang cach bao cao ca raw
+bytes va materialized/source ratio, thay vi chi luu kich thuoc tung relation.
+
+### Noi dung da trien khai
+
+- Tong hop source table/index/total bytes cho 8 source relations.
+- Tong hop materialized table/index/total bytes cho 4 read models.
+- Ghi `analyticsStorageOverheadBytes` va
+  `materializedToSourceTotalRatio` voi scale 6 vao `storage.json`.
+- Giu lai relation-level evidence de co the audit tung table, index va view.
+- Benchmark integration fail neu overhead bytes khong co hoac ratio khong duoc
+  tao.
+
+### Review va validation
+
+- Opt-in PostgreSQL/PostGIS benchmark integration: passed.
+- `storage.json` co du 12 relation, source/materialized totals, overhead bytes
+  va ratio.
+- Controlled run tren clean commit `aaea493`: seed `5537`, 10 warm-up va 50
+  measured iterations cho moi query/variant.
+- Correctness 10/10, 1.000 measured samples thanh cong, standalone summary
+  20/20 dong va checksum deu pass.
+- Same-seed fingerprint tiep tuc trung voi independent run:
+  `68d4bf0c35479d67fabdc1474663b7a3f6ac33bdf57dfe24b59b9dd1a8821b2f`.
+- Manual review khong phat hien blocker.
+
+### Rui ro da biet
+
+- Ratio cua smoke artifact chi mo ta dung dataset va environment da ghi trong
+  manifest; khong duoc ngoai suy thanh thesis-scale storage overhead.
+- Phase 7 van cho user review truoc khi Phase 8 bat dau.
+
+---
+## Commit: `test: add reproducible analytics benchmark`
+
+Branch: `codex/admin-v2`
+
+Phase: Admin Analytics Backend â€” Phase 7: Reproducible Dataset and Benchmark
+
+Commit hash: `54dbb62`
+
+### Muc tieu
+
+Tao dataset va quy trinh benchmark co the lap lai, dong thoi dam bao moi bang
+ket qua co the truy nguoc ve raw sample, moi truong, query plan va checksum.
+
+### Noi dung da trien khai
+
+- Them ba profile `smoke`, `medium`, `thesis`, generator version `1.0` va seed
+  cong bo `5537`.
+- Sinh synthetic users, trips, payments, matching runs/offers, supply snapshots
+  va PostGIS location history bang SQL set-based, khong dung du lieu nguoi dung
+  that.
+- Them peak-hour theo `Asia/Ho_Chi_Minh`, spatial hotspots, time/cell boundary,
+  payment states, open/terminal matching runs va supply gaps co chu dich.
+- Kiem tra row count, distribution va invariant trip/matching/accepted-driver
+  truoc khi benchmark.
+- Them opt-in Testcontainers runner. Runner apply Phase 4/5 releases, refresh
+  materialized views, so sanh direct/materialized cho 10 query cases roi moi
+  chay warm-up va measurement.
+- Ghi raw CSV, environment/dataset manifest, correctness hashes, refresh
+  samples, relation sizes, representative SQL, `EXPLAIN ANALYZE BUFFERS`,
+  statistical summary va SHA-256 checksums.
+- Them PowerShell runner va summarizer; summary dung arithmetic mean,
+  continuous P50/P95 va population standard deviation.
+- Dong bang benchmark protocol version `1.0`.
+
+### Review truoc commit
+
+- Benchmark utility tests: 6 passed.
+- Full backend regression suite: 509 tests passed, 0 failures, 0 errors,
+  0 skipped.
+- Opt-in benchmark integration passed tren PostgreSQL/PostGIS 15 va Redis 7.
+- Smoke benchmark correctness gate passed cho 10/10 query cases; hash
+  direct/materialized bang nhau sau numeric normalization scale 9.
+- Kiem tra script syntax, 20 raw CSV, 20 SQL, 20 JSON query plans va checksum:
+  pass.
+- Manual review da sua timezone peak-hour, matching/trip state alignment,
+  accepted-driver alignment, deterministic map ordering, cross-platform SQL
+  hash va query-plan aggregation bi nhan ban.
+- Manual review sau sua khong phat hien blocker.
+
+### Evidence sau commit
+
+- Controlled run tren clean commit `aaea493`: profile `smoke`, seed `5537`,
+  10 warm-up va 50 measured iterations cho moi query/variant.
+- 1.000 measured samples thanh cong, 0 query error.
+- Hai database container doc lap tao cung row count, distribution va
+  fingerprint
+  `68d4bf0c35479d67fabdc1474663b7a3f6ac33bdf57dfe24b59b9dd1a8821b2f`.
+- Standalone summarizer tao lai dung 20/20 summary rows tu raw CSV.
+- Core artifact checksums: pass.
+- Evidence nho duoc luu tai
+  `docs/admin-analytics/benchmark-example/smoke-seed-5537/`.
+
+### Rui ro da biet va viec tiep theo
+
+- Smoke run chi xac nhan methodology va artifact pipeline trong mot moi truong;
+  khong duoc dung nhu ket luan hieu nang cua luan van.
+- Host storage media chua duoc khang dinh vi Docker Desktop dung virtual disk;
+  manifest ghi ro limitation nay.
+- `thesis` profile can duoc chay tren moi truong duoc kiem soat, luu o durable
+  storage va review raw evidence rieng.
+- Phase 7 dang cho user review. Khong bat dau Phase 8 va khong doi production
+  query variant truoc khi duoc phe duyet.
+
+---
 ## Commit: `feat: harden admin analytics API handoff`
 
 Branch: `codex/admin-v2`

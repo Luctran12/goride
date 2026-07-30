@@ -259,6 +259,11 @@ The executable generator, runner and summarizer are documented in
 The runner refuses non-empty output directories and writes SHA-256 checksums
 after every core artifact.
 
+The committed
+[`smoke` example](benchmark-example/smoke-seed-5537/README.md) demonstrates the
+artifact layout and the 10/50 procedure. It is development evidence for one
+environment, not the thesis-scale result.
+
 ---
 
 ## 12. Reporting Rules

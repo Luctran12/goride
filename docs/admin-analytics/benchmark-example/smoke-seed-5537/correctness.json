@@ -1,0 +1,57 @@
+{
+  "cases" : [ {
+    "queryId" : "Q01_OVERVIEW_7D",
+    "directResultSha256" : "5041711f2545937ae445c89ea4bcc00aa1064ceafcc216ec300d90541d53006e",
+    "materializedResultSha256" : "5041711f2545937ae445c89ea4bcc00aa1064ceafcc216ec300d90541d53006e",
+    "passed" : true
+  }, {
+    "queryId" : "Q02_OVERVIEW_30D",
+    "directResultSha256" : "9db25cfbb6a14f61a46fd71712213320421e81637f3f2a2d8a9710b9ac342fc9",
+    "materializedResultSha256" : "9db25cfbb6a14f61a46fd71712213320421e81637f3f2a2d8a9710b9ac342fc9",
+    "passed" : true
+  }, {
+    "queryId" : "Q03_DEMAND_HOURLY_7D",
+    "directResultSha256" : "0263194e3413764885e456ffc3f644817053b194c3b69521992a90ac2206a130",
+    "materializedResultSha256" : "0263194e3413764885e456ffc3f644817053b194c3b69521992a90ac2206a130",
+    "passed" : true
+  }, {
+    "queryId" : "Q04_DEMAND_DAILY_90D",
+    "directResultSha256" : "281c7bc606a84fe6b6966180e3cbb1be34b15333f98c65904c49d752610f01b9",
+    "materializedResultSha256" : "281c7bc606a84fe6b6966180e3cbb1be34b15333f98c65904c49d752610f01b9",
+    "passed" : true
+  }, {
+    "queryId" : "Q05_SUPPLY_HOURLY_7D",
+    "directResultSha256" : "9a8ee5d223a4f6d4bf9e57b4e0be9b2d1a8b5598ecdec43a6ebc2fcc2209c1fd",
+    "materializedResultSha256" : "9a8ee5d223a4f6d4bf9e57b4e0be9b2d1a8b5598ecdec43a6ebc2fcc2209c1fd",
+    "passed" : true
+  }, {
+    "queryId" : "Q06_MATCHING_PERFORMANCE_30D",
+    "directResultSha256" : "99cec668df48cad833636699f26c3735b087e42726a37e46a6e06771832b0fc8",
+    "materializedResultSha256" : "99cec668df48cad833636699f26c3735b087e42726a37e46a6e06771832b0fc8",
+    "passed" : true
+  }, {
+    "queryId" : "Q07_MATCHING_FUNNEL_30D",
+    "directResultSha256" : "8c26dbba8c615a0f09b31b5b1cc485bb4fa977d2229845187f396f36b0e7fb2e",
+    "materializedResultSha256" : "8c26dbba8c615a0f09b31b5b1cc485bb4fa977d2229845187f396f36b0e7fb2e",
+    "passed" : true
+  }, {
+    "queryId" : "Q08_HEATMAP_7D_250M",
+    "directResultSha256" : "15929fef13a25b73307c9909ae4702f9e2fb0e16ed05d61b91d527603cbac33e",
+    "materializedResultSha256" : "15929fef13a25b73307c9909ae4702f9e2fb0e16ed05d61b91d527603cbac33e",
+    "passed" : true
+  }, {
+    "queryId" : "Q09_HEATMAP_7D_1000M",
+    "directResultSha256" : "9184a540cc04f19cf9ddd84f84fe4f24ff35dd5e514a3303b378877beebcb917",
+    "materializedResultSha256" : "9184a540cc04f19cf9ddd84f84fe4f24ff35dd5e514a3303b378877beebcb917",
+    "passed" : true
+  }, {
+    "queryId" : "Q10_HEATMAP_30D_2000M",
+    "directResultSha256" : "03112c86a7e44d8ca5ffea815fc0082d307a585a9546336947de1249870387ef",
+    "materializedResultSha256" : "03112c86a7e44d8ca5ffea815fc0082d307a585a9546336947de1249870387ef",
+    "passed" : true
+  } ],
+  "materializedCutoff" : "2026-07-30T02:42:00.598028Z",
+  "numericComparisonScale" : 9,
+  "passed" : true,
+  "queryCutoff" : "2026-05-02T17:00:00Z"
+}

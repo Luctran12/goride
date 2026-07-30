@@ -51,13 +51,34 @@ test: add reproducible analytics benchmark
 
 ## Acceptance Criteria
 
-- Same seed produces the same row counts and distributions.
-- Correctness gate passes before timing.
-- Warm-up and measured iterations are separated.
-- Direct and materialized variants use identical filters and cutoff.
-- Average, P50 and P95 are derived from raw samples.
-- Table/index/view size and refresh duration are recorded.
-- No performance claim exists without raw evidence.
+- [x] Same seed produces the same row counts and distributions.
+- [x] Correctness gate passes before timing.
+- [x] Warm-up and measured iterations are separated.
+- [x] Direct and materialized variants use identical filters and cutoff.
+- [x] Average, P50 and P95 are derived from raw samples.
+- [x] Table/index/view size and refresh duration are recorded.
+- [x] No performance claim exists without raw evidence.
+
+## Validation Evidence
+
+- Implementation commits: `54dbb62`
+  (`test: add reproducible analytics benchmark`) and `aaea493`
+  (`test: report benchmark storage overhead`).
+- Benchmark utility tests: 6 passed.
+- Full backend regression suite: 509 passed, 0 failures, 0 errors, 0 skipped.
+- Opt-in PostgreSQL/PostGIS benchmark integration: passed.
+- Controlled `smoke` run used seed `5537`, 10 warm-up and 50 measured
+  iterations for each of 10 query cases and both variants.
+- Direct/materialized correctness hashes matched for all 10 cases before
+  timing; all 1,000 measured samples succeeded.
+- Independent runs produced the same row counts, distributions and fingerprint
+  `68d4bf0c35479d67fabdc1474663b7a3f6ac33bdf57dfe24b59b9dd1a8821b2f`.
+- The standalone summarizer reproduced every value in the 20-row statistical
+  summary from raw CSV.
+- All core artifact checksums passed.
+
+The committed evidence is at
+[`benchmark-example/smoke-seed-5537`](../admin-analytics/benchmark-example/smoke-seed-5537/README.md).
 
 ## Review Gate
 
