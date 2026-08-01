@@ -1,0 +1,269 @@
+{
+  "correctnessPassed" : true,
+  "profile" : "smoke",
+  "queryCutoff" : "2026-05-02T17:00:00Z",
+  "seed" : 5537,
+  "measuredIterations" : 50,
+  "warmupIterations" : 10,
+  "results" : [ {
+    "queryId" : "Q01_OVERVIEW_7D",
+    "variant" : "DIRECT",
+    "statistics" : {
+      "sampleCount" : 50,
+      "errorCount" : 0,
+      "minimumMs" : 4.444300,
+      "maximumMs" : 16.768700,
+      "averageMs" : 6.235028,
+      "p50Ms" : 5.500150,
+      "p95Ms" : 11.335870,
+      "standardDeviationMs" : 2.257287
+    }
+  }, {
+    "queryId" : "Q01_OVERVIEW_7D",
+    "variant" : "MATERIALIZED",
+    "statistics" : {
+      "sampleCount" : 50,
+      "errorCount" : 0,
+      "minimumMs" : 1.102100,
+      "maximumMs" : 15.528700,
+      "averageMs" : 2.744250,
+      "p50Ms" : 2.104000,
+      "p95Ms" : 6.221285,
+      "standardDeviationMs" : 2.210246
+    }
+  }, {
+    "queryId" : "Q02_OVERVIEW_30D",
+    "variant" : "DIRECT",
+    "statistics" : {
+      "sampleCount" : 50,
+      "errorCount" : 0,
+      "minimumMs" : 5.056400,
+      "maximumMs" : 19.720900,
+      "averageMs" : 6.140326,
+      "p50Ms" : 5.715950,
+      "p95Ms" : 7.169035,
+      "standardDeviationMs" : 2.021130
+    }
+  }, {
+    "queryId" : "Q02_OVERVIEW_30D",
+    "variant" : "MATERIALIZED",
+    "statistics" : {
+      "sampleCount" : 50,
+      "errorCount" : 0,
+      "minimumMs" : 1.476100,
+      "maximumMs" : 5.878800,
+      "averageMs" : 2.342482,
+      "p50Ms" : 2.032350,
+      "p95Ms" : 4.753965,
+      "standardDeviationMs" : 0.943017
+    }
+  }, {
+    "queryId" : "Q03_DEMAND_HOURLY_7D",
+    "variant" : "DIRECT",
+    "statistics" : {
+      "sampleCount" : 50,
+      "errorCount" : 0,
+      "minimumMs" : 1.060800,
+      "maximumMs" : 3.454200,
+      "averageMs" : 2.053966,
+      "p50Ms" : 2.005800,
+      "p95Ms" : 2.931025,
+      "standardDeviationMs" : 0.473257
+    }
+  }, {
+    "queryId" : "Q03_DEMAND_HOURLY_7D",
+    "variant" : "MATERIALIZED",
+    "statistics" : {
+      "sampleCount" : 50,
+      "errorCount" : 0,
+      "minimumMs" : 1.047200,
+      "maximumMs" : 5.161600,
+      "averageMs" : 2.118492,
+      "p50Ms" : 1.978000,
+      "p95Ms" : 3.165385,
+      "standardDeviationMs" : 0.672797
+    }
+  }, {
+    "queryId" : "Q04_DEMAND_DAILY_90D",
+    "variant" : "DIRECT",
+    "statistics" : {
+      "sampleCount" : 50,
+      "errorCount" : 0,
+      "minimumMs" : 1.873800,
+      "maximumMs" : 14.682700,
+      "averageMs" : 3.963224,
+      "p50Ms" : 3.131850,
+      "p95Ms" : 8.036000,
+      "standardDeviationMs" : 2.507583
+    }
+  }, {
+    "queryId" : "Q04_DEMAND_DAILY_90D",
+    "variant" : "MATERIALIZED",
+    "statistics" : {
+      "sampleCount" : 50,
+      "errorCount" : 0,
+      "minimumMs" : 1.861500,
+      "maximumMs" : 6.788300,
+      "averageMs" : 3.055946,
+      "p50Ms" : 2.682950,
+      "p95Ms" : 5.511010,
+      "standardDeviationMs" : 1.075743
+    }
+  }, {
+    "queryId" : "Q05_SUPPLY_HOURLY_7D",
+    "variant" : "DIRECT",
+    "statistics" : {
+      "sampleCount" : 50,
+      "errorCount" : 0,
+      "minimumMs" : 0.899900,
+      "maximumMs" : 4.958800,
+      "averageMs" : 1.535518,
+      "p50Ms" : 1.319250,
+      "p95Ms" : 3.025500,
+      "standardDeviationMs" : 0.733844
+    }
+  }, {
+    "queryId" : "Q05_SUPPLY_HOURLY_7D",
+    "variant" : "MATERIALIZED",
+    "statistics" : {
+      "sampleCount" : 50,
+      "errorCount" : 0,
+      "minimumMs" : 0.982600,
+      "maximumMs" : 2.641900,
+      "averageMs" : 1.577818,
+      "p50Ms" : 1.482100,
+      "p95Ms" : 2.448015,
+      "standardDeviationMs" : 0.391588
+    }
+  }, {
+    "queryId" : "Q06_MATCHING_PERFORMANCE_30D",
+    "variant" : "DIRECT",
+    "statistics" : {
+      "sampleCount" : 50,
+      "errorCount" : 0,
+      "minimumMs" : 4.134300,
+      "maximumMs" : 24.452400,
+      "averageMs" : 5.516140,
+      "p50Ms" : 5.009000,
+      "p95Ms" : 6.726590,
+      "standardDeviationMs" : 2.768017
+    }
+  }, {
+    "queryId" : "Q06_MATCHING_PERFORMANCE_30D",
+    "variant" : "MATERIALIZED",
+    "statistics" : {
+      "sampleCount" : 50,
+      "errorCount" : 0,
+      "minimumMs" : 0.946600,
+      "maximumMs" : 10.512600,
+      "averageMs" : 1.765534,
+      "p50Ms" : 1.560350,
+      "p95Ms" : 2.609675,
+      "standardDeviationMs" : 1.318379
+    }
+  }, {
+    "queryId" : "Q07_MATCHING_FUNNEL_30D",
+    "variant" : "DIRECT",
+    "statistics" : {
+      "sampleCount" : 50,
+      "errorCount" : 0,
+      "minimumMs" : 1.530700,
+      "maximumMs" : 3.154800,
+      "averageMs" : 2.051542,
+      "p50Ms" : 1.881350,
+      "p95Ms" : 2.983120,
+      "standardDeviationMs" : 0.467432
+    }
+  }, {
+    "queryId" : "Q07_MATCHING_FUNNEL_30D",
+    "variant" : "MATERIALIZED",
+    "statistics" : {
+      "sampleCount" : 50,
+      "errorCount" : 0,
+      "minimumMs" : 0.637000,
+      "maximumMs" : 1.713900,
+      "averageMs" : 1.110752,
+      "p50Ms" : 1.023550,
+      "p95Ms" : 1.608015,
+      "standardDeviationMs" : 0.290836
+    }
+  }, {
+    "queryId" : "Q08_HEATMAP_7D_250M",
+    "variant" : "DIRECT",
+    "statistics" : {
+      "sampleCount" : 50,
+      "errorCount" : 0,
+      "minimumMs" : 1.635900,
+      "maximumMs" : 24.605300,
+      "averageMs" : 2.966496,
+      "p50Ms" : 2.169850,
+      "p95Ms" : 4.752000,
+      "standardDeviationMs" : 3.301749
+    }
+  }, {
+    "queryId" : "Q08_HEATMAP_7D_250M",
+    "variant" : "MATERIALIZED",
+    "statistics" : {
+      "sampleCount" : 50,
+      "errorCount" : 0,
+      "minimumMs" : 1.650300,
+      "maximumMs" : 13.252200,
+      "averageMs" : 2.544070,
+      "p50Ms" : 2.257200,
+      "p95Ms" : 3.255200,
+      "standardDeviationMs" : 1.590956
+    }
+  }, {
+    "queryId" : "Q09_HEATMAP_7D_1000M",
+    "variant" : "DIRECT",
+    "statistics" : {
+      "sampleCount" : 50,
+      "errorCount" : 0,
+      "minimumMs" : 1.277000,
+      "maximumMs" : 5.533900,
+      "averageMs" : 2.267216,
+      "p50Ms" : 1.940450,
+      "p95Ms" : 4.037395,
+      "standardDeviationMs" : 0.964796
+    }
+  }, {
+    "queryId" : "Q09_HEATMAP_7D_1000M",
+    "variant" : "MATERIALIZED",
+    "statistics" : {
+      "sampleCount" : 50,
+      "errorCount" : 0,
+      "minimumMs" : 1.185900,
+      "maximumMs" : 4.906500,
+      "averageMs" : 1.998418,
+      "p50Ms" : 1.662500,
+      "p95Ms" : 3.901790,
+      "standardDeviationMs" : 0.855965
+    }
+  }, {
+    "queryId" : "Q10_HEATMAP_30D_2000M",
+    "variant" : "DIRECT",
+    "statistics" : {
+      "sampleCount" : 50,
+      "errorCount" : 0,
+      "minimumMs" : 1.684700,
+      "maximumMs" : 10.242300,
+      "averageMs" : 2.982240,
+      "p50Ms" : 2.763950,
+      "p95Ms" : 4.463000,
+      "standardDeviationMs" : 1.328072
+    }
+  }, {
+    "queryId" : "Q10_HEATMAP_30D_2000M",
+    "variant" : "MATERIALIZED",
+    "statistics" : {
+      "sampleCount" : 50,
+      "errorCount" : 0,
+      "minimumMs" : 1.505600,
+      "maximumMs" : 6.644500,
+      "averageMs" : 2.718798,
+      "p50Ms" : 2.346900,
+      "p95Ms" : 5.196040,
+      "standardDeviationMs" : 1.133374
+    }
+  } ]
+}

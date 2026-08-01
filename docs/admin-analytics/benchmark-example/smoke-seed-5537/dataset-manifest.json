@@ -1,0 +1,58 @@
+{
+  "generatorVersion" : "1.0",
+  "generatorSqlSha256" : "cee3537ef89676000a00ff478cf5967ccb68bf135773d8a14ad566577bfab940",
+  "profile" : "smoke",
+  "seed" : 5537,
+  "startedAt" : "2026-07-30T02:41:58.408670800Z",
+  "completedAt" : "2026-07-30T02:41:58.760277300Z",
+  "generationDurationMs" : 351,
+  "stateSemanticsPassed" : true,
+  "rowCounts" : {
+    "users" : 100,
+    "driver_profiles" : 25,
+    "trips" : 1000,
+    "trip_status_history" : 4340,
+    "matching_runs" : 1000,
+    "matching_offer_events" : 2500,
+    "driver_supply_snapshots" : 1000,
+    "trip_location_history" : 20000,
+    "payments" : 800
+  },
+  "distributions" : {
+    "tripsByStatus" : {
+      "CANCELLED" : 80,
+      "COMPLETED" : 800,
+      "NO_DRIVER" : 60,
+      "SEARCHING" : 60
+    },
+    "matchingRunsByOutcome" : {
+      "CANCELLED" : 80,
+      "FAILED" : 30,
+      "IN_PROGRESS" : 30,
+      "MATCHED" : 800,
+      "NO_DRIVER" : 60
+    },
+    "matchingOffersByOutcome" : {
+      "ACCEPTED" : 800,
+      "OFFERED" : 30,
+      "REJECTED" : 835,
+      "TIMEOUT" : 835
+    },
+    "paymentsByStatus" : {
+      "COMPLETED" : 720,
+      "FAILED" : 40,
+      "PENDING" : 40
+    },
+    "tripRequestsByPeriod" : {
+      "EVENING_PEAK" : 400,
+      "MORNING_PEAK" : 399,
+      "OFF_PEAK" : 201
+    },
+    "tripRequestsBySpatialCluster" : {
+      "DISTRIBUTED" : 100,
+      "HOTSPOT_CENTRAL" : 700,
+      "HOTSPOT_EAST" : 200
+    }
+  },
+  "distributionFingerprint" : "68d4bf0c35479d67fabdc1474663b7a3f6ac33bdf57dfe24b59b9dd1a8821b2f"
+}

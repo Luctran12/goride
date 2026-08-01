@@ -10,6 +10,7 @@ import com.example.goride.booking.dto.BookingEstimateRequest;
 import com.example.goride.booking.dto.BookingLocationRequest;
 import com.example.goride.booking.dto.FareEstimateResponse;
 import com.example.goride.booking.dto.TripResponse;
+import com.example.goride.booking.dto.TripStatusHistoryResponse;
 import com.example.goride.booking.event.BookingCancelledEvent;
 import com.example.goride.booking.event.BookingCreatedEvent;
 import com.example.goride.booking.repository.PricingConfigRepository;
@@ -20,7 +21,8 @@ import com.example.goride.booking.service.distance.DistanceService;
 import com.example.goride.booking.service.SurgePricingService.SurgePricingQuote;
 import com.example.goride.common.error.BusinessException;
 import com.example.goride.common.error.ErrorCode;
-import com.example.goride.matching.service.OfferedTripAccessService;
+import com.example.goride.matching.telemetry.MatchingTelemetryPort;
+import com.example.goride.matching.telemetry.MatchingTelemetryFailureReporter;
 import com.example.goride.payment.service.PaymentMethodService;
 import com.example.goride.servicearea.service.ServiceAreaService;
 import com.example.goride.user.domain.User;
@@ -56,12 +58,13 @@ public class BookingService {
     private final TripStatusHistoryRepository tripStatusHistoryRepository;
     private final DistanceService distanceService;
     private final PaymentMethodService paymentMethodService;
-    private final OfferedTripAccessService offeredTripAccessService;
     private final SurgePricingService surgePricingService;
     private final ServiceAreaService serviceAreaService;
     private final ApplicationEventPublisher eventPublisher;
     private final ScheduledRideProperties scheduledRideProperties;
     private final Clock clock;
+    private final MatchingTelemetryPort matchingTelemetry;
+    private final MatchingTelemetryFailureReporter matchingTelemetryFailureReporter;
 
     public BookingService(
             UserRepository userRepository,
@@ -70,12 +73,13 @@ public class BookingService {
             TripStatusHistoryRepository tripStatusHistoryRepository,
             DistanceService distanceService,
             PaymentMethodService paymentMethodService,
-            OfferedTripAccessService offeredTripAccessService,
             SurgePricingService surgePricingService,
             ServiceAreaService serviceAreaService,
             ApplicationEventPublisher eventPublisher,
             ScheduledRideProperties scheduledRideProperties,
-            Clock clock
+            Clock clock,
+            MatchingTelemetryPort matchingTelemetry,
+            MatchingTelemetryFailureReporter matchingTelemetryFailureReporter
     ) {
         this.userRepository = userRepository;
         this.pricingConfigRepository = pricingConfigRepository;
@@ -83,12 +87,13 @@ public class BookingService {
         this.tripStatusHistoryRepository = tripStatusHistoryRepository;
         this.distanceService = distanceService;
         this.paymentMethodService = paymentMethodService;
-        this.offeredTripAccessService = offeredTripAccessService;
         this.surgePricingService = surgePricingService;
         this.serviceAreaService = serviceAreaService;
         this.eventPublisher = eventPublisher;
         this.scheduledRideProperties = scheduledRideProperties;
         this.clock = clock;
+        this.matchingTelemetry = matchingTelemetry;
+        this.matchingTelemetryFailureReporter = matchingTelemetryFailureReporter;
     }
 
     @Transactional(readOnly = true)
@@ -148,7 +153,12 @@ public class BookingService {
         User user = getActiveUser(currentUserId);
         Trip trip = getActiveTrip(tripId);
         assertCanAccessTrip(user, trip);
-        return TripResponse.from(trip);
+        List<TripStatusHistoryResponse> statusHistory = tripStatusHistoryRepository
+                .findByTripIdOrderByChangedAtAsc(tripId)
+                .stream()
+                .map(TripStatusHistoryResponse::from)
+                .toList();
+        return TripResponse.from(trip, statusHistory);
     }
 
     @Transactional(readOnly = true)
@@ -192,8 +202,18 @@ public class BookingService {
                 user,
                 savedTrip.getCancelReason()
         ));
+        cancelMatchingRun(savedTrip);
         publishAfterCommit(BookingCancelledEvent.from(savedTrip));
         return TripResponse.from(savedTrip);
+    }
+
+    private void cancelMatchingRun(Trip trip) {
+        try {
+            matchingTelemetry.cancelRun(trip.getId(), trip.getCancelledAt());
+        } catch (RuntimeException exception) {
+            matchingTelemetryFailureReporter.report("cancel_run", trip.getId(), exception);
+            throw exception;
+        }
     }
 
     private Trip createTrip(User passenger, BookingCreateRequest request, FareCalculation calculation) {
@@ -299,9 +319,7 @@ public class BookingService {
     private void assertCanAccessTrip(User user, Trip trip) {
         if (user.hasRole(UserRole.ADMIN)
                 || Objects.equals(user.getId(), trip.getPassenger().getId())
-                || (trip.getDriver() != null && Objects.equals(user.getId(), trip.getDriver().getId()))
-                || (user.hasRole(UserRole.DRIVER)
-                        && offeredTripAccessService.hasActiveOffer(trip.getId(), user.getId()))) {
+                || (trip.getDriver() != null && Objects.equals(user.getId(), trip.getDriver().getId()))) {
             return;
         }
         throw new BusinessException(ErrorCode.FORBIDDEN);

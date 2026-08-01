@@ -13,6 +13,9 @@ import com.example.goride.matching.domain.MatchingRequest;
 import com.example.goride.matching.domain.TripMatchingState;
 import com.example.goride.matching.notification.DriverOfferNotification;
 import com.example.goride.matching.notification.DriverOfferNotifier;
+import com.example.goride.matching.telemetry.MatchingTelemetryOfferOutcome;
+import com.example.goride.matching.telemetry.MatchingTelemetryFailureReporter;
+import com.example.goride.matching.telemetry.MatchingTelemetryPort;
 import com.example.goride.notification.service.TripRealtimeNotifier;
 import com.example.goride.user.domain.User;
 import com.example.goride.user.domain.UserRole;
@@ -28,6 +31,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
+import java.time.Clock;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.Set;
@@ -62,6 +66,12 @@ class MatchingOfferTimeoutServiceTests {
     @Mock
     private TripRealtimeNotifier tripRealtimeNotifier;
 
+    @Mock
+    private MatchingTelemetryPort matchingTelemetry;
+
+    @Mock
+    private MatchingTelemetryFailureReporter matchingTelemetryFailureReporter;
+
     private MatchingOfferTimeoutService timeoutService;
 
     @BeforeEach
@@ -70,7 +80,10 @@ class MatchingOfferTimeoutServiceTests {
                 tripRepository,
                 candidateStore,
                 matchingService,
-                driverOfferNotifier
+                driverOfferNotifier,
+                matchingTelemetry,
+                matchingTelemetryFailureReporter,
+                Clock.systemUTC()
         );
     }
 
@@ -117,6 +130,12 @@ class MatchingOfferTimeoutServiceTests {
                 ArgumentCaptor.forClass(DriverOfferNotification.class);
         verify(candidateStore).releaseCandidateLock(20L);
         verify(candidateStore).clearTripMatching(99L);
+        verify(matchingTelemetry).resolveOffer(
+                eq(99L),
+                eq(1),
+                eq(MatchingTelemetryOfferOutcome.TIMEOUT),
+                any(Instant.class)
+        );
         verify(matchingService).findAndLockDriver(any(MatchingRequest.class), eq(2), rejectedCaptor.capture());
         verify(driverOfferNotifier).notifyDriver(eq(21L), notificationCaptor.capture());
         verify(tripRepository, never()).save(any());

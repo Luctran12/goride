@@ -14,6 +14,10 @@ import java.util.Set;
 public interface DriverCandidateStore {
     List<DriverCandidate> findAvailableCandidates(MatchingRequest request);
 
+    Optional<String> tryLockMatchingSearch(Long tripId, Duration lockTtl);
+
+    void releaseMatchingSearchLock(Long tripId, String lockToken);
+
     boolean tryLockCandidate(Long tripId, Long driverId, Duration lockTtl);
 
     void recordTripMatching(Long tripId, Long driverId, int attempt, Instant offerExpiresAt, Duration ttl);

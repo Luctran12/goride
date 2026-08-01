@@ -9,6 +9,7 @@ import com.example.goride.matching.domain.DriverOffer;
 import com.example.goride.matching.domain.MatchingRequest;
 import com.example.goride.matching.notification.DriverOfferNotification;
 import com.example.goride.matching.notification.DriverOfferNotifier;
+import com.example.goride.matching.telemetry.MatchingTelemetryTrigger;
 import com.example.goride.user.domain.User;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -25,6 +26,7 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -52,14 +54,20 @@ class SearchingTripMatchingServiceTests {
         when(tripRepository.findByStatusAndDeletedAtIsNullOrderByRequestedAtAsc(TripStatus.SEARCHING))
                 .thenReturn(List.of(trip));
         when(candidateStore.findTripMatching(99L)).thenReturn(Optional.empty());
-        when(matchingService.findAndLockDriver(any(MatchingRequest.class))).thenReturn(Optional.of(offer));
+        when(matchingService.findAndLockDriver(
+                any(MatchingRequest.class),
+                eq(MatchingTelemetryTrigger.RECOVERY)
+        )).thenReturn(Optional.of(offer));
 
         service().matchOpenSearchingTrips(20L);
 
         ArgumentCaptor<MatchingRequest> requestCaptor = ArgumentCaptor.forClass(MatchingRequest.class);
         ArgumentCaptor<DriverOfferNotification> notificationCaptor =
                 ArgumentCaptor.forClass(DriverOfferNotification.class);
-        verify(matchingService).findAndLockDriver(requestCaptor.capture());
+        verify(matchingService).findAndLockDriver(
+                requestCaptor.capture(),
+                eq(MatchingTelemetryTrigger.RECOVERY)
+        );
         verify(driverOfferNotifier).notifyDriver(org.mockito.Mockito.eq(20L), notificationCaptor.capture());
         assertThat(requestCaptor.getValue().tripId()).isEqualTo(99L);
         assertThat(requestCaptor.getValue().vehicleType()).isEqualTo(VehicleType.MOTORBIKE);
@@ -83,7 +91,10 @@ class SearchingTripMatchingServiceTests {
 
         service().matchOpenSearchingTrips(20L);
 
-        verify(matchingService, never()).findAndLockDriver(any());
+        verify(matchingService, never()).findAndLockDriver(
+                any(),
+                any(MatchingTelemetryTrigger.class)
+        );
         verify(driverOfferNotifier, never()).notifyDriver(any(), any());
     }
 

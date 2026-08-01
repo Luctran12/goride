@@ -71,6 +71,30 @@ class ProductionReadinessValidatorTests {
     }
 
     @Test
+    void rejectsLoopbackSuperuserAndDefaultDatabasePasswordInProduction() {
+        MockEnvironment environment = environment("production", "validate")
+                .withProperty(
+                        "spring.datasource.url",
+                        "jdbc:postgresql://localhost:5432/goride"
+                )
+                .withProperty("spring.datasource.username", "postgres")
+                .withProperty("spring.datasource.password", "goride");
+
+        ProductionReadinessValidator validator = new ProductionReadinessValidator(
+                environment,
+                productionJwt(),
+                cors(List.of("https://app.goride.example"), List.of()),
+                r2Storage()
+        );
+
+        assertThatThrownBy(validator::validate)
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("spring.datasource.url")
+                .hasMessageContaining("spring.datasource.username")
+                .hasMessageContaining("spring.datasource.password");
+    }
+
+    @Test
     void rejectsIncompleteR2ConfigurationInProduction() {
         FileStorageProperties storage = new FileStorageProperties();
         storage.setProvider(FileStorageProperties.Provider.R2);
@@ -248,6 +272,12 @@ class ProductionReadinessValidatorTests {
     ) {
         return new MockEnvironment()
                 .withProperty("app.environment", appEnvironment)
+                .withProperty(
+                        "spring.datasource.url",
+                        "jdbc:postgresql://postgres.internal:5432/goride"
+                )
+                .withProperty("spring.datasource.username", "goride_app")
+                .withProperty("spring.datasource.password", "prod-db-secret")
                 .withProperty("spring.jpa.hibernate.ddl-auto", ddlAuto)
                 .withProperty("springdoc.api-docs.enabled", Boolean.toString(apiDocsEnabled))
                 .withProperty("springdoc.swagger-ui.enabled", Boolean.toString(swaggerUiEnabled))

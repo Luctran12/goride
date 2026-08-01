@@ -7,6 +7,7 @@ import jakarta.persistence.LockModeType;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -27,6 +28,7 @@ public interface TripRepository extends JpaRepository<Trip, Long>, JpaSpecificat
 
     List<Trip> findByDriverIdAndDeletedAtIsNullOrderByRequestedAtDesc(Long driverId);
 
+    @EntityGraph(attributePaths = "passenger")
     List<Trip> findByStatusAndDeletedAtIsNullOrderByRequestedAtAsc(TripStatus status);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)

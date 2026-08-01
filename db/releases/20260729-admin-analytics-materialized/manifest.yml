@@ -1,0 +1,36 @@
+release_id: 20260729-admin-analytics-materialized
+title: Add materialized admin analytics read models
+author: Codex
+created_at: 2026-07-29
+risk: high
+transactional: true
+requires_downtime: false
+applies_after:
+  - 20260729-admin-analytics-spatial-indexes
+related_commit: 4060b6b
+environments:
+  - staging
+  - production
+objects:
+  - analytics.materialized_refresh_state
+  - analytics.mv_trip_daily
+  - analytics.mv_demand_hourly_cell
+  - analytics.mv_supply_hourly
+  - analytics.mv_matching_daily
+pre_deploy_checks:
+  - Confirm PostgreSQL 15 and PostGIS are available.
+  - Confirm all Phase 1 and Phase 4 source tables and indexes exist.
+  - Estimate initial refresh duration against a production-like dataset.
+deploy_steps:
+  - Run apply.sql; views are created WITH NO DATA.
+  - Deploy the application with materialized refresh enabled and query variant DIRECT.
+  - Complete and verify the first refresh before testing MATERIALIZED mode.
+post_deploy_checks:
+  - Run verify.sql and confirm every view has a qualifying unique index.
+  - Compare direct and materialized results at the recorded refresh cutoff.
+rollback_plan:
+  - Switch query variant to DIRECT and disable refresh scheduling.
+  - Run rollback.sql to remove only Phase 5 objects; retain a shared analytics schema if it contains unrelated objects.
+notes:
+  - DIRECT remains the default until Phase 7 benchmark evidence is approved.
+  - Read models use Asia/Ho_Chi_Minh, EPSG:32648 and a 250-metre base cell.

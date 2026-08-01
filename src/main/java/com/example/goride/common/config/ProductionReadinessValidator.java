@@ -19,6 +19,8 @@ public class ProductionReadinessValidator implements SmartInitializingSingleton 
     private static final String DEFAULT_DEV_JWT_SECRET = "local-dev-secret-change-me-please-change";
     private static final Set<String> PRODUCTION_ENVIRONMENTS = Set.of("prod", "production");
     private static final Set<String> UNSAFE_DDL_AUTO_VALUES = Set.of("update", "create", "create-drop");
+    private static final Set<String> UNSAFE_DATABASE_PASSWORDS =
+            Set.of("postgres", "goride", "password", "changeme", "change-me");
 
     private final Environment environment;
     private final JwtProperties jwtProperties;
@@ -56,6 +58,7 @@ public class ProductionReadinessValidator implements SmartInitializingSingleton 
 
         List<String> violations = new ArrayList<>();
         validateJwtSecret(violations);
+        validateDatasource(violations);
         validateDdlAuto(violations);
         validateStorage(violations);
         validateCors(violations);
@@ -84,6 +87,47 @@ public class ProductionReadinessValidator implements SmartInitializingSingleton 
         String ddlAuto = normalize(property("spring.jpa.hibernate.ddl-auto", ""));
         if (UNSAFE_DDL_AUTO_VALUES.contains(ddlAuto)) {
             violations.add("spring.jpa.hibernate.ddl-auto must not be '" + ddlAuto + "' in production");
+        }
+    }
+
+    private void validateDatasource(List<String> violations) {
+        String url = property("spring.datasource.url", "");
+        String username = property("spring.datasource.username", "");
+        String password = property("spring.datasource.password", "");
+        requirePresent(violations, "spring.datasource.url", url);
+        requirePresent(violations, "spring.datasource.username", username);
+        requirePresent(violations, "spring.datasource.password", password);
+
+        if ("postgres".equals(normalize(username))) {
+            violations.add(
+                    "spring.datasource.username must not use the postgres superuser in production"
+            );
+        }
+        if (UNSAFE_DATABASE_PASSWORDS.contains(normalize(password))) {
+            violations.add(
+                    "spring.datasource.password must not use a development default in production"
+            );
+        }
+        if (url.isBlank()) {
+            return;
+        }
+
+        try {
+            URI uri = new URI(url.startsWith("jdbc:") ? url.substring(5) : url);
+            String scheme = normalize(uri.getScheme());
+            String host = normalize(uri.getHost());
+            if (!"postgresql".equals(scheme)
+                    || host.isEmpty()
+                    || uri.getUserInfo() != null
+                    || isUnsafeNetworkHost(host)) {
+                violations.add(
+                        "spring.datasource.url must be a non-loopback PostgreSQL JDBC URL "
+                                + "without embedded credentials in production"
+                );
+            }
+        }
+        catch (URISyntaxException exception) {
+            violations.add("spring.datasource.url must be a valid PostgreSQL JDBC URL");
         }
     }
 
@@ -159,7 +203,7 @@ public class ProductionReadinessValidator implements SmartInitializingSingleton 
             if (!Set.of("http", "https").contains(scheme)
                     || host.isEmpty()
                     || uri.getUserInfo() != null
-                    || isUnsafeCollectorHost(host)) {
+                    || isUnsafeNetworkHost(host)) {
                 violations.add(
                         "management.otlp.tracing.endpoint must be an absolute non-loopback HTTP(S) collector URL "
                                 + "without embedded credentials"
@@ -181,7 +225,7 @@ public class ProductionReadinessValidator implements SmartInitializingSingleton 
         }
     }
 
-    private boolean isUnsafeCollectorHost(String host) {
+    private boolean isUnsafeNetworkHost(String host) {
         String normalizedHost = host.replace("[", "").replace("]", "");
         return "localhost".equals(normalizedHost)
                 || normalizedHost.endsWith(".localhost")

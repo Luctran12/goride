@@ -1,5 +1,9 @@
 package com.example.goride.auth.config;
 
+import com.example.goride.analytics.repository.DriverSupplySnapshotRepository;
+import com.example.goride.analytics.repository.DirectAnalyticsQueryPort;
+import com.example.goride.analytics.repository.MatchingOfferEventRepository;
+import com.example.goride.analytics.repository.MatchingRunRepository;
 import com.example.goride.booking.repository.PricingConfigRepository;
 import com.example.goride.booking.repository.SurgePricingRuleRepository;
 import com.example.goride.booking.repository.TripRepository;
@@ -76,6 +80,18 @@ class SecurityCorsIntegrationTests {
 
     @MockitoBean
     private TripMessageRepository tripMessageRepository;
+
+    @MockitoBean
+    private MatchingRunRepository matchingRunRepository;
+
+    @MockitoBean
+    private MatchingOfferEventRepository matchingOfferEventRepository;
+
+    @MockitoBean
+    private DriverSupplySnapshotRepository driverSupplySnapshotRepository;
+
+    @MockitoBean
+    private DirectAnalyticsQueryPort directAnalyticsQueryPort;
 
     @Resource
     private MockMvc mockMvc;

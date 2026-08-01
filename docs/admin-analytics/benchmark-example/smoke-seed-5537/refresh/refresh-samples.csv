@@ -1,0 +1,3 @@
+sequence,started_at,completed_at,duration_ms,concurrent,cutoff,rows_before,rows_after
+0,2026-07-30T02:41:59.044555700Z,2026-07-30T02:42:00.491349600Z,1439,false,2026-07-30T02:41:59.058240Z,"{}","{analytics.mv_trip_daily=242, analytics.mv_demand_hourly_cell=864, analytics.mv_supply_hourly=1000, analytics.mv_matching_daily=242}"
+1,2026-07-30T02:42:00.595833200Z,2026-07-30T02:42:02.022190600Z,1417,true,2026-07-30T02:42:00.598028Z,"{analytics.mv_trip_daily=242, analytics.mv_demand_hourly_cell=864, analytics.mv_supply_hourly=1000, analytics.mv_matching_daily=242}","{analytics.mv_trip_daily=242, analytics.mv_demand_hourly_cell=864, analytics.mv_supply_hourly=1000, analytics.mv_matching_daily=242}"

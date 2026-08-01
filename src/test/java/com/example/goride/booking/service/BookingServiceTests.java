@@ -21,7 +21,8 @@ import com.example.goride.booking.service.SurgePricingService.SurgePricingQuote;
 import com.example.goride.common.error.BusinessException;
 import com.example.goride.common.error.ErrorCode;
 import com.example.goride.driver.domain.VehicleType;
-import com.example.goride.matching.service.OfferedTripAccessService;
+import com.example.goride.matching.telemetry.MatchingTelemetryPort;
+import com.example.goride.matching.telemetry.MatchingTelemetryFailureReporter;
 import com.example.goride.payment.service.PaymentMethodService;
 import com.example.goride.servicearea.service.ServiceAreaService;
 import com.example.goride.user.domain.User;
@@ -74,9 +75,6 @@ class BookingServiceTests {
     private PaymentMethodService paymentMethodService;
 
     @Mock
-    private OfferedTripAccessService offeredTripAccessService;
-
-    @Mock
     private SurgePricingService surgePricingService;
 
     @Mock
@@ -90,6 +88,12 @@ class BookingServiceTests {
 
     @Mock
     private Clock clock;
+
+    @Mock
+    private MatchingTelemetryPort matchingTelemetry;
+
+    @Mock
+    private MatchingTelemetryFailureReporter matchingTelemetryFailureReporter;
 
     @InjectMocks
     private BookingService bookingService;
@@ -271,14 +275,46 @@ class BookingServiceTests {
                 10L
         );
         Trip trip = withTripId(sampleTrip(passenger), 99L);
+        TripStatusHistory created = TripStatusHistory.record(
+                trip,
+                null,
+                TripStatus.SEARCHING,
+                passenger,
+                "Booking created"
+        );
+        TripStatusHistory cancelled = TripStatusHistory.record(
+                trip,
+                TripStatus.SEARCHING,
+                TripStatus.CANCELLED,
+                null,
+                null
+        );
+        ReflectionTestUtils.setField(created, "id", 1L);
+        ReflectionTestUtils.setField(created, "changedAt", Instant.parse("2026-05-18T08:00:00Z"));
+        ReflectionTestUtils.setField(cancelled, "id", 2L);
+        ReflectionTestUtils.setField(cancelled, "changedAt", Instant.parse("2026-05-18T08:05:00Z"));
         when(userRepository.findByIdAndDeletedAtIsNull(10L)).thenReturn(Optional.of(passenger));
         when(tripRepository.findByIdAndDeletedAtIsNull(99L)).thenReturn(Optional.of(trip));
+        when(tripStatusHistoryRepository.findByTripIdOrderByChangedAtAsc(99L))
+                .thenReturn(List.of(created, cancelled));
 
         var response = bookingService.getMyBooking(10L, 99L);
 
         assertThat(response.id()).isEqualTo(99L);
         assertThat(response.passengerId()).isEqualTo(10L);
         assertThat(response.status()).isEqualTo(TripStatus.SEARCHING);
+        assertThat(response.statusHistory()).hasSize(2);
+        assertThat(response.statusHistory().get(0).id()).isEqualTo(1L);
+        assertThat(response.statusHistory().get(0).fromStatus()).isNull();
+        assertThat(response.statusHistory().get(0).toStatus()).isEqualTo(TripStatus.SEARCHING);
+        assertThat(response.statusHistory().get(0).changedByUserId()).isEqualTo(10L);
+        assertThat(response.statusHistory().get(0).note()).isEqualTo("Booking created");
+        assertThat(response.statusHistory().get(1).id()).isEqualTo(2L);
+        assertThat(response.statusHistory().get(1).changedByUserId()).isNull();
+        assertThat(response.statusHistory()).extracting("changedAt").containsExactly(
+                Instant.parse("2026-05-18T08:00:00Z"),
+                Instant.parse("2026-05-18T08:05:00Z")
+        );
     }
 
     @Test
@@ -299,30 +335,9 @@ class BookingServiceTests {
                 .isInstanceOfSatisfying(BusinessException.class, exception ->
                         assertThat(exception.errorCode()).isEqualTo(ErrorCode.FORBIDDEN)
                 );
+        verify(tripStatusHistoryRepository, never()).findByTripIdOrderByChangedAtAsc(any());
     }
 
-    @Test
-    void getMyBookingAllowsDriverHoldingActiveMatchingOffer() {
-        User passenger = withUserId(
-                User.create("Passenger", "0900000000", null, "hash", Set.of(UserRole.PASSENGER)),
-                10L
-        );
-        User offeredDriver = withUserId(
-                User.create("Driver", "0900000001", null, "hash", Set.of(UserRole.DRIVER)),
-                20L
-        );
-        Trip trip = withTripId(sampleTrip(passenger), 99L);
-        when(userRepository.findByIdAndDeletedAtIsNull(20L)).thenReturn(Optional.of(offeredDriver));
-        when(tripRepository.findByIdAndDeletedAtIsNull(99L)).thenReturn(Optional.of(trip));
-        when(offeredTripAccessService.hasActiveOffer(99L, 20L)).thenReturn(true);
-
-        var response = bookingService.getMyBooking(20L, 99L);
-
-        assertThat(response.id()).isEqualTo(99L);
-        assertThat(response.passengerId()).isEqualTo(10L);
-        assertThat(response.driverId()).isNull();
-        assertThat(response.status()).isEqualTo(TripStatus.SEARCHING);
-    }
     @Test
     void listMyBookingsCombinesPassengerAndDriverTripsNewestFirst() {
         User riderDriver = withUserId(
@@ -365,6 +380,7 @@ class BookingServiceTests {
         ArgumentCaptor<TripStatusHistory> historyCaptor = ArgumentCaptor.forClass(TripStatusHistory.class);
         ArgumentCaptor<BookingCancelledEvent> eventCaptor = ArgumentCaptor.forClass(BookingCancelledEvent.class);
         verify(tripStatusHistoryRepository).save(historyCaptor.capture());
+        verify(matchingTelemetry).cancelRun(eq(99L), any(Instant.class));
         verify(eventPublisher).publishEvent(eventCaptor.capture());
         assertThat(response.status()).isEqualTo(TripStatus.CANCELLED);
         assertThat(response.cancelReason()).isEqualTo("Changed plan");

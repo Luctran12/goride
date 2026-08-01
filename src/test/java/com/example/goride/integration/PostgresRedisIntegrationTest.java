@@ -36,6 +36,8 @@ abstract class PostgresRedisIntegrationTest {
         registry.add("spring.data.redis.repositories.enabled", () -> "false");
         registry.add("app.matching.timeout-scheduler.enabled", () -> "false");
         registry.add("app.driver.availability.scheduler.enabled", () -> "false");
+        registry.add("app.analytics.telemetry.supply-snapshot-enabled", () -> "false");
+        registry.add("app.analytics.direct-query-enabled", () -> "true");
         registry.add("app.notifications.fcm.enabled", () -> "false");
     }
 }

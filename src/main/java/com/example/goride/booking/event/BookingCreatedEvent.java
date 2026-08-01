@@ -14,9 +14,18 @@ public record BookingCreatedEvent(
         BigDecimal pickupLongitude,
         BigDecimal dropoffLatitude,
         BigDecimal dropoffLongitude,
-        BigDecimal estimatedFare
+        BigDecimal estimatedFare,
+        BookingMatchingTrigger matchingTrigger
 ) {
     public static BookingCreatedEvent from(Trip trip) {
+        return from(trip, BookingMatchingTrigger.BOOKING_CREATED);
+    }
+
+    public static BookingCreatedEvent fromScheduledDispatch(Trip trip) {
+        return from(trip, BookingMatchingTrigger.SCHEDULED_DISPATCH);
+    }
+
+    private static BookingCreatedEvent from(Trip trip, BookingMatchingTrigger matchingTrigger) {
         Point pickup = trip.getPickupLocation();
         Point dropoff = trip.getDropoffLocation();
         return new BookingCreatedEvent(
@@ -27,7 +36,8 @@ public record BookingCreatedEvent(
                 BigDecimal.valueOf(pickup.getX()),
                 BigDecimal.valueOf(dropoff.getY()),
                 BigDecimal.valueOf(dropoff.getX()),
-                trip.getEstimatedFare()
+                trip.getEstimatedFare(),
+                matchingTrigger
         );
     }
 }

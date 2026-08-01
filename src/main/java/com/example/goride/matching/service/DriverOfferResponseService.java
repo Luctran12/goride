@@ -14,10 +14,12 @@ import com.example.goride.matching.domain.MatchingRequest;
 import com.example.goride.matching.domain.TripMatchingState;
 import com.example.goride.matching.notification.DriverOfferNotification;
 import com.example.goride.matching.notification.DriverOfferNotifier;
+import com.example.goride.matching.telemetry.MatchingTelemetryOfferOutcome;
+import com.example.goride.matching.telemetry.MatchingTelemetryFailureReporter;
+import com.example.goride.matching.telemetry.MatchingTelemetryPort;
 import com.example.goride.notification.dto.TripStatusNotification;
 import com.example.goride.notification.dto.UserNotification;
 import com.example.goride.notification.service.TripRealtimeNotifier;
-import com.example.goride.tracking.service.TripDriverLocationBootstrapService;
 import com.example.goride.user.domain.User;
 import com.example.goride.user.domain.UserRole;
 import com.example.goride.user.repository.UserRepository;
@@ -26,6 +28,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
+import java.time.Clock;
 import java.time.Instant;
 import java.util.LinkedHashSet;
 import java.util.Objects;
@@ -41,7 +44,9 @@ public class DriverOfferResponseService {
     private final MatchingService matchingService;
     private final DriverOfferNotifier driverOfferNotifier;
     private final TripRealtimeNotifier tripRealtimeNotifier;
-    private final TripDriverLocationBootstrapService tripDriverLocationBootstrapService;
+    private final MatchingTelemetryPort matchingTelemetry;
+    private final MatchingTelemetryFailureReporter matchingTelemetryFailureReporter;
+    private final Clock clock;
 
     public DriverOfferResponseService(
             TripRepository tripRepository,
@@ -51,7 +56,9 @@ public class DriverOfferResponseService {
             MatchingService matchingService,
             DriverOfferNotifier driverOfferNotifier,
             TripRealtimeNotifier tripRealtimeNotifier,
-            TripDriverLocationBootstrapService tripDriverLocationBootstrapService
+            MatchingTelemetryPort matchingTelemetry,
+            MatchingTelemetryFailureReporter matchingTelemetryFailureReporter,
+            Clock clock
     ) {
         this.tripRepository = tripRepository;
         this.tripStatusHistoryRepository = tripStatusHistoryRepository;
@@ -60,7 +67,9 @@ public class DriverOfferResponseService {
         this.matchingService = matchingService;
         this.driverOfferNotifier = driverOfferNotifier;
         this.tripRealtimeNotifier = tripRealtimeNotifier;
-        this.tripDriverLocationBootstrapService = tripDriverLocationBootstrapService;
+        this.matchingTelemetry = matchingTelemetry;
+        this.matchingTelemetryFailureReporter = matchingTelemetryFailureReporter;
+        this.clock = clock;
     }
 
     @Transactional
@@ -73,12 +82,12 @@ public class DriverOfferResponseService {
         assertOfferActive(matchingState);
 
         if (decision == DriverOfferDecision.ACCEPT) {
-            return acceptOffer(driverId, tripId);
+            return acceptOffer(driverId, tripId, matchingState);
         }
         return rejectOffer(driverId, tripId, matchingState);
     }
 
-    private DriverTripResponse acceptOffer(Long driverId, Long tripId) {
+    private DriverTripResponse acceptOffer(Long driverId, Long tripId, TripMatchingState matchingState) {
         Trip trip = getTripForUpdate(tripId);
         if (trip.getStatus() != TripStatus.SEARCHING) {
             candidateStore.releaseCandidateLock(driverId);
@@ -87,6 +96,7 @@ public class DriverOfferResponseService {
         }
 
         User driver = getDriver(driverId);
+        acceptMatchingOffer(tripId, matchingState.attempt(), driverId);
         TripStatus previousStatus = trip.getStatus();
         trip.accept(driver);
         Trip savedTrip = tripRepository.save(trip);
@@ -97,10 +107,11 @@ public class DriverOfferResponseService {
                 driver,
                 "Driver accepted matching offer"
         ));
-        candidateStore.markCandidateBusy(driverId);
-        candidateStore.releaseCandidateLock(driverId);
-        candidateStore.clearTripMatching(tripId);
-        bootstrapDriverLocation(savedTrip);
+        runAfterCommit(() -> {
+            candidateStore.markCandidateBusy(driverId);
+            candidateStore.releaseCandidateLock(driverId);
+            candidateStore.clearTripMatching(tripId);
+        });
         notifyPassengerTripAccepted(savedTrip);
         return response(savedTrip);
     }
@@ -113,29 +124,12 @@ public class DriverOfferResponseService {
             throw new BusinessException(ErrorCode.TRIP_STATUS_INVALID_TRANSITION);
         }
 
-        candidateStore.releaseCandidateLock(driverId);
-        candidateStore.clearTripMatching(tripId);
+        rejectMatchingOffer(tripId, matchingState.attempt());
 
         Set<Long> rejectedDriverIds = new LinkedHashSet<>(matchingState.rejectedDriverIds());
         rejectedDriverIds.add(driverId);
-        Optional<DriverOffer> nextOffer = matchingService.findAndLockDriver(
-                MatchingRequest.from(trip),
-                matchingState.attempt() + 1,
-                rejectedDriverIds
-        );
-        nextOffer.ifPresent(offer -> driverOfferNotifier.notifyDriver(
-                offer.candidate().driverId(),
-                DriverOfferNotification.from(trip, offer)
-        ));
-        return nextOffer
-                .map(offer -> response(trip))
-                .orElseGet(() -> response(trip));
-    }
-
-    private void bootstrapDriverLocation(Trip trip) {
-        Long tripId = trip.getId();
-        Long driverId = trip.getDriver().getId();
-        runAfterCommit(() -> tripDriverLocationBootstrapService.bootstrap(tripId, driverId));
+        runAfterCommit(() -> continueAfterRejectedOffer(trip, matchingState, rejectedDriverIds));
+        return response(trip);
     }
 
     private void notifyPassengerTripAccepted(Trip trip) {
@@ -161,7 +155,9 @@ public class DriverOfferResponseService {
     }
 
     private void assertOfferActive(TripMatchingState matchingState) {
-        if (matchingState.offerExpiresAt().isBefore(Instant.now())) {
+        Instant now = clock.instant();
+        if (matchingState.offerExpiresAt().isBefore(now)) {
+            expireMatchingOffer(matchingState, now);
             candidateStore.releaseCandidateLock(matchingState.offeredDriverId());
             candidateStore.clearTripMatching(matchingState.tripId());
             throw new BusinessException(ErrorCode.MATCHING_OFFER_EXPIRED);
@@ -184,6 +180,69 @@ public class DriverOfferResponseService {
 
     private DriverTripResponse response(Trip trip) {
         return new DriverTripResponse(trip.getId(), trip.getStatus());
+    }
+
+    private void acceptMatchingOffer(Long tripId, int attempt, Long driverId) {
+        try {
+            matchingTelemetry.acceptOfferAndCompleteRun(
+                    tripId,
+                    attempt,
+                    driverId,
+                    clock.instant()
+            );
+        } catch (RuntimeException exception) {
+            matchingTelemetryFailureReporter.report("accept_offer", tripId, exception);
+            throw exception;
+        }
+    }
+
+    private void rejectMatchingOffer(Long tripId, int attempt) {
+        try {
+            matchingTelemetry.resolveOffer(
+                    tripId,
+                    attempt,
+                    MatchingTelemetryOfferOutcome.REJECTED,
+                    clock.instant()
+            );
+        } catch (RuntimeException exception) {
+            matchingTelemetryFailureReporter.report("reject_offer", tripId, exception);
+            throw exception;
+        }
+    }
+
+    private void expireMatchingOffer(TripMatchingState matchingState, Instant now) {
+        try {
+            matchingTelemetry.expireOffer(
+                    matchingState.tripId(),
+                    matchingState.attempt(),
+                    now
+            );
+        } catch (RuntimeException exception) {
+            matchingTelemetryFailureReporter.report(
+                    "expire_offer",
+                    matchingState.tripId(),
+                    exception
+            );
+            throw exception;
+        }
+    }
+
+    private void continueAfterRejectedOffer(
+            Trip trip,
+            TripMatchingState matchingState,
+            Set<Long> rejectedDriverIds
+    ) {
+        candidateStore.releaseCandidateLock(matchingState.offeredDriverId());
+        candidateStore.clearTripMatching(matchingState.tripId());
+        Optional<DriverOffer> nextOffer = matchingService.findAndLockDriver(
+                MatchingRequest.from(trip),
+                matchingState.attempt() + 1,
+                rejectedDriverIds
+        );
+        nextOffer.ifPresent(offer -> driverOfferNotifier.notifyDriver(
+                offer.candidate().driverId(),
+                DriverOfferNotification.from(trip, offer)
+        ));
     }
 
     private void runAfterCommit(Runnable action) {
