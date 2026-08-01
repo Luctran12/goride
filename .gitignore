@@ -41,3 +41,7 @@ secrets/
 
 ### Local uploads ###
 uploads/
+
+output/
+
+tmp/
