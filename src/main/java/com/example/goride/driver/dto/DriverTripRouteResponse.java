@@ -13,6 +13,7 @@ public record DriverTripRouteResponse(
         BookingLocationResponse destination,
         long distanceMeters,
         long durationSeconds,
+        DriverRouteSource routeSource,
         DriverRouteGeometryResponse geometry,
         List<DriverRouteStepResponse> steps
 ) {
@@ -21,7 +22,8 @@ public record DriverTripRouteResponse(
             TripStatus tripStatus,
             RouteDestinationType destinationType,
             BookingLocationResponse destination,
-            RoutePlan routePlan
+            RoutePlan routePlan,
+            DriverRouteSource routeSource
     ) {
         return new DriverTripRouteResponse(
                 tripId,
@@ -30,6 +32,7 @@ public record DriverTripRouteResponse(
                 destination,
                 routePlan.distanceMeters(),
                 routePlan.durationSeconds(),
+                routeSource,
                 DriverRouteGeometryResponse.from(routePlan.geometry()),
                 routePlan.steps().stream().map(DriverRouteStepResponse::from).toList()
         );

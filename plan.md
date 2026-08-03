@@ -1,19 +1,19 @@
 # GoRide Project Completion Plan
 
-Last updated: 2026-07-27, Asia/Bangkok
+Last updated: 2026-08-03, Asia/Bangkok
 
 ## Project Snapshot
 
 | Item | Status |
 | --- | --- |
-| Working branch | `codex/word-location-mobile` |
-| Latest merged feature on develop | `feature/driver-location-bootstrap` via `5b941d6` |
-| Develop base commit for this feature | `5b941d6` (`merge: driver location bootstrap`) |
-| Current feature | Custom three-word location gateway and mobile integration contract |
-| Test status | Targeted location/security suite passed 32 tests; full Maven ran 495 tests with 485 pass, 0 failures and 10 Docker/Testcontainers initialization errors |
+| Working branch | `codex/driver-routing-fallback` |
+| Latest merged feature on develop | Admin v2 via `ae3dac2` |
+| Develop base commit for this feature | `ae3dac2` (`merge admin-v2`) |
+| Current feature | Soft straight-line fallback for assigned-driver pickup/dropoff routing |
+| Test status | Targeted driver routing/controller suite passed 10 tests; full Maven ran 562 tests with 3 baseline failures and 18 Docker/Testcontainers errors |
 | Diff hygiene | `git diff --check` passed; Windows line-ending warnings only |
 | Code review | Internal review completed; CodeRabbit CLI is unavailable in PATH |
-| Publish status | Feature implementation approved for local develop merge; not pushed |
+| Publish status | Feature implementation was reviewed and is committed on the feature branch; not merged or pushed |
 | Local config | `src/main/resources/application.yml` is environment-specific and must stay uncommitted |
 
 ## Completed Backend Modules
@@ -24,7 +24,7 @@ Last updated: 2026-07-27, Asia/Bangkok
 | User profile | Current user profile, update profile, avatar upload, admin user list/detail/create/update/status controls | `GET/PUT /api/users/me`, `POST /api/users/me/avatar`, admin user endpoints under `/api/users` | Covers user account management, avatar URL persistence and admin CRUD workflows. |
 | Upload storage foundation | Local filesystem upload storage for dev, Cloudflare R2/S3-compatible provider for staging/production, image content-type and size validation, driver document upload URLs and user avatar upload | `POST /api/users/me/avatar`, `POST /api/v1/uploads/driver-documents/{documentType}` | Local/dev storage is ready; Cloudflare R2 provider is implemented and production now needs bucket/domain/secret UAT before launch. |
 | Driver profile and availability | Driver profile creation/update, uploaded portrait/license/ID/vehicle-registration URL metadata, admin approval flow, online/offline status, heartbeat refresh and automatic stale-driver timeout | `/api/v1/drivers/me/profile`, `/api/v1/drivers/me/status`, `POST /api/v1/drivers/me/heartbeat`, admin approval endpoints | Admin pending-driver responses include uploaded document URLs when FE submits them during onboarding. |
-| Pricing and routing | Fare estimate with base/static/dynamic surge breakdown, OSRM-compatible route distance/duration, driver navigation GeoJSON/steps, configurable estimate fallback, pricing configuration and admin surge rule management | `/api/v1/bookings/estimate`, `POST /api/v1/drivers/trips/{tripId}/route`, `/api/v1/pricing`, `/api/v1/admin/pricing`, `/api/v1/admin/pricing/surge-rules`, `/api/v1/admin/pricing/surge-status` | Estimate/create booking can use routed distance/time and demand/supply surge; assigned drivers can request pickup/dropoff routes; completed-trip fare uses actual tracking history with the booking-time surge multiplier snapshot. |
+| Pricing and routing | Fare estimate with base/static/dynamic surge breakdown, OSRM-compatible route distance/duration, driver navigation GeoJSON/steps, configurable estimate fallback, pricing configuration and admin surge rule management | `/api/v1/bookings/estimate`, `POST /api/v1/drivers/trips/{tripId}/route`, `/api/v1/pricing`, `/api/v1/admin/pricing`, `/api/v1/admin/pricing/surge-rules`, `/api/v1/admin/pricing/surge-status` | Estimate/create booking can use routed distance/time and demand/supply surge. Assigned-driver routing returns provider geometry when available and a labeled straight-line fallback when the provider fails; completed-trip fare uses actual tracking history with the booking-time surge multiplier snapshot. |
 | Service areas | Public active service area list, admin CRUD/deactivate foundation, pickup/dropoff geofence validation before fare calculation and booking creation | `GET /api/v1/service-areas`, `/api/v1/admin/service-areas`, `/api/v1/bookings/estimate`, `/api/v1/bookings` | Merged into `develop`; no active service areas means rollout remains open, once active areas exist pickup/dropoff must share at least one active area or backend returns `LOCATION_OUT_OF_SERVICE_AREA`. |
 | Three-word location | Authenticated gateway to custom Python coordinate/three-word conversion, normalized mobile DTOs and stable provider errors | `GET /api/v1/locations/to-words`, `GET /api/v1/locations/to-coordinate` | Provider is disabled by default; coordinates remain booking/routing source of truth. |
 | Booking | Create booking, scheduled booking, booking detail, passenger history/listing, cancellation rules/status updates | `/api/v1/bookings` and related detail/cancel/list endpoints | Booking lifecycle is connected to matching and trip creation; scheduled bookings stay `SCHEDULED` until dispatch window opens. |
@@ -74,7 +74,7 @@ Last updated: 2026-07-27, Asia/Bangkok
 | Fare estimate | `/api/v1/bookings/estimate` | Show fare/distance/time plus `baseFare`, `surgeAmount`, static/dynamic/effective multipliers and a surge badge when `surge.surgeApplied=true`; never recalculate fare on FE. |
 | Passenger booking | `/api/v1/bookings` | Create immediate booking or scheduled booking with optional `scheduledPickupTime`, show matching progress for `SEARCHING`, show scheduled waiting state for `SCHEDULED`, display the `fareSurgeMultiplier` snapshot on trip detail if needed, allow cancel when allowed. |
 | Driver offers | Driver trip offer APIs and user-specific WebSocket notifications | Display incoming offer countdown, accept/reject, handle timeout, and close stale offer modal when `/user/queue/trip-requests` receives `TRIP_CANCELLED`/`DISMISS`. |
-| Driver navigation | `POST /api/v1/drivers/trips/{tripId}/route` | Send current GPS, draw returned GeoJSON `LineString`, route to pickup while accepted and dropoff after arrival, then re-route only when movement/time threshold is reached. |
+| Driver navigation | `POST /api/v1/drivers/trips/{tripId}/route` | Send current GPS and inspect `routeSource`: draw provider geometry/steps for `PROVIDER`; for `STRAIGHT_LINE_FALLBACK`, show degraded routing, draw only a destination guide line, and offer external navigation. Route to pickup while accepted and dropoff after arrival; debounce re-route calls. |
 | Trip status | Driver trip status endpoints and trip WebSocket topic | Render status timeline: accepted, arrived, in progress, completed/cancelled. |
 | Realtime tracking | `/ws` SockJS or `/ws-native` native STOMP location topic, REST fallback tracking endpoints | Subscribe for live driver location after a driver is assigned; passenger can display driver approach during `ACCEPTED`/`ARRIVED` and trip movement during `IN_PROGRESS`. |
 | In-trip messaging | `GET/POST /api/v1/trips/{tripId}/messages`, `/app/trip.message`, `/topic/trip/{tripId}/messages` | Load message history on trip detail, subscribe to realtime messages, send text while trip is `ACCEPTED`, `ARRIVED` or `IN_PROGRESS`, and handle `TRIP_MESSAGE_NOT_AVAILABLE` by disabling chat input. |
@@ -104,7 +104,7 @@ Last updated: 2026-07-27, Asia/Bangkok
 | Unsafe production environment variables can block startup | The app fails fast for local JWT secret, mutating Hibernate DDL, local storage, unsafe CORS, incomplete R2 or enabled OpenAPI/Swagger surfaces | Prepare deployment env vars first; set both `SPRINGDOC_*_ENABLED=false` in production and keep local/staging docs enabled only where trusted. |
 | Online payment providers still need real merchant UAT | Frontend should not expose MoMo/VNPAY publicly until real sandbox/UAT validation evidence is recorded | Keep CASH as fallback; FE should use `/payments/methods.consumerEnabled` and must not hide solely because `sandbox=false`; devops/admin should use readiness, sandbox UAT plan, service-level signed callback tests, admin UAT result records and sandbox E2E sessions before exposing online methods. |
 | Webhook freshness defaults need sandbox validation | The 24-hour age and 5-minute future-skew defaults are configurable but not yet calibrated against real merchant retries | Validate both gateways in sandbox, record freshness replay evidence through sandbox E2E session and UAT result records, then tune provider-specific windows without weakening signature or transaction-reference checks. |
-| Routing endpoint is not production-calibrated | Fare estimates and driver navigation geometry are implemented, but endpoint capacity, route request rate and Vietnamese road quality are not validated | Use a controlled OSRM-compatible endpoint, debounce/re-route on FE, add rate/latency metrics, and tune timeout/profile during UAT. |
+| Routing endpoint is not production-calibrated | Fare estimates and driver navigation geometry are implemented and driver routing degrades to a labeled straight line on provider failure, but endpoint capacity, route request rate and Vietnamese road quality are not validated | Use a controlled OSRM-compatible endpoint, debounce/re-route on FE, monitor `STRAIGHT_LINE_FALLBACK` frequency, add rate/latency metrics, and tune timeout/profile during UAT. |
 | Surge thresholds can affect conversion and driver acceptance | Dynamic multipliers are now code-ready, but poor thresholds may make estimates confusing or too expensive | Start with conservative rules, monitor demand/supply ratio, cancellation and acceptance metrics, and let admin deactivate rules quickly during UAT. |
 | Service area polygons can block valid trips if drawn poorly | Once active zones exist, estimate/create booking reject trips outside a single active polygon | Start with broad launch-city polygons, test common pickup/dropoff pairs on real devices, keep no active zones until admin data is verified, and expose boundaries to FE for clear user guidance. |
 | Heartbeat timing is not production-calibrated | Aggressive intervals may create reconnect churn; loose intervals delay database cleanup | Start with a 20-second client heartbeat and 60-second timeout, then tune from staging disconnect and scheduler metrics. |

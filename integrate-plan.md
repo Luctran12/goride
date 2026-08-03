@@ -896,7 +896,7 @@ Response `data`:
 FE action:
 - Gui heartbeat khi app driver dang online, de xuat moi 20 giay va truoc `expiresAt`.
 - Moi heartbeat gui location moi nhat; backend cap nhat Redis GEO va `driver_profiles.last_location_at`.
-- Tam dung heartbeat khi driver bam offline hoÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚ÂºÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â·c logout.
+- Tam dung heartbeat khi driver bam offline hoÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚ÂºÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â·c logout.
 - Neu mat mang ngan, retry voi exponential backoff nhung khong de qua `expiresAt`.
 - Neu nhan `DRIVER_NOT_AVAILABLE`, dung heartbeat va hien nut "Bat dau nhan chuyen" de goi lai `PATCH /api/v1/drivers/me/status` voi `online=true`.
 - Heartbeat khong lam driver dang `BUSY` thanh `AVAILABLE`; FE tiep tuc gui heartbeat trong suot active trip.
@@ -1179,6 +1179,7 @@ Response `data`:
   },
   "distanceMeters": 2346,
   "durationSeconds": 457,
+  "routeSource": "PROVIDER",
   "geometry": {
     "type": "LineString",
     "coordinates": [
@@ -1205,10 +1206,11 @@ FE action:
 - GeoJSON coordinates luon theo thu tu `[longitude, latitude]`; khong dao thanh `[lat, lng]` khi ve polyline.
 - Goi lan dau ngay sau khi accept trip, sau do re-route khi tai xe di lech/di chuyen du nguong hoac theo interval co debounce; khong goi theo tung GPS frame.
 - Khi status doi sang `ARRIVED`, goi lai endpoint de destination tu dong chuyen sang `DROPOFF`.
-- `maneuverType`/`maneuverModifier` la du lieu OSRM; FE tu map sang icon va text tieng Viet.
+- Neu `routeSource=PROVIDER`, `maneuverType`/`maneuverModifier` la du lieu provider; FE co the map sang icon va text tieng Viet.
+- Neu `routeSource=STRAIGHT_LINE_FALLBACK`, geometry chi gom GPS hien tai va destination, `steps=[]`. Hien trang thai routing suy giam, khong hien turn-by-turn instruction va cung cap nut mo external map/navigation.
 - Chi assigned driver goi duoc. `FORBIDDEN` thi dong navigation va refresh trip detail.
-- `ROUTING_PROVIDER_ERROR` HTTP 502 thi giu destination marker, cho retry hoac mo external map app bang destination coordinates.
-- Driver navigation yeu cau `ROUTING_ENABLED=true`; khong dung Haversine fallback vi duong thang khong an toan de dieu huong.
+- Khi `app.routing.fallback-enabled=false`, `ROUTING_PROVIDER_ERROR` HTTP 502 thi giu destination marker, cho retry hoac mo external map app bang destination coordinates.
+- Straight-line fallback duoc bat mac dinh de giu flow, nhung khong phai duong bo an toan va khong thay the provider routing cho production.
 
 ---
 

@@ -4,6 +4,7 @@ import com.example.goride.booking.domain.TripStatus;
 import com.example.goride.booking.dto.BookingLocationResponse;
 import com.example.goride.common.security.CurrentUser;
 import com.example.goride.driver.dto.DriverRouteGeometryResponse;
+import com.example.goride.driver.dto.DriverRouteSource;
 import com.example.goride.driver.dto.DriverTripRouteRequest;
 import com.example.goride.driver.dto.DriverTripRouteResponse;
 import com.example.goride.driver.dto.RouteDestinationType;
@@ -44,6 +45,7 @@ class DriverTripControllerTests {
                 ),
                 2300,
                 480,
+                DriverRouteSource.PROVIDER,
                 new DriverRouteGeometryResponse("LineString", List.of(
                         List.of(BigDecimal.valueOf(106.69), BigDecimal.valueOf(10.76)),
                         List.of(BigDecimal.valueOf(106.7), BigDecimal.valueOf(10.77))

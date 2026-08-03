@@ -9,9 +9,11 @@ import com.example.goride.booking.service.distance.RouteGeometry;
 import com.example.goride.booking.service.distance.RouteGeometryProvider;
 import com.example.goride.booking.service.distance.RoutePlan;
 import com.example.goride.booking.service.distance.RouteStep;
+import com.example.goride.booking.service.distance.RoutingProperties;
 import com.example.goride.common.error.BusinessException;
 import com.example.goride.common.error.ErrorCode;
 import com.example.goride.driver.domain.VehicleType;
+import com.example.goride.driver.dto.DriverRouteSource;
 import com.example.goride.driver.dto.DriverTripRouteRequest;
 import com.example.goride.driver.dto.RouteDestinationType;
 import com.example.goride.user.domain.User;
@@ -53,10 +55,12 @@ class DriverTripRoutingServiceTests {
     private RouteGeometryProvider routeGeometryProvider;
 
     private DriverTripRoutingService service;
+    private RoutingProperties routingProperties;
 
     @BeforeEach
     void setUp() {
-        service = new DriverTripRoutingService(tripRepository, routeGeometryProvider);
+        routingProperties = new RoutingProperties();
+        service = new DriverTripRoutingService(tripRepository, routeGeometryProvider, routingProperties);
     }
 
     @Test
@@ -73,6 +77,7 @@ class DriverTripRoutingServiceTests {
         assertThat(response.destination().lng()).isEqualByComparingTo("106.7");
         assertThat(response.geometry().type()).isEqualTo("LineString");
         assertThat(response.geometry().coordinates()).hasSize(2);
+        assertThat(response.routeSource()).isEqualTo(DriverRouteSource.PROVIDER);
         assertThat(response.steps()).singleElement()
                 .satisfies(step -> assertThat(step.maneuverModifier()).isEqualTo("right"));
         assertRouteLocations("10.76", "106.69", "10.77", "106.7");
@@ -92,6 +97,72 @@ class DriverTripRoutingServiceTests {
         assertThat(response.destination().lat()).isEqualByComparingTo("10.813");
         assertThat(response.destination().lng()).isEqualByComparingTo("106.665");
         assertRouteLocations("10.76", "106.69", "10.813", "106.665");
+    }
+
+    @Test
+    void returnsStraightLineFallbackWhenProviderFails() {
+        Trip trip = acceptedTrip();
+        when(tripRepository.findByIdAndDeletedAtIsNull(99L)).thenReturn(Optional.of(trip));
+        when(routeGeometryProvider.route(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
+                .thenThrow(new BusinessException(ErrorCode.ROUTING_PROVIDER_ERROR, "provider unavailable"));
+
+        var response = service.route(20L, 99L, CURRENT_LOCATION);
+
+        assertThat(response.routeSource()).isEqualTo(DriverRouteSource.STRAIGHT_LINE_FALLBACK);
+        assertThat(response.distanceMeters()).isPositive();
+        assertThat(response.durationSeconds()).isPositive();
+        assertThat(response.geometry().type()).isEqualTo("LineString");
+        assertThat(response.geometry().coordinates()).containsExactly(
+                List.of(BigDecimal.valueOf(106.6900), BigDecimal.valueOf(10.7600)),
+                List.of(BigDecimal.valueOf(106.7000), BigDecimal.valueOf(10.7700))
+        );
+        assertThat(response.steps()).isEmpty();
+    }
+
+    @Test
+    void keepsFallbackValuesPositiveWhenDriverIsAlreadyAtDestination() {
+        Trip trip = acceptedTrip();
+        when(tripRepository.findByIdAndDeletedAtIsNull(99L)).thenReturn(Optional.of(trip));
+        when(routeGeometryProvider.route(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
+                .thenThrow(new BusinessException(ErrorCode.ROUTING_PROVIDER_ERROR, "provider unavailable"));
+        DriverTripRouteRequest pickupLocation = new DriverTripRouteRequest(
+                BigDecimal.valueOf(10.7700),
+                BigDecimal.valueOf(106.7000)
+        );
+
+        var response = service.route(20L, 99L, pickupLocation);
+
+        assertThat(response.distanceMeters()).isEqualTo(1);
+        assertThat(response.durationSeconds()).isEqualTo(1);
+        assertThat(response.routeSource()).isEqualTo(DriverRouteSource.STRAIGHT_LINE_FALLBACK);
+    }
+
+    @Test
+    void propagatesProviderErrorWhenFallbackIsDisabled() {
+        routingProperties.setFallbackEnabled(false);
+        Trip trip = acceptedTrip();
+        when(tripRepository.findByIdAndDeletedAtIsNull(99L)).thenReturn(Optional.of(trip));
+        when(routeGeometryProvider.route(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
+                .thenThrow(new BusinessException(ErrorCode.ROUTING_PROVIDER_ERROR, "provider unavailable"));
+
+        assertThatThrownBy(() -> service.route(20L, 99L, CURRENT_LOCATION))
+                .isInstanceOfSatisfying(BusinessException.class, exception ->
+                        assertThat(exception.errorCode()).isEqualTo(ErrorCode.ROUTING_PROVIDER_ERROR)
+                );
+    }
+
+    @Test
+    void doesNotFallbackForNonProviderBusinessErrors() {
+        Trip trip = acceptedTrip();
+        when(tripRepository.findByIdAndDeletedAtIsNull(99L)).thenReturn(Optional.of(trip));
+        when(routeGeometryProvider.route(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
+                .thenThrow(new BusinessException(ErrorCode.FORBIDDEN, "unexpected authorization failure"));
+
+        assertThatThrownBy(() -> service.route(20L, 99L, CURRENT_LOCATION))
+                .isInstanceOfSatisfying(BusinessException.class, exception -> {
+                    assertThat(exception.errorCode()).isEqualTo(ErrorCode.FORBIDDEN);
+                    assertThat(exception.getMessage()).isEqualTo("unexpected authorization failure");
+                });
     }
 
     @Test

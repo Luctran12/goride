@@ -6,6 +6,36 @@
 
 ---
 
+## Commit: `feat: add driver routing fallback`
+
+Branch: `codex/driver-routing-fallback`
+
+Phase: Production hardening / routing resilience
+
+### Muc tieu
+
+Giu luong navigation den pickup/dropoff hoat dong o che do degraded khi OSRM-compatible provider bi tat, timeout hoac tra du lieu route khong hop le, dong thoi cho FE biet ro day khong phai turn-by-turn route.
+
+### Noi dung da trien khai
+
+- Them `DriverRouteSource` voi hai gia tri `PROVIDER` va `STRAIGHT_LINE_FALLBACK`.
+- Mo rong response `POST /api/v1/drivers/trips/{tripId}/route` voi field `routeSource`.
+- Khi provider thanh cong, giu nguyen distance, duration, GeoJSON `LineString` va maneuver steps.
+- Khi provider nem `ROUTING_PROVIDER_ERROR` va `app.routing.fallback-enabled=true`, tra `LineString` hai diem tu GPS tai xe den destination, Haversine distance, duration uoc tinh 25 km/h va `steps=[]`.
+- Khi fallback bi tat, tiep tuc tra `ROUTING_PROVIDER_ERROR`; khong nuot loi phan quyen hoac trip status.
+- Ghi warning log kem driver id, trip id va provider reason de trace tan suat degraded routing.
+- FE phai hien canh bao degraded routing va mo external navigation khi can; fallback geometry khong duoc xem la duong bo an toan.
+
+### Kiem thu
+
+- Provider route thanh cong va `routeSource=PROVIDER`.
+- Provider loi tra straight-line fallback co distance/duration duong, dung thu tu `[longitude, latitude]` va khong co maneuver steps.
+- Driver da o destination van nhan gia tri toi thieu hop le.
+- Fallback disabled van tra provider error.
+- Authorization va trip lifecycle rules tiep tuc duoc bao ve.
+- Targeted driver routing/controller suite: pass 10 tests.
+- Full Maven: 562 tests, 3 baseline failures and 18 Docker/Testcontainers initialization errors; khong co routing fallback failure.
+
 ## Planned commit: `feat: integrate three-word mobile location lookup`
 
 Branch: `codex/word-location-mobile`
