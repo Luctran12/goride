@@ -1,6 +1,6 @@
 # GoRide Current Phase
 
-> Last updated: 2026-07-28, Asia/Bangkok
+> Last updated: 2026-08-03, Asia/Bangkok
 >
 > Purpose: source of truth before starting or reviewing the next backend commit.
 
@@ -8,42 +8,42 @@
 
 ## 1. Repository Status
 
-- Current branch: `codex/word-location-mobile`.
-- Base develop commit: `5b941d6` (`merge: driver location bootstrap`).
+- Current branch: `codex/driver-routing-fallback`.
+- Base develop commit: `ae3dac2` (`merge admin-v2`).
 - Local-only config: `src/main/resources/application.yml` has environment-specific changes and must remain uncommitted.
-- Working direction: expose the custom three-word location service through authenticated GoRide APIs for passenger and driver mobile flows.
+- Working direction: keep assigned-driver pickup/dropoff navigation usable when the OSRM-compatible provider is disabled, unavailable, or returns invalid route data.
 
 ---
 
-## 2. Active Work Ready For Review
+## 2. Reviewed Work
 
-Planned commit: `feat: integrate three-word mobile location lookup`.
+Commit: `feat: add driver routing fallback`.
 
 Scope implemented:
-- Add a configurable HTTP adapter for the existing Python `/api/to-words` and `/api/to-coordinate` APIs.
-- Expose GoRide endpoints under `/api/v1/locations` with the common response/error envelope.
-- Keep `lat`/`lng` as the source of truth; translate GoRide `lng` to the Python provider's `lon` parameter.
-- Normalize three-word input before provider lookup, return provider `_` compounds as spaces for mobile display, and validate coordinates at the GoRide boundary.
-- Map malformed input, unknown addresses, unsupported map bounds, provider timeout, and provider failure to stable error codes.
-- Add unit/provider/controller coverage and a mobile integration contract.
+- Keep provider route geometry and maneuver steps unchanged when routing succeeds.
+- Catch only `ROUTING_PROVIDER_ERROR` and honor `app.routing.fallback-enabled`.
+- Return a direct GeoJSON `LineString` from the driver's current GPS to pickup/dropoff when fallback is enabled.
+- Estimate fallback distance with Haversine and duration at 25 km/h; values remain at least one meter and one second.
+- Add `routeSource=PROVIDER|STRAIGHT_LINE_FALLBACK` so FE can distinguish real navigation from degraded guidance.
+- Return `steps=[]` for fallback and log driver/trip/provider failure context.
+- Preserve authorization and trip-status errors without fallback.
 
 ---
 
-## 3. Mobile Contract
+## 3. Frontend Contract
 
-- Passenger selects a map point, then taps `Lay 3 tu`; the app calls `GET /api/v1/locations/to-words?lat={lat}&lng={lng}`.
-- Driver taps `Tim bang 3 tu`, enters a dot-separated address, then the app calls `GET /api/v1/locations/to-coordinate?address={address}`.
-- Driver lookup first shows a preview marker and cell bounds. It must not replace an active trip destination until the driver explicitly confirms.
-- Both endpoints require a valid passenger or driver JWT.
-- Booking requests continue to send their existing `lat`, `lng`, and street `address` fields. The three-word address is display/share metadata and is not booking source of truth.
+- Call `POST /api/v1/drivers/trips/{tripId}/route` with the driver's current `latitude` and `longitude`.
+- When `routeSource=PROVIDER`, draw the returned route and render maneuver steps normally.
+- When `routeSource=STRAIGHT_LINE_FALLBACK`, treat geometry as a destination guide only, show degraded routing, hide maneuver UI, and offer external navigation.
+- Continue using `destinationType=PICKUP` for `ACCEPTED` and `DROPOFF` for `ARRIVED`/`IN_PROGRESS`.
+- If fallback is disabled, provider failure remains `ROUTING_PROVIDER_ERROR` HTTP 502.
 
 ---
 
 ## 4. Validation
 
-- Targeted location/security suite: pass 32 tests.
-- Full `./mvnw.cmd test`: 495 tests discovered, 485 passed, 0 failures, and 10 integration errors during Docker/Testcontainers initialization.
-- Docker root cause: Testcontainers cannot access `\\.\pipe\docker_engine`; feature and non-Docker tests have no assertion failure.
-- `git diff --check`: pass; Git reports Windows CRLF conversion warnings only.
-- Manual review: found and fixed default exposure, mismatched provider address, inverted bounds, and out-of-cell coordinate issues; regression tests cover these cases.
-- The repository contains backend only, so mobile screens are documented as an implementation-ready React Native contract rather than edited in this branch.
+- Targeted `DriverTripRoutingServiceTests` and `DriverTripControllerTests`: pass 10 tests.
+- Covers provider success, fallback geometry, zero-distance minimum values, fallback disabled, non-provider error propagation, driver authorization and trip lifecycle rules.
+- Full `./mvnw.cmd test`: 562 tests, 3 baseline failures and 18 Docker/Testcontainers initialization errors; routing fallback targeted tests have no failures.
+- `git diff --check`: pass; Windows CRLF conversion warnings only.
+- Internal review completed; CodeRabbit CLI is unavailable in PATH.
