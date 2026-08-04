@@ -4,6 +4,6 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Configuration;
 
 @Configuration
-@EnableConfigurationProperties(PaymentProviderProperties.class)
+@EnableConfigurationProperties({PaymentProviderProperties.class, FareDistanceFilterProperties.class})
 public class PaymentConfig {
 }

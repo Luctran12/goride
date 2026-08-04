@@ -8,42 +8,46 @@
 
 ## 1. Repository Status
 
-- Current branch: `codex/driver-routing-fallback`.
-- Base develop commit: `ae3dac2` (`merge admin-v2`).
+- Current branch: `codex/gps-fare-filtering`.
+- Base develop commit: `a687c1d` (`merge: driver routing fallback`).
 - Local-only config: `src/main/resources/application.yml` has environment-specific changes and must remain uncommitted.
-- Working direction: keep assigned-driver pickup/dropoff navigation usable when the OSRM-compatible provider is disabled, unavailable, or returns invalid route data.
+- Working direction: prevent GPS jitter, stale gaps and implausible jumps from inflating completed-trip actual distance and final fare.
 
 ---
 
 ## 2. Reviewed Work
 
-Commit: `feat: add driver routing fallback`.
+Commit: `feat: filter gps distance for actual fare`.
 
 Scope implemented:
-- Keep provider route geometry and maneuver steps unchanged when routing succeeds.
-- Catch only `ROUTING_PROVIDER_ERROR` and honor `app.routing.fallback-enabled`.
-- Return a direct GeoJSON `LineString` from the driver's current GPS to pickup/dropoff when fallback is enabled.
-- Estimate fallback distance with Haversine and duration at 25 km/h; values remain at least one meter and one second.
-- Add `routeSource=PROVIDER|STRAIGHT_LINE_FALLBACK` so FE can distinguish real navigation from degraded guidance.
-- Return `steps=[]` for fallback and log driver/trip/provider failure context.
-- Preserve authorization and trip-status errors without fallback.
+- Add configurable actual-fare GPS filter properties with safe defaults.
+- Ignore movement below 5 meters as jitter.
+- Reject segments whose inferred speed exceeds 55 meters/second.
+- Reject non-increasing timestamps and skip distance across tracking gaps longer than 30 seconds.
+- Keep the last accepted anchor after jitter/speed/timestamp rejection; rebase after a long gap.
+- Fall back to the trip estimated distance when no segment remains valid.
+- Preserve the legacy calculation behind an explicit disable switch.
+- Log aggregate rejection counts once at fare completion and warn when estimate fallback is required.
+- Keep REST/WebSocket tracking contracts and database schema unchanged.
 
 ---
 
-## 3. Frontend Contract
+## 3. Runtime Configuration
 
-- Call `POST /api/v1/drivers/trips/{tripId}/route` with the driver's current `latitude` and `longitude`.
-- When `routeSource=PROVIDER`, draw the returned route and render maneuver steps normally.
-- When `routeSource=STRAIGHT_LINE_FALLBACK`, treat geometry as a destination guide only, show degraded routing, hide maneuver UI, and offer external navigation.
-- Continue using `destinationType=PICKUP` for `ACCEPTED` and `DROPOFF` for `ARRIVED`/`IN_PROGRESS`.
-- If fallback is disabled, provider failure remains `ROUTING_PROVIDER_ERROR` HTTP 502.
+- `ACTUAL_FARE_GPS_FILTER_ENABLED=true`
+- `ACTUAL_FARE_GPS_MIN_MOVEMENT_METERS=5`
+- `ACTUAL_FARE_GPS_MAX_SPEED_METERS_PER_SECOND=55`
+- `ACTUAL_FARE_GPS_MAX_SEGMENT_GAP_SECONDS=30`
+
+These thresholds are backend operational controls. FE continues sending trip location updates using the existing contract and displays the backend final fare without recalculating distance.
 
 ---
 
 ## 4. Validation
 
-- Targeted `DriverTripRoutingServiceTests` and `DriverTripControllerTests`: pass 10 tests.
-- Covers provider success, fallback geometry, zero-distance minimum values, fallback disabled, non-provider error propagation, driver authorization and trip lifecycle rules.
-- Full `./mvnw.cmd test`: 562 tests, 3 baseline failures and 18 Docker/Testcontainers initialization errors; routing fallback targeted tests have no failures.
+- Targeted fare/tracking/status/Spring context suite: pass 29 tests.
+- Covers jitter, teleport spikes, long gaps, duplicate timestamps, all-rejected fallback, disabled-filter compatibility and properties validation.
+- Full `./mvnw.cmd test`: 572 tests, 3 baseline failures and 18 Docker/Testcontainers initialization errors; GPS filtering tests have no failures.
 - `git diff --check`: pass; Windows CRLF conversion warnings only.
-- Internal review completed; CodeRabbit CLI is unavailable in PATH.
+- User and internal reviews completed; CodeRabbit CLI is unavailable in PATH.
+- Threshold calibration with real device traces remains a staging UAT task.
