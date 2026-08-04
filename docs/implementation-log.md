@@ -6,6 +6,44 @@
 
 ---
 
+## Commit: `feat: filter gps distance for actual fare`
+
+Branch: `codex/gps-fare-filtering`
+
+Phase: Production hardening / fare correctness
+
+### Muc tieu
+
+Khong de GPS jitter, timestamp loi, tracking gap hoac teleport spike lam tang actual distance va final fare khi driver complete trip.
+
+### Noi dung da trien khai
+
+- Them `FareDistanceFilterProperties` voi config prefix `app.payment.actual-fare.gps-filter`.
+- Mac dinh bo movement duoi 5 m, segment tren 55 m/s, timestamp khong tang va gap tren 30 giay.
+- Jitter/speed/timestamp point bi loai khong thay accepted anchor; gap dai rebase anchor nhung khong cong khoang cach bi mat ket noi.
+- Neu khong con segment hop le, dung estimated distance cua trip thay vi distance tu GPS nhieu.
+- Co switch tat filter de rollback ve phep cong Haversine legacy neu can.
+- Log mot summary rejected segment khi complete fare va warning khi phai fallback estimate.
+- Khong doi tracking API, WebSocket payload hoac database schema.
+
+### Cau hinh
+
+- `ACTUAL_FARE_GPS_FILTER_ENABLED=true`
+- `ACTUAL_FARE_GPS_MIN_MOVEMENT_METERS=5`
+- `ACTUAL_FARE_GPS_MAX_SPEED_METERS_PER_SECOND=55`
+- `ACTUAL_FARE_GPS_MAX_SEGMENT_GAP_SECONDS=30`
+
+### Kiem thu
+
+- Jitter, teleport spike, long gap va duplicate timestamp.
+- Tat filter giu legacy behavior.
+- Tat ca segment bi loai thi fallback estimated distance.
+- Property threshold validation va Spring context binding.
+- Targeted fare/tracking/status/context suite: pass 29 tests.
+- Full Maven: 572 tests, 3 baseline failures and 18 Docker/Testcontainers initialization errors; khong co failure moi tu GPS filtering.
+- `git diff --check`: pass; CodeRabbit CLI khong co trong PATH.
+- User review: completed; approved for commit and merge into `develop`.
+
 ## Commit: `feat: add driver routing fallback`
 
 Branch: `codex/driver-routing-fallback`

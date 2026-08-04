@@ -280,7 +280,7 @@ type PaymentSandboxUatStatus = "NOT_RUN" | "BLOCKED" | "FAILED" | "PASSED";
 - [x] Driver cap nhat `ACCEPTED -> ARRIVED`.
 - [x] Driver cap nhat `ARRIVED -> IN_PROGRESS`.
 - [x] Driver cap nhat `IN_PROGRESS -> COMPLETED`.
-- [x] Khi completed, backend tinh actual distance/duration tu tracking history va tinh `finalFare`.
+- [x] Khi completed, backend loc GPS jitter, teleport speed, tracking gap va timestamp loi truoc khi tinh actual distance; neu khong du segment hop le thi dung estimated distance, sau do tinh `finalFare`.
 - [x] Khi completed, backend tao payment `PENDING`.
 - [x] Khi completed, backend tang `driver_profiles.total_trips` cua assigned driver.
 - [x] Broadcast trip status qua WebSocket topic.
@@ -1325,8 +1325,16 @@ FE action:
 - Backend nhan vi tri driver tu luc `ACCEPTED` de passenger thay tai xe dang den diem don. Vi tri truoc `IN_PROGRESS` chi duoc cache/broadcast realtime, khong luu vao trip location history dung de tinh quang duong/final fare.
 - Khi status con `SEARCHING`, hien man hinh dang tim tai xe va cho offer/status qua WebSocket; khong coi `DRIVER_LOCATION_NOT_FOUND` la loi.
 
----
+Backend actual-fare GPS filtering:
+- Khong doi request/response tracking; FE tiep tuc gui location theo contract hien tai.
+- Chi history khi trip `IN_PROGRESS` duoc dung tinh actual distance.
+- Backend mac dinh bo movement duoi 5 m, inferred speed tren 55 m/s, timestamp khong tang va distance qua gap tren 30 giay.
+- Gap dai chi rebase anchor; backend khong noi duong thang qua khoang mat tracking.
+- Neu tat ca segment bi loai, backend dung estimated distance cua trip de tranh tinh tien theo GPS nhieu.
+- FE khong tu cong location points va khong tu tinh final fare; luon hien `finalFare`/`actualDistanceKm` backend tra ve sau completion.
+- Cac nguong co the tune bang `ACTUAL_FARE_GPS_FILTER_ENABLED`, `ACTUAL_FARE_GPS_MIN_MOVEMENT_METERS`, `ACTUAL_FARE_GPS_MAX_SPEED_METERS_PER_SECOND`, va `ACTUAL_FARE_GPS_MAX_SEGMENT_GAP_SECONDS`.
 
+---
 ### 4.6.1 In-trip messaging
 
 Dung cho hop thoai passenger-driver trong active trip. FE nen load history qua REST khi mo trip detail, sau do subscribe WebSocket topic de nhan message moi.

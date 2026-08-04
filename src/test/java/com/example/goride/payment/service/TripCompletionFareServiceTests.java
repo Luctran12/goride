@@ -4,6 +4,7 @@ import com.example.goride.booking.domain.PaymentMethod;
 import com.example.goride.booking.domain.PricingConfig;
 import com.example.goride.booking.domain.Trip;
 import com.example.goride.driver.domain.VehicleType;
+import com.example.goride.payment.config.FareDistanceFilterProperties;
 import com.example.goride.tracking.domain.TripLocationHistory;
 import com.example.goride.tracking.repository.TripLocationHistoryRepository;
 import com.example.goride.user.domain.User;
@@ -37,12 +38,17 @@ class TripCompletionFareServiceTests {
     private TripLocationHistoryRepository tripLocationHistoryRepository;
 
     private TripCompletionFareService service;
+    private FareDistanceFilterProperties filterProperties;
+    private Instant nextLocationTime;
 
     @BeforeEach
     void setUp() {
+        filterProperties = new FareDistanceFilterProperties();
+        nextLocationTime = Instant.parse("2026-05-21T08:00:00Z");
         service = new TripCompletionFareService(
                 tripLocationHistoryRepository,
-                Clock.fixed(COMPLETED_AT, ZoneOffset.UTC)
+                Clock.fixed(COMPLETED_AT, ZoneOffset.UTC),
+                filterProperties
         );
     }
 
@@ -90,6 +96,103 @@ class TripCompletionFareServiceTests {
         assertThat(fare.actualDistanceKm()).isEqualByComparingTo("4.20");
         assertThat(fare.actualDurationMin()).isEqualTo(18);
         assertThat(fare.finalFare()).isEqualByComparingTo("32200");
+    }
+
+    @Test
+    void ignoresGpsJitterBeforeAddingValidMovement() {
+        Trip trip = inProgressTrip();
+        Instant startedAt = Instant.parse("2026-05-21T08:00:00Z");
+        when(tripLocationHistoryRepository.findByTripIdAndTripDeletedAtIsNullOrderByRecordedAtAsc(99L))
+                .thenReturn(List.of(
+                        locationAt(trip, 106.7000, 10.7700, startedAt),
+                        locationAt(trip, 106.7000, 10.77001, startedAt.plusSeconds(5)),
+                        locationAt(trip, 106.7000, 10.7745, startedAt.plusSeconds(10)),
+                        locationAt(trip, 106.7000, 10.7790, startedAt.plusSeconds(20))
+                ));
+
+        TripCompletionFare fare = service.calculate(trip);
+
+        assertThat(fare.actualDistanceKm()).isEqualByComparingTo("1.00");
+    }
+
+    @Test
+    void rejectsTeleportSpikeWithoutUsingItAsNextAnchor() {
+        Trip trip = inProgressTrip();
+        Instant startedAt = Instant.parse("2026-05-21T08:00:00Z");
+        when(tripLocationHistoryRepository.findByTripIdAndTripDeletedAtIsNullOrderByRecordedAtAsc(99L))
+                .thenReturn(List.of(
+                        locationAt(trip, 106.7000, 10.7700, startedAt),
+                        locationAt(trip, 106.7000, 10.8000, startedAt.plusSeconds(5)),
+                        locationAt(trip, 106.7000, 10.7745, startedAt.plusSeconds(10)),
+                        locationAt(trip, 106.7000, 10.7790, startedAt.plusSeconds(20))
+                ));
+
+        TripCompletionFare fare = service.calculate(trip);
+
+        assertThat(fare.actualDistanceKm()).isEqualByComparingTo("1.00");
+    }
+
+    @Test
+    void rebasesAfterLongTrackingGapAndCountsLaterValidSegments() {
+        Trip trip = inProgressTrip();
+        Instant startedAt = Instant.parse("2026-05-21T08:00:00Z");
+        when(tripLocationHistoryRepository.findByTripIdAndTripDeletedAtIsNullOrderByRecordedAtAsc(99L))
+                .thenReturn(List.of(
+                        locationAt(trip, 106.7000, 10.7700, startedAt),
+                        locationAt(trip, 106.7000, 10.7790, startedAt.plusSeconds(60)),
+                        locationAt(trip, 106.7000, 10.7880, startedAt.plusSeconds(80))
+                ));
+
+        TripCompletionFare fare = service.calculate(trip);
+
+        assertThat(fare.actualDistanceKm()).isEqualByComparingTo("1.00");
+    }
+
+    @Test
+    void ignoresNonIncreasingTimestampWithoutChangingAnchor() {
+        Trip trip = inProgressTrip();
+        Instant startedAt = Instant.parse("2026-05-21T08:00:00Z");
+        when(tripLocationHistoryRepository.findByTripIdAndTripDeletedAtIsNullOrderByRecordedAtAsc(99L))
+                .thenReturn(List.of(
+                        locationAt(trip, 106.7000, 10.7700, startedAt),
+                        locationAt(trip, 106.7000, 10.7900, startedAt),
+                        locationAt(trip, 106.7000, 10.7745, startedAt.plusSeconds(10))
+                ));
+
+        TripCompletionFare fare = service.calculate(trip);
+
+        assertThat(fare.actualDistanceKm()).isEqualByComparingTo("0.50");
+    }
+
+    @Test
+    void fallsBackToEstimateWhenAllTrackedSegmentsAreRejected() {
+        Trip trip = inProgressTrip();
+        Instant startedAt = Instant.parse("2026-05-21T08:00:00Z");
+        when(tripLocationHistoryRepository.findByTripIdAndTripDeletedAtIsNullOrderByRecordedAtAsc(99L))
+                .thenReturn(List.of(
+                        locationAt(trip, 106.7000, 10.7700, startedAt),
+                        locationAt(trip, 106.7000, 10.7790, startedAt.plusSeconds(5))
+                ));
+
+        TripCompletionFare fare = service.calculate(trip);
+
+        assertThat(fare.actualDistanceKm()).isEqualByComparingTo("4.20");
+    }
+
+    @Test
+    void preservesLegacyDistanceCalculationWhenFilterIsDisabled() {
+        filterProperties.setEnabled(false);
+        Trip trip = inProgressTrip();
+        Instant startedAt = Instant.parse("2026-05-21T08:00:00Z");
+        when(tripLocationHistoryRepository.findByTripIdAndTripDeletedAtIsNullOrderByRecordedAtAsc(99L))
+                .thenReturn(List.of(
+                        locationAt(trip, 106.7000, 10.7700, startedAt),
+                        locationAt(trip, 106.7000, 10.7790, startedAt.plusSeconds(1))
+                ));
+
+        TripCompletionFare fare = service.calculate(trip);
+
+        assertThat(fare.actualDistanceKm()).isEqualByComparingTo("1.00");
     }
 
     @Test
@@ -154,7 +257,20 @@ class TripCompletionFareServiceTests {
     }
 
     private TripLocationHistory location(Trip trip, double longitude, double latitude) {
-        return TripLocationHistory.record(trip, point(longitude, latitude), null, null);
+        TripLocationHistory history = locationAt(trip, longitude, latitude, nextLocationTime);
+        nextLocationTime = nextLocationTime.plusSeconds(20);
+        return history;
+    }
+
+    private TripLocationHistory locationAt(
+            Trip trip,
+            double longitude,
+            double latitude,
+            Instant recordedAt
+    ) {
+        TripLocationHistory history = TripLocationHistory.record(trip, point(longitude, latitude), null, null);
+        ReflectionTestUtils.setField(history, "recordedAt", recordedAt);
+        return history;
     }
 
     private User passenger(Long id) {
