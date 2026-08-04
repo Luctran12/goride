@@ -15,6 +15,7 @@ import java.math.RoundingMode;
 import java.net.URI;
 import java.time.Duration;
 import java.util.List;
+import java.util.Optional;
 
 @Service
 public class RoutingDistanceService implements DistanceService {
@@ -24,22 +25,26 @@ public class RoutingDistanceService implements DistanceService {
     private static final double AVERAGE_CITY_SPEED_KMH = 25.0;
 
     private final RoutingProperties routingProperties;
+    private final RouteEstimateCache routeEstimateCache;
     private final RestClient restClient;
 
     @Autowired
     public RoutingDistanceService(
             RoutingProperties routingProperties,
+            RouteEstimateCache routeEstimateCache,
             RestClient.Builder restClientBuilder
     ) {
-        this(routingProperties, restClientBuilder, routingProperties.timeout());
+        this(routingProperties, routeEstimateCache, restClientBuilder, routingProperties.timeout());
     }
 
     RoutingDistanceService(
             RoutingProperties routingProperties,
+            RouteEstimateCache routeEstimateCache,
             RestClient.Builder restClientBuilder,
             Duration timeout
     ) {
         this.routingProperties = routingProperties;
+        this.routeEstimateCache = routeEstimateCache;
         if (routingProperties.isEnabled()) {
             routingProperties.normalizedBaseUrl();
             routingProperties.normalizedProfile();
@@ -57,14 +62,53 @@ public class RoutingDistanceService implements DistanceService {
         if (!routingProperties.isEnabled()) {
             return fallbackEstimate(pickup, dropoff);
         }
+
+        String routingProfile = routingProperties.normalizedProfile();
+        Optional<DistanceEstimate> cachedEstimate = findCachedEstimate(
+                routingProfile,
+                pickup,
+                dropoff
+        );
+        if (cachedEstimate.isPresent()) {
+            return cachedEstimate.get();
+        }
+
         try {
             OsrmRouteResponse response = restClient.get()
                     .uri(routeUri(pickup, dropoff))
                     .retrieve()
                     .body(OsrmRouteResponse.class);
-            return routeEstimate(response);
+            DistanceEstimate estimate = routeEstimate(response);
+            cacheEstimate(routingProfile, pickup, dropoff, estimate);
+            return estimate;
         } catch (RestClientException | IllegalArgumentException exception) {
             return fallbackOrThrow(pickup, dropoff, exception);
+        }
+    }
+
+    private Optional<DistanceEstimate> findCachedEstimate(
+            String routingProfile,
+            Location pickup,
+            Location dropoff
+    ) {
+        try {
+            return routeEstimateCache.find(routingProfile, pickup, dropoff);
+        } catch (RuntimeException exception) {
+            log.warn("Route estimate cache read failed; calling provider error={}", exception.getMessage());
+            return Optional.empty();
+        }
+    }
+
+    private void cacheEstimate(
+            String routingProfile,
+            Location pickup,
+            Location dropoff,
+            DistanceEstimate estimate
+    ) {
+        try {
+            routeEstimateCache.put(routingProfile, pickup, dropoff, estimate);
+        } catch (RuntimeException exception) {
+            log.warn("Route estimate cache write failed; returning provider result error={}", exception.getMessage());
         }
     }
 

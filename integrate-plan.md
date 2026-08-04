@@ -414,6 +414,7 @@ type PaymentSandboxUatStatus = "NOT_RUN" | "BLOCKED" | "FAILED" | "PASSED";
 ### Routing/maps
 
 - [x] Da thay mock distance bean bang OSRM-compatible routing provider cho estimate/create booking.
+- [x] Provider estimate thanh cong duoc cache Redis theo routing profile va pickup/dropoff lam tron; cache outage khong chan booking.
 - [x] Da co driver trip routing API tu current GPS den pickup/dropoff theo trip status.
 - [ ] Can UAT routing endpoint production/self-hosted va theo doi tan suat fallback truoc khi launch.
 
@@ -467,10 +468,17 @@ app:
     profile: ${ROUTING_PROFILE:driving}
     timeout-seconds: ${ROUTING_TIMEOUT_SECONDS:5}
     fallback-enabled: ${ROUTING_FALLBACK_ENABLED:true}
+    estimate-cache:
+      enabled: ${ROUTING_ESTIMATE_CACHE_ENABLED:true}
+      coordinate-scale: ${ROUTING_ESTIMATE_CACHE_COORDINATE_SCALE:4}
+      ttl-seconds: ${ROUTING_ESTIMATE_CACHE_TTL_SECONDS:300}
 ```
 
 - Khi enabled, backend gui pickup/dropoff theo OSRM order `longitude,latitude`.
 - Provider distance meter duoc tra ve FE thanh km; duration giay duoc lam tron len thanh phut.
+- Provider result thanh cong duoc cache Redis mac dinh 5 phut bang pickup/dropoff lam tron 4 chu so thap phan va routing profile.
+- Cache hit/miss hoan toan transparent voi FE. Redis cache loi hoac payload sai thi backend goi provider; fallback estimate khong duoc cache.
+- FE van nen debounce estimate khi user keo map pin; cache khong thay the request-rate control.
 - Neu fallback enabled, timeout/HTTP error/`NoRoute` tu provider se dung Haversine estimate de booking flow khong bi dung.
 - Neu fallback disabled, estimate/create booking tra `ROUTING_PROVIDER_ERROR` HTTP 502; FE hien thong bao khong the tinh lo trinh va cho retry.
 - Distance/duration nay chi la estimate truoc chuyen. Khi trip completed, final fare dung tracking history va actual duration, nhung giu `fareSurgeMultiplier` da snapshot luc booking.
