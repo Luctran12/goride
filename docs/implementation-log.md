@@ -6,6 +6,43 @@
 
 ---
 
+## Commit: `perf: cache routing estimates`
+
+Branch: `codex/routing-estimate-cache`
+
+Phase: Production hardening / routing provider load
+
+### Muc tieu
+
+Giam cac request estimate lap lai den OSRM-compatible provider bang cache Redis dung chung, trong khi cache outage khong duoc lam dung flow estimate/dat xe.
+
+### Noi dung da trien khai
+
+- Them `RouteEstimateCache`, `RedisRouteEstimateCache` va `RoutingEstimateCacheProperties`.
+- Key versioned gom routing profile va pickup/dropoff lam tron mac dinh 4 chu so thap phan.
+- Cache provider result dang JSON voi TTL mac dinh 300 giay.
+- Cache hit bo qua provider; provider success ghi cache.
+- Redis read/write error duoc xem nhu cache miss va chi log error message gon.
+- Payload cache sai bi xoa; fallback estimate khong duoc cache de provider co the phuc hoi ngay.
+- Khi routing disabled, backend dung fallback hien tai va khong truy cap cache.
+- Khong doi REST request/response, database schema hoac FE contract.
+
+### Cau hinh
+
+- `ROUTING_ESTIMATE_CACHE_ENABLED=true`
+- `ROUTING_ESTIMATE_CACHE_COORDINATE_SCALE=4`
+- `ROUTING_ESTIMATE_CACHE_TTL_SECONDS=300`
+
+### Kiem thu
+
+- Cache hit, rounded key, TTL, malformed payload, cache disabled va Redis outage.
+- Provider success ghi cache; provider fallback khong ghi cache.
+- Cache write failure van tra provider result.
+- Targeted routing/cache/properties/Spring context suite: pass 22 tests.
+- Full Maven: 584 tests, 3 baseline failures va 18 Docker/Testcontainers initialization errors; khong co failure moi tu routing cache.
+- `git diff --check`: pass; internal review complete; CodeRabbit CLI khong co trong PATH.
+- User review: completed; approved for commit and merge into `develop`.
+
 ## Commit: `feat: filter gps distance for actual fare`
 
 Branch: `codex/gps-fare-filtering`
