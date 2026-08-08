@@ -6,6 +6,106 @@
 
 ---
 
+## Commit: `3ead9e1` - `feat: add deterministic extraction and data quality gates`
+
+Branch: `codex/admin-demand-forecasting`
+
+Phase: Admin Demand Forecasting Phase 3 - deterministic extraction and data
+quality
+
+### Muc tieu
+
+Tao canonical demand snapshot theo interval bat bien `[from, cutoff)`, chan du
+lieu loi truoc Phase 4 va luu duoc trace day du giua artifact ngoai Git voi
+`processing_runs`/`data_quality_results` cua Phase 2.
+
+### Noi dung da trien khai
+
+- Bien `extract` tu placeholder thanh CLI that voi `--from-utc` va
+  `--cutoff-utc`; boundary bat buoc co timezone, khong nam trong tuong lai va
+  align voi bucket 15 phut.
+- Them Porto ZIP/CSV adapter: kiem tra dung mot CSV, header chinh xac, parse Unix
+  epoch UTC, dung diem dau polyline lam pickup proxy va khong xuat taxi ID hay
+  full trajectory.
+- Them GoRide PostgreSQL adapter: trip query parameterized, bounded, stable
+  order; service-area lookup; supply coverage; `EXPLAIN (FORMAT JSON)` evidence;
+  connection `READ ONLY` va `REPEATABLE READ`.
+- Them canonical demand-event v1 va SQLite disk spool de enforce unique trip,
+  bounded memory, stable sort truoc khi xuat JSONL va SHA-256.
+- Tach deterministic snapshot UUID khoi database processing-attempt UUID. Cung
+  profile, dataset, interval, config va code commit tao cung snapshot identity
+  va checksum du run directory khac nhau.
+- Them 8 quality rules: schema, checksum, duplicate trip, missing event time,
+  event vuot cutoff, invalid pickup, missing trajectory va supply coverage.
+  Moi rule co severity, status, counts, threshold va metric khi phu hop.
+- Quality `FAIL` ghi artifact va database evidence, chuyen processing run sang
+  `FAILED`, tra exit code 6 va khong cho stage tiep theo duoc promote.
+- Them Psycopg 3.3.4; database adapter validate PostgreSQL/PostGIS/Phase 2 schema,
+  ghi lifecycle va quality JSONB ma khong log password.
+- Ghi `run-manifest.json`, `dataset-manifest.json`, canonical JSONL,
+  `data-quality.json`, summary, query plan/failure evidence va
+  `checksums.sha256` duoi external analytics data root.
+
+### Validation da chay
+
+- Python 3.11.9: 33/33 tests pass khi bat ca hai database integration tests.
+- Python 3.12.13: 31 tests pass, 2 database integration tests skip theo env gate.
+- PostgreSQL 18/PostGIS 3.6.2 tren `goride_analytics_porto`: fixture extraction
+  ghi `SUCCEEDED`, 7 quality rows, doc lai dung counts va cleanup ve `0|0`.
+- GoRide database that: read-only/repeatable-read extraction va JSON query plan
+  pass; tat ca event output nho hon cutoff.
+- `EXPLAIN` cho bounded trip query dung temporal index
+  `idx_trips_driver_requested_at` tren local data.
+- Determinism fixture: hai run identity khac nhau nhung cung input/cutoff/commit
+  tao cung snapshot UUID va SHA-256.
+- Quality fixture bao phu null timestamp, schema, checksum, duplicate, invalid
+  geometry, future/cutoff, missing trajectory va incomplete supply coverage.
+- CLI help, packaging contract, `compileall`, `git diff --check` va staged
+  credential scan pass.
+- `.env.example` cua user khong nam trong commit.
+
+### Manual review findings
+
+- Sua `records_checked` cho schema/future rules de luon thoa
+  `records_breached <= records_checked` cua Phase 2.
+- Dung disk-backed uniqueness thay vi set trong RAM de co the doc Porto theo
+  kieu streaming ma van xuat deterministic order.
+- Dung snapshot UUID trong canonical row, khong dung processing attempt UUID,
+  de retry khong lam thay doi checksum.
+- Them terminal failure handling cho ca typed va unexpected exception; khong
+  de processing run o `RUNNING` khi writer con ket noi duoc.
+- Gioi han output canonical, khong co passenger, driver, payment, taxi hay full
+  trajectory fields.
+- Service-area subplan hien la sequential scan vi local table rat nho; trip
+  temporal predicate van dung index. Can review lai plan khi so service area
+  tang dang ke.
+
+### Files chinh
+
+- `analytics-processing/src/goride_analytics/extraction/*`
+- `analytics-processing/src/goride_analytics/quality.py`
+- `analytics-processing/src/goride_analytics/database.py`
+- `analytics-processing/src/goride_analytics/cli.py`
+- `analytics-processing/tests/test_*extraction.py`
+- `analytics-processing/tests/test_pipeline.py`
+- `analytics-processing/tests/test_quality.py`
+- `analytics-processing/tests/test_*database_integration.py`
+- `analytics-processing/README.md`
+- `docs/current-phase.md`
+
+### Known risks / review gate
+
+- Full Porto run chua duoc phep chay vi external manifest van thieu
+  `sourceRelativePath: raw/porto-taxi/v1/train.csv.zip`; CLI fail closed bang
+  exit code 3 va khong tu suy doan path.
+- Porto-scale runtime/memory/disk throughput chua co evidence cho den khi
+  manifest tren duoc sua; fixture moi chung minh behavior va determinism.
+- GoRide la operational source co the bi sua giua hai lan chay. Moi lan chay
+  dung mot repeatable-read snapshot va checksum se phat hien drift, nhung khong
+  the bao dam checksum lap lai neu lich su nguon bi backfill/update.
+- Canonical Phase 3 dung JSONL; Parquet feature artifact chi bat dau o Phase 4.
+- Dung tai review gate. Chi bat dau Phase 4 sau khi user phe duyet.
+
 ## Commit: `2e460fa` - `feat: add demand forecasting analytics schema`
 
 Branch: `codex/admin-demand-forecasting`
