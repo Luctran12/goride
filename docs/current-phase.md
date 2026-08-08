@@ -22,15 +22,15 @@
 
 ---
 
-## 2. Active Phase
+## 2. Active Phase Ready For Review
 
 Phase 0 — Baseline, security and contract freeze from
 [`admin-analytics-processing-layer-implementation-plan.md`](admin-analytics-processing-layer-implementation-plan.md).
 
-Planned commit:
+Completed commit:
 
 ```text
-docs: freeze demand forecasting research and data contracts
+a375f5d docs: freeze demand forecasting research and data contracts
 ```
 
 Scope:
@@ -44,7 +44,7 @@ Scope:
 - record exact backend/frontend baselines and dataset checksum;
 - validate existing Admin Analytics tests and database release descriptors.
 
-Out of scope for Phase 0:
+Out of scope for the completed Phase 0 commit:
 
 - Python package or dependency installation;
 - forecast database tables;
@@ -83,15 +83,24 @@ Out of scope for Phase 0:
 
 ## 4. Review Gate
 
-Phase 0 is complete only when:
+Implementation and local validation are complete. User review is required, and
+the external credential-rotation action remains mandatory.
+
+Validation evidence:
+
+- 33/33 focused Analytics/configuration tests passed.
+- All 12 database release descriptors passed `validate-db-release.ps1 -All`.
+- Porto SHA-256, ZIP structure, CSV header and first data row passed.
+- PostgreSQL 18/PostGIS 3.6.2 database and EPSG:3763 transform smoke passed.
+- Documentation links and `git diff --check` passed.
+- Manual review corrected Unix-epoch timezone semantics and froze EPSG:3763.
+
+Phase 0 is approved only when:
 
 - tracked runtime datasource configuration contains no real credential;
 - the credential already present in Git history has been rotated externally;
-- architecture, data and evaluation contracts are internally consistent;
-- dataset checksum verification passes;
-- focused Analytics/configuration tests pass;
-- all database release folders pass descriptor validation;
-- manual review finds no leakage, source-semantics or claim-boundary defect;
+- the external dataset manifest adds `sourceRelativePath` before Phase 1 config
+  validation;
 - the user approves Phase 0 before Phase 1 begins.
 
 ---

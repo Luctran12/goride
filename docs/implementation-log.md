@@ -6,6 +6,91 @@
 
 ---
 
+## Commit: `a375f5d` — `docs: freeze demand forecasting research and data contracts`
+
+Branch: `codex/admin-demand-forecasting`
+
+Phase: Admin Demand Forecasting Phase 0 — baseline, security and contract freeze
+
+### Muc tieu
+
+Dong bang ranh gioi kien truc, data semantics va evaluation protocol truoc khi
+them Python processing runtime, schema du bao hoac giao dien forecast. Phase 0
+phai ngan data leakage, tach claim Porto/GoRide va khoi phuc datasource config
+an toan tren tracked branch.
+
+### Noi dung da trien khai
+
+- Them master plan 12 phase cho processing, database, model, Spring API va
+  Admin UI.
+- Ghi ADR chon Python batch processing + PostgreSQL/PostGIS serving store +
+  Spring Admin API; frontend khong goi Python truc tiep.
+- Dong bang canonical demand event, target proxy cua Porto, GoRide request
+  semantics, UTC/IANA timezone, grid identity, feature availability va quality
+  gates.
+- Dong bang evaluation protocol: 15-minute bucket, horizon 15/30/60, grid
+  500/1000/2000 m, chronological development folds, May-June final holdout,
+  historical-mean/seasonal-naive va gradient-boosted candidate.
+- Tach `porto-thesis`, `goride-local` va integration fixtures; cam tron
+  population/claim va cam deploy Porto model nhu Ho Chi Minh City model.
+- Dong bang external artifact/config contract va dataset manifest checksum.
+- Xac nhan backend base `develop@ae3dac2` va frontend baseline
+  `codex/admin_v2@5acdf06`.
+- Khoi phuc `application.yml` sang `DATABASE_*` overrides voi local-only
+  `goride` defaults; loai bo credential that khoi tracked current config.
+- Ghi deviation so voi TDD data-warehouse future direction.
+
+### Validation da chay
+
+- 9 Analytics/config test classes: 33/33 pass.
+- Tat ca 12 database release folders: pass
+  `scripts/validate-db-release.ps1 -All`.
+- Porto `train.csv.zip`: SHA-256 khop
+  `210dd0a20da66a8fc2de3440aecd84670921bc257591f8365a4475e31453c5ea`;
+  ZIP/header/first row hop le.
+- `goride_analytics_porto`: PostgreSQL 18 + PostGIS 3.6.2 hoat dong.
+- `spatial_ref_sys` xac nhan EPSG:3763 la ETRS89 / Portugal TM06, don vi met;
+  EPSG:4326 -> EPSG:3763 transform smoke pass.
+- Internal Markdown link check: pass.
+- `git diff --check`: pass truoc commit.
+- Staged credential scan: khong co credential that trong added lines.
+
+Maven Wrapper tren PowerShell sandbox bi loi khi doc `.Target[0]` cua thu muc
+Maven cache. Validation da dung Maven 3.9.15 da cache, offline repository cua
+may va cung test classes; day la tooling issue, khong phai assertion failure.
+
+### Manual review findings
+
+- Phat hien `TIMESTAMP` Porto can parse dung Unix epoch UTC instant, khong duoc
+  parse nhu local time; data contract da sua va chi convert sang
+  `Europe/Lisbon` cho calendar semantics.
+- Xac minh EPSG:3763 bang PostGIS truoc khi dong bang thay vi tai su dung sai
+  EPSG:32648 cua Ho Chi Minh City.
+- Feature ablation supply duoc gioi han cho GoRide; Porto khong co supply source
+  nen khong duoc dua vao Porto RQ3.
+- Final holdout duoc tach khoi bon development folds; random split bi cam.
+- Khong tim thay broken local documentation link, leakage allowance hoac claim
+  tron Porto/GoRide sau review.
+
+### Files chinh
+
+- `docs/admin-analytics-processing-layer-implementation-plan.md`
+- `docs/admin-demand-forecasting/**`
+- `docs/changes-in-implementation.md`
+- `docs/current-phase.md`
+- `src/main/resources/application.yml`
+
+### Known risks / review gate
+
+- Credential da tung commit van ton tai trong Git history va phai duoc rotate
+  ben ngoai repository; Phase 0 khong the tu xac minh hanh dong external nay.
+- External manifest hien can them `sourceRelativePath` truoc Phase 1 config
+  validation.
+- Porto target la trip-start proxy, khong phai thoi diem user tao request.
+- Frontend baseline nam tren `codex/admin_v2`, chua co `develop` branch; commit
+  pair phai duoc ghi lai khi bat dau UI phase.
+- Phase 0 dang cho user review; chua duoc phep bat dau Phase 1.
+
 ## Planned commit: `feat: integrate three-word mobile location lookup`
 
 Branch: `codex/word-location-mobile`
