@@ -1,0 +1,45 @@
+release_id: 20260808-admin-demand-forecasting
+title: Add demand forecasting analytics persistence contract
+author: Codex
+created_at: 2026-08-08
+risk: high
+transactional: true
+requires_downtime: false
+applies_after:
+  - 20260729-admin-analytics-materialized
+related_commit: pending
+environments:
+  - local
+  - staging
+  - production
+objects:
+  - analytics.processing_runs
+  - analytics.data_quality_results
+  - analytics.demand_features
+  - analytics.model_versions
+  - analytics.forecast_runs
+  - analytics.demand_forecasts
+  - analytics.forecast_evaluations
+  - analytics.enforce_published_forecast_model
+  - analytics.trg_forecast_runs_approved_model
+pre_deploy_checks:
+  - Confirm PostgreSQL 15 or newer and PostGIS are available.
+  - Confirm EPSG:3763 and EPSG:32648 exist in spatial_ref_sys.
+  - Confirm the seven forecasting tables do not already exist.
+deploy_steps:
+  - Run precheck.sql and archive its successful output.
+  - Run apply.sql in one transaction.
+  - Run verify.sql, then integration-test.sql on a non-production database.
+post_deploy_checks:
+  - Confirm all constraints and indexes reported by verify.sql are present.
+  - Confirm duplicate run and prediction fixtures are rejected.
+  - Record table and index sizes before defining a production retention window.
+rollback_plan:
+  - Stop all analytics writers before rollback.
+  - Export the seven forecasting tables when they contain evidence.
+  - Run rollback.sql in reverse dependency order.
+notes:
+  - The release stores aggregate cells and model metadata, never raw trip identities.
+  - UUID database keys are separate from artifact_run_id directory identities.
+  - Forecast lookup uses B-tree plus GiST indexes; target-time BRIN supports retention scans.
+  - No application runtime writes these tables until later reviewed phases.

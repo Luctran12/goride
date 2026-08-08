@@ -22,36 +22,36 @@
 
 ---
 
-## 2. Active Phase Ready For Review
+## 2. Active Phase
 
-Phase 1 — Processing project scaffold and reproducibility foundation from
+Phase 2 — Forecast analytics database release from
 [`admin-analytics-processing-layer-implementation-plan.md`](admin-analytics-processing-layer-implementation-plan.md).
 
-User approval to start Phase 1: 2026-08-08.
+User approval to start Phase 2: 2026-08-08.
 
-Completed commit:
+Planned commit:
 
 ```text
-d5705f5 feat: scaffold reproducible analytics processing layer
+feat: add demand forecasting analytics schema
 ```
 
 Scope:
 
-- create an installable `analytics-processing` Python package;
-- freeze Python/runtime and minimal dependency ranges;
-- implement strict YAML profile loading and environment resolution;
-- implement dataset manifest/path/SHA-256 validation;
-- create deterministic config hash, run identity and run manifest metadata;
-- emit structured JSON logs without secrets;
-- expose skeleton commands `extract`, `build-features`, `train`, `evaluate`
-  and `forecast` that fail as not implemented instead of fabricating output;
-- add standard-library unit/CLI tests and local validation instructions.
+- add one reviewed `precheck/apply/verify/rollback/manifest` release;
+- create persistent contracts for processing runs, quality results, demand
+  features, model versions, forecast runs, cell forecasts and evaluations;
+- enforce lifecycle, checksum, UTC bucket, horizon, cell-size, geometry/SRID,
+  foreign-key and idempotency constraints;
+- add query/retention-oriented B-tree and GiST indexes;
+- add transactional integration fixtures for valid rows, duplicate rejection,
+  invalid-state rejection and forecast evaluation backfill;
+- prove apply, verify, rollback and re-apply on PostgreSQL/PostGIS.
 
-Out of scope for Phase 1:
+Out of scope for Phase 2:
 
-- database connection and forecast schema;
 - reading or transforming the full Porto CSV;
 - feature computation, model fitting or prediction;
+- Python database adapter or persistence repositories;
 - Spring forecast APIs;
 - frontend forecast screens.
 
@@ -84,10 +84,10 @@ Out of scope for Phase 1:
 
 ---
 
-## 4. Phase 1 Evidence
+## 4. Phase 1 Approved Baseline
 
-Implementation and local validation are complete. User review is required
-before Phase 2 starts.
+Phase 1 was approved when the user requested Phase 2. Its package, dependency
+locks, validation behavior and two commits remain the implementation baseline.
 
 Validation evidence:
 
@@ -114,9 +114,10 @@ credential-rotation action from Phase 0 remains an operational responsibility.
 
 ## 5. Next Expected Work
 
-Phase 1 stops at this review gate. After user approval, Phase 2 may add the
-forecast database release. Full Porto validation additionally requires this
-field in the external dataset manifest:
+After implementation, Phase 2 must stop at a user review gate. Phase 3 may add
+deterministic extraction and data-quality persistence only after the schema,
+rollback evidence and idempotency constraints are approved. Full Porto
+validation additionally requires this field in the external dataset manifest:
 
 ```json
 "sourceRelativePath": "raw/porto-taxi/v1/train.csv.zip"
