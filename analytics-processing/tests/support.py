@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import hashlib
+import csv
+import io
 import json
+import zipfile
 from pathlib import Path
 from typing import Any
 
@@ -108,3 +111,63 @@ def create_data_root(root: Path, *, include_source_relative_path: bool = True) -
         encoding="utf-8",
     )
     return root
+
+
+def create_porto_data_root(root: Path, rows: list[dict[str, str]]) -> Path:
+    source = root / "raw" / "test-dataset" / "v1" / "source.zip"
+    source.parent.mkdir(parents=True, exist_ok=True)
+    csv_buffer = io.StringIO(newline="")
+    fieldnames = [
+        "TRIP_ID",
+        "CALL_TYPE",
+        "ORIGIN_CALL",
+        "ORIGIN_STAND",
+        "TAXI_ID",
+        "TIMESTAMP",
+        "DAY_TYPE",
+        "MISSING_DATA",
+        "POLYLINE",
+    ]
+    writer = csv.DictWriter(csv_buffer, fieldnames=fieldnames, lineterminator="\n")
+    writer.writeheader()
+    writer.writerows(rows)
+    with zipfile.ZipFile(source, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+        archive.writestr("train.csv", csv_buffer.getvalue())
+    manifest = {
+        "datasetName": "test-dataset",
+        "datasetVersion": "v1",
+        "sourceFile": "source.zip",
+        "sourceRelativePath": "raw/test-dataset/v1/source.zip",
+        "sourceCrs": "EPSG:4326",
+        "timezone": "Europe/Lisbon",
+        "license": "CC BY 4.0",
+        "sha256": hashlib.sha256(source.read_bytes()).hexdigest(),
+        "immutable": True,
+    }
+    manifest_path = root / "manifests" / "datasets" / "test-v1.json"
+    manifest_path.parent.mkdir(parents=True, exist_ok=True)
+    manifest_path.write_text(
+        json.dumps(manifest, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    return root
+
+
+def porto_row(
+    trip_id: str,
+    timestamp: int | str,
+    *,
+    polyline: str = "[[-8.61099,41.14557],[-8.611,41.146]]",
+    missing_data: str = "False",
+) -> dict[str, str]:
+    return {
+        "TRIP_ID": trip_id,
+        "CALL_TYPE": "B",
+        "ORIGIN_CALL": "",
+        "ORIGIN_STAND": "1",
+        "TAXI_ID": "private-taxi-id",
+        "TIMESTAMP": str(timestamp),
+        "DAY_TYPE": "A",
+        "MISSING_DATA": missing_data,
+        "POLYLINE": polyline,
+    }

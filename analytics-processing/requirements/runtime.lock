@@ -1,4 +1,5 @@
-# Generated from the Phase 1 reviewed runtime environment.
+# Runtime dependencies reviewed through Phase 3.
 # Install with: python -m pip install -r requirements/runtime.lock
+psycopg[binary]==3.3.4
 PyYAML==6.0.3
 tzdata==2026.3

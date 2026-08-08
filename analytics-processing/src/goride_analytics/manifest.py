@@ -37,6 +37,9 @@ class DatasetValidationResult:
     source_relative_path: str | None = None
     source_bytes: int | None = None
     sha256: str | None = None
+    manifest_path: Path | None = None
+    source_path: Path | None = None
+    license_name: str | None = None
 
 
 def _safe_child(root: Path, relative_path: str, label: str) -> Path:
@@ -234,4 +237,7 @@ def validate_dataset(
         source_relative_path=manifest.source_relative_path,
         source_bytes=source_path.stat().st_size,
         sha256=actual_checksum,
+        manifest_path=manifest_path,
+        source_path=source_path,
+        license_name=manifest.license_name,
     )

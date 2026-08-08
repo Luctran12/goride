@@ -1,14 +1,14 @@
 # GoRide Analytics Processing
 
 Deterministic Python command-line foundation for the Admin demand-forecasting
-processing layer. Phase 1 implements configuration, dataset-manifest validation,
-hashing, run identity and failure semantics. It intentionally does not extract
-the full Porto dataset, build features, train or publish forecasts yet.
+processing layer. Phase 3 adds bounded Porto/GoRide extraction, a canonical
+demand-event snapshot, deterministic checksums, data-quality gates and lifecycle
+persistence. Feature building, training and forecast publication remain gated.
 
 ## Runtime
 
 - Python 3.11 or 3.12
-- PyYAML 6.0.3 and tzdata 2026.3
+- PyYAML 6.0.3, tzdata 2026.3 and Psycopg 3.3.4
 - External data root selected by `GORIDE_ANALYTICS_DATA_ROOT`
 
 Create an isolated environment from this directory:
@@ -41,6 +41,27 @@ python -m goride_analytics validate-config `
 
 It exits before processing data when validation fails.
 
+## Extract a bounded snapshot
+
+Set the Phase 2 analytics database variables in addition to the data root:
+
+```powershell
+$env:ANALYTICS_DATABASE_HOST = "localhost"
+$env:ANALYTICS_DATABASE_PORT = "5432"
+$env:ANALYTICS_DATABASE_NAME = "goride_analytics_porto"
+$env:ANALYTICS_DATABASE_USERNAME = "postgres"
+$env:ANALYTICS_DATABASE_PASSWORD = "<local-secret>"
+
+python -m goride_analytics extract `
+  --config configs\porto-thesis.yml `
+  --from-utc 2013-07-01T00:00:00Z `
+  --cutoff-utc 2013-08-01T00:00:00Z
+```
+
+The interval is exactly `[from-utc, cutoff-utc)`. Both boundaries must align
+to the configured bucket. Raw datasets and generated run evidence remain below
+the external analytics data root and are never committed.
+
 ## Stage commands
 
 ```text
@@ -51,9 +72,9 @@ evaluate
 forecast
 ```
 
-Phase 1 exposes these commands as explicit placeholders. They validate their
-profile and then return exit code `4`/`STAGE_NOT_IMPLEMENTED`. They never write
-fabricated success artifacts.
+`extract` is implemented in Phase 3. The remaining commands are explicit
+placeholders: they validate their profile and then return exit code
+`4`/`STAGE_NOT_IMPLEMENTED` without fabricated success artifacts.
 
 ## Run tests
 
@@ -73,6 +94,9 @@ python -m unittest discover -s tests -v
 | 3 | Dataset/manifest validation failure |
 | 4 | Stage intentionally not implemented in the current phase |
 | 5 | Unsafe or conflicting run output |
+| 6 | Data-quality FAIL gate |
+| 7 | Database configuration, compatibility or persistence failure |
+| 8 | Source extraction failure |
 | 70 | Unexpected internal error |
 
 Errors and lifecycle events are JSON lines on stderr. Password, secret, token

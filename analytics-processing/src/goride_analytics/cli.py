@@ -3,10 +3,11 @@ from __future__ import annotations
 import argparse
 import json
 import sys
-from typing import Sequence, TextIO
+from typing import Any, Callable, Sequence, TextIO
 
 from .config import load_config
 from .errors import AnalyticsError, ConfigurationError, ExitCode
+from .extraction.pipeline import parse_utc_boundary, run_extraction
 from .manifest import validate_dataset
 from .runs import build_run_identity
 from .stages import STAGE_COMMANDS, execute_placeholder
@@ -29,7 +30,14 @@ def build_parser() -> argparse.ArgumentParser:
         help="Validate profile, manifest, source path and checksum",
     )
     validate.add_argument("--config", required=True)
-    for stage in STAGE_COMMANDS:
+    extract = subparsers.add_parser(
+        "extract",
+        help="Create a deterministic canonical snapshot and evaluate quality",
+    )
+    extract.add_argument("--config", required=True)
+    extract.add_argument("--from-utc", required=True)
+    extract.add_argument("--cutoff-utc", required=True)
+    for stage in (stage for stage in STAGE_COMMANDS if stage != "extract"):
         command = subparsers.add_parser(stage, help=f"Phase-gated {stage} stage")
         command.add_argument("--config", required=True)
     return parser
@@ -65,6 +73,7 @@ def main(
     *,
     stdout: TextIO | None = None,
     stderr: TextIO | None = None,
+    extraction_runner: Callable[..., Any] = run_extraction,
 ) -> int:
     stdout = stdout or sys.stdout
     logger = JsonLogger(stderr or sys.stderr)
@@ -79,11 +88,39 @@ def main(
             configHash=config.config_hash,
             datasetStatus=dataset_result.status,
         )
-        if args.command != "validate-config":
+        outcome = None
+        if args.command == "extract":
+            outcome = extraction_runner(
+                config,
+                dataset_result,
+                from_utc=parse_utc_boundary(args.from_utc, "from-utc"),
+                cutoff_utc=parse_utc_boundary(args.cutoff_utc, "cutoff-utc"),
+            )
+            logger.info(
+                "analytics_extraction_completed",
+                artifactRunId=outcome.artifact_run_id,
+                processingRunId=str(outcome.processing_run_id),
+                qualityStatus=outcome.quality.overall_status,
+                snapshotSha256=outcome.snapshot.sha256,
+            )
+        elif args.command != "validate-config":
             execute_placeholder(args.command)
+        payload = _success_payload(config, dataset_result)
+        if outcome is not None:
+            payload = {
+                "status": "SUCCEEDED",
+                "profile": config.profile.name,
+                "configHash": config.config_hash,
+                "dataset": {
+                    "datasetName": dataset_result.dataset_name,
+                    "datasetVersion": dataset_result.dataset_version,
+                    "sourceType": dataset_result.source_type,
+                },
+                **outcome.to_dict(),
+            }
         stdout.write(
             json.dumps(
-                _success_payload(config, dataset_result),
+                payload,
                 ensure_ascii=False,
                 sort_keys=True,
             )

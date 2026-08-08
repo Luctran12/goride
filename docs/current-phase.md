@@ -22,36 +22,35 @@
 
 ---
 
-## 2. Active Phase Ready For Review
+## 2. Active Phase
 
-Phase 2 — Forecast analytics database release from
+Phase 3 — Deterministic extraction and data quality from
 [`admin-analytics-processing-layer-implementation-plan.md`](admin-analytics-processing-layer-implementation-plan.md).
 
-User approval to start Phase 2: 2026-08-08.
+User approval to start Phase 3: 2026-08-08.
 
-Completed commit:
+Planned commit:
 
 ```text
-2e460fa feat: add demand forecasting analytics schema
+feat: add deterministic extraction and data quality gates
 ```
 
 Scope:
 
-- add one reviewed `precheck/apply/verify/rollback/manifest` release;
-- create persistent contracts for processing runs, quality results, demand
-  features, model versions, forecast runs, cell forecasts and evaluations;
-- enforce lifecycle, checksum, UTC bucket, horizon, cell-size, geometry/SRID,
-  foreign-key and idempotency constraints;
-- add query/retention-oriented B-tree and GiST indexes;
-- add transactional integration fixtures for valid rows, duplicate rejection,
-  invalid-state rejection and forecast evaluation backfill;
-- prove apply, verify, rollback and re-apply on PostgreSQL/PostGIS.
+- implement bounded Porto ZIP/CSV and GoRide PostgreSQL source adapters;
+- emit the frozen canonical demand-event schema without passenger, driver,
+  payment, taxi or full-trajectory fields;
+- create deterministic snapshot UUID/checksum and stable row ordering;
+- implement Phase 3 quality rules with PASS/WARN/FAIL metrics;
+- stop promotion on FAIL while retaining run, quality and failure evidence;
+- persist processing lifecycle and quality results to the Phase 2 schema;
+- write dataset/run/quality/checksum artifacts outside Git;
+- prove repeated extraction checksum, cutoff isolation and read-only bounded SQL.
 
-Out of scope for Phase 2:
+Out of scope for Phase 3:
 
-- reading or transforming the full Porto CSV;
-- feature computation, model fitting or prediction;
-- Python database adapter or persistence repositories;
+- spatial grid aggregation and bucket materialization;
+- feature computation, model fitting, evaluation or prediction;
 - Spring forecast APIs;
 - frontend forecast screens.
 
@@ -84,10 +83,10 @@ Out of scope for Phase 2:
 
 ---
 
-## 4. Phase 2 Evidence
+## 4. Phase 2 Approved Baseline
 
-Implementation and validation are complete. User review is required before
-Phase 3 starts.
+Phase 2 was approved when the user requested Phase 3. Its schema, release and
+rollback contracts remain the persistence baseline.
 
 Validation evidence:
 
@@ -115,9 +114,10 @@ separate from Phase 1 artifact-directory identities by design.
 
 ## 5. Next Expected Work
 
-Phase 2 stops at this review gate. After user approval, Phase 3 may add
-deterministic extraction and data-quality persistence. Full Porto validation
-additionally requires this field in the external dataset manifest:
+After implementation, Phase 3 must stop at a user review gate. Phase 4 may add
+spatial-temporal aggregation and features only after deterministic snapshot,
+cutoff, quality and persistence evidence are approved. Full Porto validation
+requires this field in the external dataset manifest:
 
 ```json
 "sourceRelativePath": "raw/porto-taxi/v1/train.csv.zip"

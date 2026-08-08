@@ -48,6 +48,8 @@ tmp/
 
 ### Analytics processing local artifacts ###
 analytics-processing/.venv/
+analytics-processing/.venv-*/
+analytics-processing/.test-deps-*/
 analytics-processing/.coverage
 analytics-processing/.pytest_cache/
 analytics-processing/**/__pycache__/

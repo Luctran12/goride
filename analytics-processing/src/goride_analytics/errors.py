@@ -10,6 +10,9 @@ class ExitCode(IntEnum):
     DATASET_INVALID = 3
     STAGE_NOT_IMPLEMENTED = 4
     RUN_CONFLICT = 5
+    DATA_QUALITY_FAILED = 6
+    DATABASE_ERROR = 7
+    EXTRACTION_FAILED = 8
     INTERNAL_ERROR = 70
 
 
@@ -52,9 +55,9 @@ class StageNotImplementedError(AnalyticsError):
     def __init__(self, stage: str) -> None:
         super().__init__(
             "STAGE_NOT_IMPLEMENTED",
-            f"Stage '{stage}' is intentionally not implemented in Phase 1",
+            f"Stage '{stage}' is intentionally not implemented in the current phase",
             ExitCode.STAGE_NOT_IMPLEMENTED,
-            {"stage": stage, "phase": 1},
+            {"stage": stage, "phase": 3},
         )
 
 
@@ -66,3 +69,33 @@ class RunConflictError(AnalyticsError):
             ExitCode.RUN_CONFLICT,
             details,
         )
+
+
+class DataQualityError(AnalyticsError):
+    def __init__(self, failed_rules: list[str], run_id: str) -> None:
+        super().__init__(
+            "DATA_QUALITY_FAILED",
+            "One or more FAIL-level data-quality rules were breached",
+            ExitCode.DATA_QUALITY_FAILED,
+            {"failedRules": sorted(failed_rules), "processingRunId": run_id},
+        )
+
+
+class DatabaseError(AnalyticsError):
+    def __init__(
+        self,
+        code: str,
+        message: str,
+        details: Mapping[str, Any] | None = None,
+    ) -> None:
+        super().__init__(code, message, ExitCode.DATABASE_ERROR, details)
+
+
+class ExtractionError(AnalyticsError):
+    def __init__(
+        self,
+        code: str,
+        message: str,
+        details: Mapping[str, Any] | None = None,
+    ) -> None:
+        super().__init__(code, message, ExitCode.EXTRACTION_FAILED, details)
