@@ -22,17 +22,17 @@
 
 ---
 
-## 2. Active Phase
+## 2. Active Phase Ready For Review
 
 Phase 2 — Forecast analytics database release from
 [`admin-analytics-processing-layer-implementation-plan.md`](admin-analytics-processing-layer-implementation-plan.md).
 
 User approval to start Phase 2: 2026-08-08.
 
-Planned commit:
+Completed commit:
 
 ```text
-feat: add demand forecasting analytics schema
+2e460fa feat: add demand forecasting analytics schema
 ```
 
 Scope:
@@ -84,40 +84,40 @@ Out of scope for Phase 2:
 
 ---
 
-## 4. Phase 1 Approved Baseline
+## 4. Phase 2 Evidence
 
-Phase 1 was approved when the user requested Phase 2. Its package, dependency
-locks, validation behavior and two commits remain the implementation baseline.
+Implementation and validation are complete. User review is required before
+Phase 3 starts.
 
 Validation evidence:
 
-- 19/19 unit and CLI tests passed on Python 3.11.9 and Python 3.12.13.
-- Dependency-lock contract matches `pyproject.toml` for runtime and optional
-  model-spike packages.
-- `HistGradientBoostingRegressor` compatibility spike passed deterministic
-  fit/predict with NumPy 1.26.4 and scikit-learn 1.9.0.
-- GoRide profile validation passed and returned
-  `CONFIG_VALID_CONNECTION_DEFERRED_TO_PHASE_3` as designed.
-- The real Porto profile returned exit code 3 and
-  `DATASET_MANIFEST_FIELD_MISSING` because the external manifest lacks
-  `sourceRelativePath`; no path was inferred and no artifact was written.
-- Path traversal, checksum mismatch, unsafe run slug, chronological overlap,
-  output overwrite and structured-log redaction all have regression tests.
-- `git diff --check` passed before the implementation commit.
+- All 13 database release descriptors passed `validate-db-release.ps1 -All`.
+- PostgreSQL 18/PostGIS 3.6.2 local cycle passed precheck, apply, verify,
+  transactional fixture, rollback to zero forecasting tables and re-apply.
+- The final local schema is applied to `goride_analytics_porto`; all seven
+  forecasting tables are empty after fixture rollback.
+- Testcontainers PostgreSQL 15/PostGIS release-chain integration passed 1/1:
+  apply/verify/fixture, reverse rollback with absence assertions, then re-apply
+  and verify again.
+- Fixtures prove rejection of duplicate processing runs, forecasts and
+  evaluation dimensions; unsupported cell sizes; invalid model lifecycle;
+  non-EPSG:4326 geometry; and deletion of referenced evidence.
+- Actual/error backfill passed the target-bucket closure and exact absolute
+  error constraints.
+- `git diff --check` and the release-folder trailing-whitespace scan passed.
 
-Manual review replaced optimization-sensitive boundary assertions with an
-explicit dataset error, enforced safe run/profile slugs, added microseconds to
-run IDs and retained fail-closed output allocation. The external
-credential-rotation action from Phase 0 remains an operational responsibility.
+Manual review added a composite processing/forecast contract, an approved-model
+trigger for published runs, canonical cell-ID enforcement, label-availability
+time checks and WGS84 coordinate bounds. UUID database identities remain
+separate from Phase 1 artifact-directory identities by design.
 
 ---
 
 ## 5. Next Expected Work
 
-After implementation, Phase 2 must stop at a user review gate. Phase 3 may add
-deterministic extraction and data-quality persistence only after the schema,
-rollback evidence and idempotency constraints are approved. Full Porto
-validation additionally requires this field in the external dataset manifest:
+Phase 2 stops at this review gate. After user approval, Phase 3 may add
+deterministic extraction and data-quality persistence. Full Porto validation
+additionally requires this field in the external dataset manifest:
 
 ```json
 "sourceRelativePath": "raw/porto-taxi/v1/train.csv.zip"

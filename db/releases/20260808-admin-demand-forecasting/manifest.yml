@@ -7,7 +7,7 @@ transactional: true
 requires_downtime: false
 applies_after:
   - 20260729-admin-analytics-materialized
-related_commit: pending
+related_commit: 2e460fa
 environments:
   - local
   - staging

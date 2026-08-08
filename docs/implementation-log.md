@@ -6,6 +6,82 @@
 
 ---
 
+## Commit: `2e460fa` - `feat: add demand forecasting analytics schema`
+
+Branch: `codex/admin-demand-forecasting`
+
+Phase: Admin Demand Forecasting Phase 2 - forecast analytics database release
+
+### Muc tieu
+
+Tao persistent contract co rollback cho processing run, data quality, feature,
+model, forecast va evaluation truoc khi Python pipeline bat dau ghi database.
+Schema phai ngan duplicate evidence, leakage theo thoi gian, sai SRID/grid va
+publish model chua duoc phe duyet.
+
+### Noi dung da trien khai
+
+- Them release `20260808-admin-demand-forecasting` gom manifest, precheck,
+  apply, verify, rollback va transactional integration fixture.
+- Tao bay bang trong schema `analytics`: `processing_runs`,
+  `data_quality_results`, `demand_features`, `model_versions`, `forecast_runs`,
+  `demand_forecasts` va `forecast_evaluations`.
+- Dung UUID cho database identity va `artifact_run_id` rieng de lien ket run
+  directory cua Phase 1.
+- Enforce status/lifecycle, SHA-256/Git commit, JSON object, count, time order,
+  15-minute alignment, horizon 15/30/60, cell size va canonical cell ID.
+- Enforce feature label chi ton tai sau target bucket closure; forecast actual,
+  absolute error va evaluation timestamp phai duoc backfill cung nhau.
+- Enforce Polygon EPSG:4326 hop le, khong rong va nam trong WGS84 bounds.
+- Dung composite FK de forecast run khop processing run `FORECAST` ve profile,
+  dataset, cutoff va config; dung trigger de run `PUBLISHED` chi nhan model
+  `APPROVED`.
+- Them B-tree cho lookup, GiST cho forecast geometry va BRIN cho target-time
+  retention scan; unique index `NULLS NOT DISTINCT` cho evaluation dimensions.
+- Mo rong release-chain integration test de chay fixture, rollback dao chieu,
+  assert object da xoa va re-apply toan chuoi.
+
+### Validation da chay
+
+- `scripts/validate-db-release.ps1 -All`: 13/13 release folders pass.
+- PostgreSQL 18/PostGIS 3.6.2 tren `goride_analytics_porto`: precheck, apply,
+  verify, fixture, rollback ve 0 table, precheck va re-apply pass.
+- Fixture transaction pass va rollback sach; tong row tren bay table sau test
+  bang 0.
+- Testcontainers PostgreSQL 15/PostGIS:
+  `AdminAnalyticsReleaseChainIntegrationTests` pass 1 test, 0 failure/error.
+  Test chay apply/verify/fixture, rollback dao chieu, assert absence va re-apply.
+- `git diff --check` va trailing-whitespace scan: pass.
+
+### Manual review findings
+
+- Fixture dau tien bat duoc PostgreSQL `ON DELETE RESTRICT` phat
+  `restrict_violation`, khac voi nhanh `foreign_key_violation`; test da bat dung
+  nhom `integrity_constraint_violation`.
+- Them processing/forecast composite FK de metadata khong the drift giua hai
+  table du chi tung FK rieng van hop le.
+- Them published-model trigger; model `VALIDATED`, `REJECTED` hoac `RETIRED`
+  khong the tao run publish moi.
+- Them label-time, canonical cell ID va WGS84 boundary guards sau manual review.
+- Fixture dung transaction va `ROLLBACK`, khong de du lieu mau trong database.
+
+### Files chinh
+
+- `db/releases/20260808-admin-demand-forecasting/*`
+- `src/test/java/com/example/goride/integration/AdminAnalyticsReleaseChainIntegrationTests.java`
+- `docs/current-phase.md`
+
+### Known risks / review gate
+
+- Rollback se xoa evidence neu table da co du lieu; manifest bat buoc stop writer
+  va export truoc rollback.
+- Retention window chua co so lieu production; index/table size duoc expose trong
+  `verify.sql` va se chot sau profiling volume.
+- Phase 2 chua co Python DB adapter, extraction, feature computation, training,
+  Spring API hay UI.
+- Local experiment database dang giu schema da re-apply va khong co fixture row.
+- Dung tai review gate. Chi bat dau Phase 3 sau khi user phe duyet.
+
 ## Commit: `d5705f5` - `feat: scaffold reproducible analytics processing layer`
 
 Branch: `codex/admin-demand-forecasting`
