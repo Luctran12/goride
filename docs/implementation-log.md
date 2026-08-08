@@ -6,6 +6,82 @@
 
 ---
 
+## Commit: `d5705f5` - `feat: scaffold reproducible analytics processing layer`
+
+Branch: `codex/admin-demand-forecasting`
+
+Phase: Admin Demand Forecasting Phase 1 - processing scaffold and
+reproducibility foundation
+
+### Muc tieu
+
+Tao processing layer Python co the cai dat va kiem chung lap lai truoc khi doc
+full dataset, tao forecast schema hoac train model. Boundary phai fail closed
+khi config, manifest, checksum, path hoac output evidence khong hop le.
+
+### Noi dung da trien khai
+
+- Tao package `analytics-processing` ho tro Python 3.11/3.12, runtime lock toi
+  thieu va optional model-spike lock.
+- Them hai profile tach biet: `porto-thesis` cho empirical evaluation va
+  `goride-local` cho system integration.
+- Parse YAML strict, reject unknown/missing key va validate timezone, CRS,
+  bucket, horizon, grid, history, feature availability, chronological split va
+  artifact contract.
+- Tao canonical config SHA-256, run identity gom Git/runtime metadata, run
+  directory an toan va atomic `run-manifest.json` khong overwrite.
+- Validate external data root/path containment, manifest identity,
+  `sourceRelativePath`, immutable flag, source file va streaming SHA-256.
+- Them JSON Lines logging va redaction de khong lo password, secret, token,
+  credential hoac API key.
+- Expose `validate-config` va skeleton `extract`, `build-features`, `train`,
+  `evaluate`, `forecast`; stage chua den phase tra
+  `STAGE_NOT_IMPLEMENTED`/exit code 4 va khong tao fake artifact.
+- Them compatibility spike cho `HistGradientBoostingRegressor` va huong dan
+  local setup/test.
+
+### Validation da chay
+
+- Python 3.11.9: 19/19 unit va CLI tests pass.
+- Python 3.12.13: 19/19 unit va CLI tests pass.
+- Dependency locks khop dependency declarations trong `pyproject.toml`.
+- Model spike pass deterministic fit/predict voi NumPy 1.26.4 va
+  scikit-learn 1.9.0.
+- `goride-local` validate pass va defer DB connection den Phase 3 dung contract.
+- `porto-thesis` tren manifest that fail dung exit code 3/
+  `DATASET_MANIFEST_FIELD_MISSING` vi external manifest chua co
+  `sourceRelativePath`; khong infer path va khong ghi output.
+- `git diff --check`: pass truoc commit.
+
+### Manual review findings
+
+- Thay `assert` o dataset boundary bang explicit typed failure de validation
+  khong thay doi khi Python chay optimized mode.
+- Enforce safe profile/run slug va root containment de metadata khong the tao
+  path traversal.
+- Run timestamp co microseconds; neu target van trung thi allocation fail closed
+  thay vi overwrite evidence.
+- Lock runtime chi gom YAML/timezone; model dependencies van optional cho den
+  khi model family duoc chon bang evaluation.
+
+### Files chinh
+
+- `analytics-processing/pyproject.toml`
+- `analytics-processing/configs/*`
+- `analytics-processing/src/goride_analytics/*`
+- `analytics-processing/tests/*`
+- `analytics-processing/requirements/*`
+- `analytics-processing/README.md`
+- `docs/current-phase.md`
+
+### Known risks / review gate
+
+- External Porto manifest can them
+  `sourceRelativePath: raw/porto-taxi/v1/train.csv.zip` de full validation pass.
+- Phase 1 chua connect PostgreSQL, doc Porto CSV, build feature, train model hay
+  publish forecast; cac skeleton command co chu y fail ro rang.
+- Dung tai review gate. Chi bat dau Phase 2 sau khi user phe duyet.
+
 ## Commit: `a375f5d` — `docs: freeze demand forecasting research and data contracts`
 
 Branch: `codex/admin-demand-forecasting`

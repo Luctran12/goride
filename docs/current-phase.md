@@ -17,22 +17,22 @@
   from `main`, but `main` does not contain Admin Analytics Phase 0-8. This
   feature starts from `develop` because its schema, PostGIS grid, telemetry and
   API contracts are required dependencies.
-- User-local `.env.example` remains outside the Phase 0 commit unless reviewed
-  separately.
+- User-local `.env.example` remains outside the analytics commits unless
+  reviewed separately.
 
 ---
 
-## 2. Active Phase
+## 2. Active Phase Ready For Review
 
 Phase 1 — Processing project scaffold and reproducibility foundation from
 [`admin-analytics-processing-layer-implementation-plan.md`](admin-analytics-processing-layer-implementation-plan.md).
 
 User approval to start Phase 1: 2026-08-08.
 
-Planned commit:
+Completed commit:
 
 ```text
-feat: scaffold reproducible analytics processing layer
+d5705f5 feat: scaffold reproducible analytics processing layer
 ```
 
 Scope:
@@ -84,29 +84,40 @@ Out of scope for Phase 1:
 
 ---
 
-## 4. Phase 0 Evidence
+## 4. Phase 1 Evidence
 
-Implementation and local validation are complete. User review is required, and
-the external credential-rotation action remains mandatory.
+Implementation and local validation are complete. User review is required
+before Phase 2 starts.
 
 Validation evidence:
 
-- 33/33 focused Analytics/configuration tests passed.
-- All 12 database release descriptors passed `validate-db-release.ps1 -All`.
-- Porto SHA-256, ZIP structure, CSV header and first data row passed.
-- PostgreSQL 18/PostGIS 3.6.2 database and EPSG:3763 transform smoke passed.
-- Documentation links and `git diff --check` passed.
-- Manual review corrected Unix-epoch timezone semantics and froze EPSG:3763.
+- 19/19 unit and CLI tests passed on Python 3.11.9 and Python 3.12.13.
+- Dependency-lock contract matches `pyproject.toml` for runtime and optional
+  model-spike packages.
+- `HistGradientBoostingRegressor` compatibility spike passed deterministic
+  fit/predict with NumPy 1.26.4 and scikit-learn 1.9.0.
+- GoRide profile validation passed and returned
+  `CONFIG_VALID_CONNECTION_DEFERRED_TO_PHASE_3` as designed.
+- The real Porto profile returned exit code 3 and
+  `DATASET_MANIFEST_FIELD_MISSING` because the external manifest lacks
+  `sourceRelativePath`; no path was inferred and no artifact was written.
+- Path traversal, checksum mismatch, unsafe run slug, chronological overlap,
+  output overwrite and structured-log redaction all have regression tests.
+- `git diff --check` passed before the implementation commit.
 
-Phase 0 contracts were approved by the user when Phase 1 was requested. The
-external credential-rotation action remains an operational responsibility.
-The Porto manifest still lacks `sourceRelativePath`; Phase 1 validation must
-report this explicitly and must not silently infer a source path.
+Manual review replaced optimization-sensitive boundary assertions with an
+explicit dataset error, enforced safe run/profile slugs, added microseconds to
+run IDs and retained fail-closed output allocation. The external
+credential-rotation action from Phase 0 remains an operational responsibility.
 
 ---
 
 ## 5. Next Expected Work
 
-After implementation, Phase 1 must stop at a user review gate. Phase 2 may add
-the forecast database release only after the package, dependency lock, failure
-semantics and validation evidence are approved.
+Phase 1 stops at this review gate. After user approval, Phase 2 may add the
+forecast database release. Full Porto validation additionally requires this
+field in the external dataset manifest:
+
+```json
+"sourceRelativePath": "raw/porto-taxi/v1/train.csv.zip"
+```
