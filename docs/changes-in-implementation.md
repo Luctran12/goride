@@ -4,6 +4,51 @@
 
 ---
 
+## 2026-08-08 - Demand forecasting uses an isolated batch processing layer
+
+- Date: 2026-08-08
+- Branch: `codex/admin-demand-forecasting`
+- Affected feature: Admin Analytics demand-forecasting extension
+- Approval source: user-approved processing-layer direction and phased
+  implementation plan
+
+### TDD expectation
+
+The original TDD describes Analytics Dashboard as future work and suggests a
+separate data warehouse such as BigQuery or ClickHouse when scale requires it.
+It does not define forecasting targets, model evaluation or a processing
+runtime.
+
+### Implemented design
+
+- Keep the existing PostgreSQL/PostGIS Admin Analytics subsystem as the
+  serving foundation.
+- Add an isolated Python batch layer for extraction, quality, feature
+  engineering, training, backtesting and scheduled inference.
+- Persist forecast metadata/results in the `analytics` schema and serve them
+  only through Spring Admin APIs.
+- Keep large datasets, model binaries and raw experiment artifacts outside Git.
+- Use Porto Taxi for real-data method evaluation and a separate GoRide profile
+  for integration; do not mix their populations or claims.
+
+### Reason
+
+A warehouse/streaming platform would add operational scope without answering
+the selected research question. Python provides a practical reproducible model
+toolchain, while PostgreSQL/PostGIS and Spring reuse the implemented spatial,
+security and frontend contracts. Dataset isolation prevents a Porto-trained
+artifact from being represented as a Ho Chi Minh City production model.
+
+### Impact
+
+- The repository gains a second runtime/dependency lifecycle in Phase 1.
+- Training and inference never execute inside an Admin HTTP request.
+- Frontend never calls Python directly.
+- A separate experiment database/artifact namespace is required for Porto.
+- Production-like GoRide forecasts require retraining and validation on
+  sufficiently representative GoRide data.
+- Deep learning and streaming remain conditional future extensions.
+
 ## 2026-07-28 - Matching analytics preserves open-ended rematching
 
 - Date: 2026-07-28

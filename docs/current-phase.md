@@ -1,6 +1,6 @@
 # GoRide Current Phase
 
-> Last updated: 2026-07-28, Asia/Bangkok
+> Last updated: 2026-08-08, Asia/Ho_Chi_Minh
 >
 > Purpose: source of truth before starting or reviewing the next backend commit.
 
@@ -8,42 +8,97 @@
 
 ## 1. Repository Status
 
-- Current branch: `codex/word-location-mobile`.
-- Base develop commit: `5b941d6` (`merge: driver location bootstrap`).
-- Local-only config: `src/main/resources/application.yml` has environment-specific changes and must remain uncommitted.
-- Working direction: expose the custom three-word location service through authenticated GoRide APIs for passenger and driver mobile flows.
+- Active feature: Admin demand-forecasting processing layer.
+- Current branch: `codex/admin-demand-forecasting`.
+- Backend base: `develop` commit `ae3dac2` (`merge admin-v2`).
+- Frontend integration baseline: `goride-web` branch `codex/admin_v2`, commit
+  `5acdf06` (`docs: record phase 11 release hardening review`).
+- Branch-base exception: the repository convention normally starts features
+  from `main`, but `main` does not contain Admin Analytics Phase 0-8. This
+  feature starts from `develop` because its schema, PostGIS grid, telemetry and
+  API contracts are required dependencies.
+- User-local `.env.example` remains outside the Phase 0 commit unless reviewed
+  separately.
 
 ---
 
-## 2. Active Work Ready For Review
+## 2. Active Phase
 
-Planned commit: `feat: integrate three-word mobile location lookup`.
+Phase 0 — Baseline, security and contract freeze from
+[`admin-analytics-processing-layer-implementation-plan.md`](admin-analytics-processing-layer-implementation-plan.md).
 
-Scope implemented:
-- Add a configurable HTTP adapter for the existing Python `/api/to-words` and `/api/to-coordinate` APIs.
-- Expose GoRide endpoints under `/api/v1/locations` with the common response/error envelope.
-- Keep `lat`/`lng` as the source of truth; translate GoRide `lng` to the Python provider's `lon` parameter.
-- Normalize three-word input before provider lookup, return provider `_` compounds as spaces for mobile display, and validate coordinates at the GoRide boundary.
-- Map malformed input, unknown addresses, unsupported map bounds, provider timeout, and provider failure to stable error codes.
-- Add unit/provider/controller coverage and a mobile integration contract.
+Planned commit:
+
+```text
+docs: freeze demand forecasting research and data contracts
+```
+
+Scope:
+
+- restore an environment-backed tracked datasource configuration without the
+  credential that was previously committed;
+- record the mandatory external credential-rotation action;
+- freeze the processing-layer architecture and system boundary;
+- freeze canonical input, target, grid, time, quality and leakage semantics;
+- freeze the Porto thesis evaluation protocol and GoRide integration profile;
+- record exact backend/frontend baselines and dataset checksum;
+- validate existing Admin Analytics tests and database release descriptors.
+
+Out of scope for Phase 0:
+
+- Python package or dependency installation;
+- forecast database tables;
+- feature generation, training or inference;
+- Spring forecast APIs;
+- frontend forecast screens.
 
 ---
 
-## 3. Mobile Contract
+## 3. Frozen Baseline
 
-- Passenger selects a map point, then taps `Lay 3 tu`; the app calls `GET /api/v1/locations/to-words?lat={lat}&lng={lng}`.
-- Driver taps `Tim bang 3 tu`, enters a dot-separated address, then the app calls `GET /api/v1/locations/to-coordinate?address={address}`.
-- Driver lookup first shows a preview marker and cell bounds. It must not replace an active trip destination until the driver explicitly confirms.
-- Both endpoints require a valid passenger or driver JWT.
-- Booking requests continue to send their existing `lat`, `lng`, and street `address` fields. The three-word address is display/share metadata and is not booking source of truth.
+### Backend
+
+- Existing Admin Analytics remains the historical descriptive layer.
+- The new artifact extends it; it does not rewrite direct/materialized queries,
+  telemetry or the historical heatmap.
+- PostgreSQL/PostGIS remains the serving store.
+- Spring Boot remains the only HTTP boundary exposed to Admin Web.
+
+### Dataset
+
+- Thesis method dataset: Porto Taxi, version
+  `porto-2013-07_2014-06-v1`.
+- Source artifact: `train.csv.zip`.
+- SHA-256:
+  `210dd0a20da66a8fc2de3440aecd84670921bc257591f8365a4475e31453c5ea`.
+- License recorded by the source repository: CC BY 4.0.
+- Local dataset root is external to Git and selected through
+  `GORIDE_ANALYTICS_DATA_ROOT`.
+- GoRide synthetic/operational data is a separate integration profile and must
+  not be merged into Porto evaluation results.
+- Local experiment database `goride_analytics_porto` exists with PostgreSQL 18,
+  PostGIS 3.6.2 and both EPSG:3763/EPSG:32648 spatial references available.
 
 ---
 
-## 4. Validation
+## 4. Review Gate
 
-- Targeted location/security suite: pass 32 tests.
-- Full `./mvnw.cmd test`: 495 tests discovered, 485 passed, 0 failures, and 10 integration errors during Docker/Testcontainers initialization.
-- Docker root cause: Testcontainers cannot access `\\.\pipe\docker_engine`; feature and non-Docker tests have no assertion failure.
-- `git diff --check`: pass; Git reports Windows CRLF conversion warnings only.
-- Manual review: found and fixed default exposure, mismatched provider address, inverted bounds, and out-of-cell coordinate issues; regression tests cover these cases.
-- The repository contains backend only, so mobile screens are documented as an implementation-ready React Native contract rather than edited in this branch.
+Phase 0 is complete only when:
+
+- tracked runtime datasource configuration contains no real credential;
+- the credential already present in Git history has been rotated externally;
+- architecture, data and evaluation contracts are internally consistent;
+- dataset checksum verification passes;
+- focused Analytics/configuration tests pass;
+- all database release folders pass descriptor validation;
+- manual review finds no leakage, source-semantics or claim-boundary defect;
+- the user approves Phase 0 before Phase 1 begins.
+
+---
+
+## 5. Next Expected Work
+
+After user approval, Phase 1 will scaffold `analytics-processing` as a
+deterministic Python package with configuration validation, manifest hashing,
+structured logging and skeleton CLI commands. No Phase 1 implementation starts
+before this review gate is approved.
