@@ -1,0 +1,4 @@
+# Generated from the Phase 1 reviewed runtime environment.
+# Install with: python -m pip install -r requirements/runtime.lock
+PyYAML==6.0.3
+tzdata==2026.3

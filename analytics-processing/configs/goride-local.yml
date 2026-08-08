@@ -1,0 +1,49 @@
+profile:
+  name: goride-local
+  purpose: system-integration
+  random_seed: 5537
+
+dataset:
+  name: goride-operational
+  version: local
+  source_type: postgresql
+  database_env_prefix: ANALYTICS_DATABASE
+  expected_source_crs: EPSG:4326
+  expected_timezone: Asia/Ho_Chi_Minh
+
+spatial:
+  source_srid: 4326
+  projected_srid: 32648
+  primary_cell_size_meters: 500
+  evaluation_cell_sizes_meters: [250, 500, 1000, 2000]
+
+temporal:
+  source_timezone: Asia/Ho_Chi_Minh
+  storage_timezone: UTC
+  bucket_minutes: 15
+  forecast_horizons_minutes: [15, 30, 60]
+
+quality:
+  reject_missing_trajectory: false
+  reject_invalid_coordinate: true
+  reject_future_timestamp: true
+  minimum_history_buckets: 672
+  fail_on_checksum_mismatch: false
+
+features:
+  demand_lags: [1, 2, 4, 96, 672]
+  rolling_windows: [4, 12, 96, 672]
+  include_temporal_features: true
+  include_spatial_neighbors: true
+  include_supply_features: true
+
+evaluation:
+  strategy: rolling_origin
+  metrics: [MAE, RMSE, WAPE]
+
+artifacts:
+  feature_format: parquet
+  compression: zstd
+  write_raw_predictions: true
+  write_run_manifest: true
+  checksum_algorithm: sha256

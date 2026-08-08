@@ -1,0 +1,59 @@
+profile:
+  name: porto-thesis
+  purpose: thesis-training-and-evaluation
+  random_seed: 5537
+
+dataset:
+  name: porto-taxi
+  version: porto-2013-07_2014-06-v1
+  source_type: archive
+  root_env: GORIDE_ANALYTICS_DATA_ROOT
+  manifest_relative_path: manifests/datasets/porto-taxi-v1.json
+  expected_source_crs: EPSG:4326
+  expected_timezone: Europe/Lisbon
+
+spatial:
+  source_srid: 4326
+  projected_srid: 3763
+  primary_cell_size_meters: 500
+  evaluation_cell_sizes_meters: [500, 1000, 2000]
+
+temporal:
+  source_timezone: Europe/Lisbon
+  storage_timezone: UTC
+  bucket_minutes: 15
+  forecast_horizons_minutes: [15, 30, 60]
+
+quality:
+  reject_missing_trajectory: true
+  reject_invalid_coordinate: true
+  reject_future_timestamp: true
+  minimum_history_buckets: 672
+  fail_on_checksum_mismatch: true
+
+features:
+  demand_lags: [1, 2, 4, 96, 672]
+  rolling_windows: [4, 12, 96, 672]
+  include_temporal_features: true
+  include_spatial_neighbors: true
+  include_supply_features: false
+
+evaluation:
+  strategy: rolling_origin
+  metrics: [MAE, RMSE, WAPE]
+  train:
+    from: "2013-07-01T00:00:00"
+    to: "2014-03-01T00:00:00"
+  validation:
+    from: "2014-03-01T00:00:00"
+    to: "2014-05-01T00:00:00"
+  test:
+    from: "2014-05-01T00:00:00"
+    to: "2014-07-01T00:00:00"
+
+artifacts:
+  feature_format: parquet
+  compression: zstd
+  write_raw_predictions: true
+  write_run_manifest: true
+  checksum_algorithm: sha256

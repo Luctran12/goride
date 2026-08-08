@@ -22,33 +22,36 @@
 
 ---
 
-## 2. Active Phase Ready For Review
+## 2. Active Phase
 
-Phase 0 — Baseline, security and contract freeze from
+Phase 1 — Processing project scaffold and reproducibility foundation from
 [`admin-analytics-processing-layer-implementation-plan.md`](admin-analytics-processing-layer-implementation-plan.md).
 
-Completed commit:
+User approval to start Phase 1: 2026-08-08.
+
+Planned commit:
 
 ```text
-a375f5d docs: freeze demand forecasting research and data contracts
+feat: scaffold reproducible analytics processing layer
 ```
 
 Scope:
 
-- restore an environment-backed tracked datasource configuration without the
-  credential that was previously committed;
-- record the mandatory external credential-rotation action;
-- freeze the processing-layer architecture and system boundary;
-- freeze canonical input, target, grid, time, quality and leakage semantics;
-- freeze the Porto thesis evaluation protocol and GoRide integration profile;
-- record exact backend/frontend baselines and dataset checksum;
-- validate existing Admin Analytics tests and database release descriptors.
+- create an installable `analytics-processing` Python package;
+- freeze Python/runtime and minimal dependency ranges;
+- implement strict YAML profile loading and environment resolution;
+- implement dataset manifest/path/SHA-256 validation;
+- create deterministic config hash, run identity and run manifest metadata;
+- emit structured JSON logs without secrets;
+- expose skeleton commands `extract`, `build-features`, `train`, `evaluate`
+  and `forecast` that fail as not implemented instead of fabricating output;
+- add standard-library unit/CLI tests and local validation instructions.
 
-Out of scope for the completed Phase 0 commit:
+Out of scope for Phase 1:
 
-- Python package or dependency installation;
-- forecast database tables;
-- feature generation, training or inference;
+- database connection and forecast schema;
+- reading or transforming the full Porto CSV;
+- feature computation, model fitting or prediction;
 - Spring forecast APIs;
 - frontend forecast screens.
 
@@ -81,7 +84,7 @@ Out of scope for the completed Phase 0 commit:
 
 ---
 
-## 4. Review Gate
+## 4. Phase 0 Evidence
 
 Implementation and local validation are complete. User review is required, and
 the external credential-rotation action remains mandatory.
@@ -95,19 +98,15 @@ Validation evidence:
 - Documentation links and `git diff --check` passed.
 - Manual review corrected Unix-epoch timezone semantics and froze EPSG:3763.
 
-Phase 0 is approved only when:
-
-- tracked runtime datasource configuration contains no real credential;
-- the credential already present in Git history has been rotated externally;
-- the external dataset manifest adds `sourceRelativePath` before Phase 1 config
-  validation;
-- the user approves Phase 0 before Phase 1 begins.
+Phase 0 contracts were approved by the user when Phase 1 was requested. The
+external credential-rotation action remains an operational responsibility.
+The Porto manifest still lacks `sourceRelativePath`; Phase 1 validation must
+report this explicitly and must not silently infer a source path.
 
 ---
 
 ## 5. Next Expected Work
 
-After user approval, Phase 1 will scaffold `analytics-processing` as a
-deterministic Python package with configuration validation, manifest hashing,
-structured logging and skeleton CLI commands. No Phase 1 implementation starts
-before this review gate is approved.
+After implementation, Phase 1 must stop at a user review gate. Phase 2 may add
+the forecast database release only after the package, dependency lock, failure
+semantics and validation evidence are approved.
