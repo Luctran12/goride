@@ -299,9 +299,11 @@ class DatabaseExtractionIntegrationTests(unittest.TestCase):
                     connection.close()
 
     def test_feature_rows_roll_back_when_success_transition_fails(self) -> None:
-        from_utc = datetime(2013, 7, 1, tzinfo=timezone.utc)
-        cutoff = datetime(2013, 7, 1, 2, tzinfo=timezone.utc)
-        event_time = int(datetime(2013, 7, 1, 0, 5, tzinfo=timezone.utc).timestamp())
+        from_utc = datetime(2013, 7, 31, 23, tzinfo=timezone.utc)
+        cutoff = datetime(2013, 8, 1, 1, tzinfo=timezone.utc)
+        event_time = int(
+            datetime(2013, 7, 31, 23, 5, tzinfo=timezone.utc).timestamp()
+        )
         with tempfile.TemporaryDirectory() as temporary:
             base = Path(temporary)
             data_root = create_porto_data_root(
@@ -351,6 +353,17 @@ class DatabaseExtractionIntegrationTests(unittest.TestCase):
                         repository_factory=_FailingTerminalRepository,
                     )
                 self.assertEqual(raised.exception.code, "TEST_TERMINAL_FAILURE")
+                feature_directory = (
+                    data_root
+                    / "runs"
+                    / "feature-build"
+                    / feature_identity.run_id
+                    / "demand-features"
+                )
+                self.assertEqual(
+                    len(list(feature_directory.glob("target_month=*/part-*.parquet"))),
+                    2,
+                )
 
                 connection = connect_database(settings)
                 try:

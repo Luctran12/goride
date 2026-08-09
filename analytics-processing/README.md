@@ -78,9 +78,12 @@ python -m goride_analytics build-features `
 
 The command verifies every extraction checksum before reading data, projects
 WGS84 pickups into the profile CRS, applies the frozen zero-origin floor grid,
-materializes continuous UTC buckets and emits:
+selects cells using training data only, materializes continuous UTC buckets and
+emits:
 
-- `demand-features.parquet` in stable cell/cutoff/horizon order;
+- `demand-features/target_month=YYYY-MM/part-00000.parquet` in stable
+  cell/cutoff/horizon order;
+- `cell-eligibility.json` with the frozen selected cell IDs and coverage;
 - `feature-dictionary.json` and `feature-manifest.json`;
 - `feature-quality.json`, run evidence and `checksums.sha256`;
 - idempotent rows in `analytics.demand_features`.
@@ -88,6 +91,11 @@ materializes continuous UTC buckets and emits:
 Demand lag, rolling and neighbor features use only buckets closed at the row's
 inference cutoff. GoRide supply remains nullable and WARNs when coverage is
 missing; a sample recorded after its bucket closes fails the build.
+
+The Porto profile selects all boundary-tied cells needed to cover at least 95%
+of demand in the train split. Validation/test demand never influences that
+population. Planning fails before Parquet/feature-row writes above 1,500,000
+rows per target-month partition or 15,000,000 rows for the run.
 
 ## Stage commands
 

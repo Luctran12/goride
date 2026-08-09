@@ -165,6 +165,19 @@ y(c, b) = count of accepted canonical demand events whose pickup belongs to c
 Every evaluation table/report must carry `demand_event_semantics` so the Porto
 proxy cannot be mislabeled as observed request creation.
 
+### 7.1 Evaluation cell population
+
+Porto version 1 evaluates the boundary-tied cells required to cover at least
+95% of demand observed in the train split. Ranking and the boundary are computed
+without validation/test rows. The frozen selected cell IDs are reused for all
+later folds, horizons and candidate models so comparisons use the same
+population. Excluded tail cells remain in canonical evidence and their demand
+coverage is reported; conclusions must not claim full-city cell coverage.
+
+Feature rows are partitioned by `target_bucket_start_utc` calendar month. The
+partition dimension changes storage/layout only, not feature or target
+semantics.
+
 ## 8. Feature availability contract
 
 A feature used to predict target bucket `b` at inference cutoff `t` is valid

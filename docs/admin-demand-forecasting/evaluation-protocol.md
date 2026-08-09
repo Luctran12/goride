@@ -213,12 +213,14 @@ Before timing or reporting model quality:
 
 1. Source checksum matches the dataset manifest.
 2. All FAIL-level data-quality rules pass.
-3. Grid boundary fixtures pass.
-4. Bucket continuity and timezone/DST fixtures pass.
-5. Leakage guards prove every feature source timestamp is at/before cutoff.
-6. Metric unit tests match hand-calculated examples, including zero WAPE.
-7. Baseline and candidate predictions cover the same evaluated population.
-8. Raw prediction row count and checksum are recorded.
+3. Freeze the boundary-tied 95% cumulative train-demand cell population and
+   reuse the exact cell IDs for validation, test, baselines and candidates.
+4. Grid boundary fixtures pass.
+5. Bucket continuity and timezone/DST fixtures pass.
+6. Leakage guards prove every feature source timestamp is at/before cutoff.
+7. Metric unit tests match hand-calculated examples, including zero WAPE.
+8. Baseline and candidate predictions cover the same evaluated population.
+9. Raw prediction row count and checksum are recorded.
 
 Failure stops the reported run; failed artifacts are retained with status.
 

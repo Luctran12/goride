@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import tempfile
 import unittest
 from datetime import datetime, timezone
@@ -175,7 +176,24 @@ class FeaturePipelineTests(unittest.TestCase):
             )
             self.assertTrue((first_directory / "feature-dictionary.json").is_file())
             self.assertTrue((first_directory / "feature-manifest.json").is_file())
+            self.assertTrue((first_directory / "cell-eligibility.json").is_file())
             self.assertTrue((first_directory / "checksums.sha256").is_file())
+            self.assertEqual(len(outcomes[0].artifact.partitions), 1)
+            self.assertTrue(
+                (
+                    first_directory
+                    / "demand-features"
+                    / "target_month=2013-07"
+                    / "part-00000.parquet"
+                ).is_file()
+            )
+            manifest = json.loads(
+                (first_directory / "feature-manifest.json").read_text(
+                    encoding="utf-8"
+                )
+            )
+            self.assertEqual(manifest["partitionBy"], "target_month_utc")
+            self.assertEqual(manifest["rowCount"], 6)
 
     def test_snapshot_checksum_tampering_is_rejected_before_build(self) -> None:
         start = datetime(2013, 7, 1, tzinfo=timezone.utc)

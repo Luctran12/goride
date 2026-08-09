@@ -20,7 +20,7 @@ from ..database import (
     verify_database,
 )
 from ..errors import AnalyticsError, DataQualityError, ExtractionError
-from ..hashing import file_sha256
+from ..hashing import canonical_mapping_sha256, file_sha256
 from ..runs import (
     RunIdentity,
     allocate_run_directory,
@@ -37,12 +37,37 @@ from .builder import (
     iter_feature_rows,
 )
 from .grid import GridDefinition
+from .planning import FeaturePartitionPlan, build_feature_plan
 from .snapshot import ExtractionSnapshot
-from .spool import FeatureArtifact, FeatureSpool
+from .spool import FeatureArtifact, FeatureSpool, iter_parquet_rows
 from .supply import load_supply_series
 
 
 _COMMIT_HASH = re.compile(r"^(?:[0-9a-f]{40}|[0-9a-f]{64})$")
+
+
+@dataclass(frozen=True)
+class FeaturePartitionArtifact:
+    plan: FeaturePartitionPlan
+    artifact: FeatureArtifact
+
+    def to_dict(self, root: Path) -> dict[str, object]:
+        return {
+            **self.plan.to_dict(),
+            "bytes": self.artifact.byte_count,
+            "file": self.artifact.path.relative_to(root).as_posix(),
+            "rows": self.artifact.row_count,
+            "sha256": self.artifact.sha256,
+        }
+
+
+@dataclass(frozen=True)
+class FeatureDatasetArtifact:
+    path: Path
+    partitions: tuple[FeaturePartitionArtifact, ...]
+    row_count: int
+    byte_count: int
+    sha256: str
 
 
 @dataclass(frozen=True)
@@ -51,7 +76,7 @@ class FeatureBuildOutcome:
     processing_run_id: UUID
     feature_artifact_id: UUID
     feature_set_version: str
-    artifact: FeatureArtifact
+    artifact: FeatureDatasetArtifact
     quality: FeatureQualityReport
     attempt_no: int
     run_directory: Path
@@ -64,7 +89,8 @@ class FeatureBuildOutcome:
                 "bytes": self.artifact.byte_count,
                 "featureArtifactId": str(self.feature_artifact_id),
                 "featureSetVersion": self.feature_set_version,
-                "file": self.artifact.path.name,
+                "directory": self.artifact.path.name,
+                "partitions": len(self.artifact.partitions),
                 "rows": self.artifact.row_count,
                 "sha256": self.artifact.sha256,
             },
@@ -94,6 +120,22 @@ def _write_checksums(directory: Path) -> None:
     temporary = directory / ".checksums.sha256.tmp"
     temporary.write_text(content, encoding="utf-8")
     os.replace(temporary, directory / "checksums.sha256")
+
+
+def _dataset_artifact(
+    path: Path,
+    partitions: list[FeaturePartitionArtifact],
+    *,
+    run_directory: Path,
+) -> FeatureDatasetArtifact:
+    values = [item.to_dict(run_directory) for item in partitions]
+    return FeatureDatasetArtifact(
+        path=path,
+        partitions=tuple(partitions),
+        row_count=sum(item.artifact.row_count for item in partitions),
+        byte_count=sum(item.artifact.byte_count for item in partitions),
+        sha256=canonical_mapping_sha256({"partitions": values}),
+    )
 
 
 def _analytics_root(config: ProcessingConfig, environment: Mapping[str, str]) -> Path:
@@ -126,12 +168,26 @@ def _dictionary_payload(config: ProcessingConfig) -> dict[str, object]:
             "policy": "missing history is null; continuous complete buckets are zero",
             "quality": "WARN when coverage_ratio < 1",
         },
+        "cellEligibility": {
+            "includeBoundaryTies": True,
+            "requestedTrainingDemandCoverage": (
+                config.features.training_demand_coverage
+            ),
+            "selectionData": "training split only",
+        },
         "demandLags": list(config.features.demand_lags),
         "neighbor": {
             "enabled": config.features.include_spatial_neighbors,
             "meaning": "sum of lag-1 demand across eight adjacent square cells",
         },
         "rollingWindows": list(config.features.rolling_windows),
+        "partitioning": {
+            "dimension": config.artifacts.feature_partition,
+            "maximumRowsPerPartition": (
+                config.artifacts.maximum_rows_per_partition
+            ),
+            "maximumRowsPerRun": config.artifacts.maximum_rows_per_run,
+        },
         "supply": {
             "enabled": config.features.include_supply_features,
             "meaning": "sum of available drivers at the previous closed area bucket",
@@ -195,7 +251,7 @@ def run_feature_build(
     terminal = False
     rows_built = 0
     input_rows = 0
-    spool_path = run_directory / ".feature-spool.sqlite3"
+    spool_paths: set[Path] = set()
     try:
         settings = DatabaseSettings.from_environment(environment)
         write_connection = connection_factory(settings, read_only=False)
@@ -213,7 +269,15 @@ def run_feature_build(
                 "extractionRun": snapshot.run_directory.name,
                 "featureArtifactId": str(deterministic_artifact_id),
                 "featureSetVersion": version,
+                "featurePartition": config.artifacts.feature_partition,
+                "maximumRowsPerPartition": (
+                    config.artifacts.maximum_rows_per_partition
+                ),
+                "maximumRowsPerRun": config.artifacts.maximum_rows_per_run,
                 "sourceSnapshotSha256": snapshot.snapshot_sha256,
+                "trainingDemandCoverage": (
+                    config.features.training_demand_coverage
+                ),
             },
         )
         started = True
@@ -237,85 +301,145 @@ def run_feature_build(
             bucket_minutes=config.temporal.bucket_minutes,
         )
         input_rows = cube.stats.input_events
-        with FeatureSpool(spool_path) as spool:
-            for row in iter_feature_rows(
-                cube,
-                config,
-                grid=grid,
-                version=version,
-                snapshot_sha256=snapshot.snapshot_sha256,
-                feature_artifact_id=deterministic_artifact_id,
-                supply=supply,
-            ):
-                spool.add(row)
-            cube.stats.duplicate_feature_rows = spool.duplicate_rows
-            rows_built = spool.count()
-            quality = build_feature_quality(
-                cube.stats,
-                expected_buckets=cube.bucket_count,
-                include_supply=config.features.include_supply_features,
-            )
-            artifact = spool.export_parquet(
-                run_directory / "demand-features.parquet",
-                compression=config.artifacts.compression,
-            )
-            _write_json(run_directory / "feature-quality.json", quality.to_dict())
-            _write_json(
-                run_directory / "feature-manifest.json",
-                {
-                    "cellCount": len(cube.cells),
-                    "cellSizeMeters": selected_cell_size,
-                    "featureArtifactId": str(deterministic_artifact_id),
-                    "featureSetVersion": version,
-                    "fromUtc": snapshot.from_utc.isoformat().replace("+00:00", "Z"),
-                    "gridOriginMeters": {
-                        "x": config.spatial.grid_origin_x_meters,
-                        "y": config.spatial.grid_origin_y_meters,
-                    },
-                    "gridVersion": config.spatial.grid_version,
-                    "projectedSrid": config.spatial.projected_srid,
-                    "qualityStatus": quality.overall_status,
-                    "rowCount": artifact.row_count,
-                    "sha256": artifact.sha256,
-                    "sourceCutoffUtc": snapshot.cutoff_utc.isoformat().replace(
-                        "+00:00", "Z"
-                    ),
-                    "sourceSnapshotSha256": snapshot.snapshot_sha256,
-                    "studyBoundsWgs84": dict(
-                        config.spatial.study_bounds_wgs84.__dict__
-                    ),
-                },
-            )
-            run_repository.save_quality(db_run_id, quality.results)
-            if quality.failed_rules:
-                run_repository.fail(
-                    db_run_id,
-                    rows_read=input_rows,
-                    rows_written=rows_built,
-                    error_code="DATA_QUALITY_FAILED",
-                    error_message="FAIL rules: " + ", ".join(quality.failed_rules),
+        plan = build_feature_plan(cube, config)
+        eligibility_payload = {
+            **plan.eligibility.to_dict(),
+            "selectedCellIds": [
+                cube.cells[key].cell_id
+                for key in plan.eligibility.selected_cell_keys
+            ],
+        }
+        _write_json(
+            run_directory / "cell-eligibility.json",
+            eligibility_payload,
+        )
+        features_directory = run_directory / "demand-features"
+        features_directory.mkdir()
+        partition_artifacts: list[FeaturePartitionArtifact] = []
+        for partition in plan.partitions:
+            spool_path = run_directory / f".feature-spool-{partition.key}.sqlite3"
+            spool_paths.add(spool_path)
+            with FeatureSpool(spool_path) as spool:
+                for row in iter_feature_rows(
+                    cube,
+                    config,
+                    grid=grid,
+                    version=version,
+                    snapshot_sha256=snapshot.snapshot_sha256,
+                    feature_artifact_id=deterministic_artifact_id,
+                    supply=supply,
+                    selected_cell_keys=plan.eligibility.selected_cell_keys,
+                    target_from_utc=partition.target_from_utc,
+                    target_to_utc=partition.target_to_utc,
+                ):
+                    spool.add(row)
+                cube.stats.duplicate_feature_rows += spool.duplicate_rows
+                partition_rows = spool.count()
+                if partition_rows != partition.projected_rows:
+                    raise ExtractionError(
+                        "FEATURE_PARTITION_COUNT_MISMATCH",
+                        "Generated partition row count differs from its cost plan",
+                        {
+                            "actualRows": partition_rows,
+                            "partition": partition.key,
+                            "projectedRows": partition.projected_rows,
+                        },
+                    )
+                partition_directory = (
+                    features_directory / f"target_month={partition.key}"
                 )
-                terminal = True
-                _write_checksums(run_directory)
-                raise DataQualityError(quality.failed_rules, str(db_run_id))
+                partition_directory.mkdir()
+                partition_artifacts.append(
+                    FeaturePartitionArtifact(
+                        partition,
+                        spool.export_parquet(
+                            partition_directory / "part-00000.parquet",
+                            compression=config.artifacts.compression,
+                        ),
+                    )
+                )
+            spool_path.unlink(missing_ok=True)
+            spool_paths.discard(spool_path)
+        artifact = _dataset_artifact(
+            features_directory,
+            partition_artifacts,
+            run_directory=run_directory,
+        )
+        rows_built = artifact.row_count
+        if rows_built != plan.projected_rows:
+            raise ExtractionError(
+                "FEATURE_RUN_COUNT_MISMATCH",
+                "Generated feature-row count differs from the cost plan",
+                {"actualRows": rows_built, "projectedRows": plan.projected_rows},
+            )
+        quality = build_feature_quality(
+            cube.stats,
+            expected_buckets=cube.bucket_count,
+            include_supply=config.features.include_supply_features,
+        )
+        _write_json(run_directory / "feature-quality.json", quality.to_dict())
+        _write_json(
+            run_directory / "feature-manifest.json",
+            {
+                "cellEligibility": plan.eligibility.to_dict(),
+                "cellSizeMeters": selected_cell_size,
+                "featureArtifactId": str(deterministic_artifact_id),
+                "featureSetVersion": version,
+                "fromUtc": snapshot.from_utc.isoformat().replace("+00:00", "Z"),
+                "gridOriginMeters": {
+                    "x": config.spatial.grid_origin_x_meters,
+                    "y": config.spatial.grid_origin_y_meters,
+                },
+                "gridVersion": config.spatial.grid_version,
+                "partitionBy": config.artifacts.feature_partition,
+                "partitions": [
+                    item.to_dict(run_directory) for item in artifact.partitions
+                ],
+                "projectedSrid": config.spatial.projected_srid,
+                "qualityStatus": quality.overall_status,
+                "rowCount": artifact.row_count,
+                "sha256": artifact.sha256,
+                "sourceCutoffUtc": snapshot.cutoff_utc.isoformat().replace(
+                    "+00:00", "Z"
+                ),
+                "sourceSnapshotSha256": snapshot.snapshot_sha256,
+                "studyBoundsWgs84": dict(
+                    config.spatial.study_bounds_wgs84.__dict__
+                ),
+            },
+        )
+        run_repository.save_quality(db_run_id, quality.results)
+        if quality.failed_rules:
+            run_repository.fail(
+                db_run_id,
+                rows_read=input_rows,
+                rows_written=rows_built,
+                error_code="DATA_QUALITY_FAILED",
+                error_message="FAIL rules: " + ", ".join(quality.failed_rules),
+            )
+            terminal = True
             _write_checksums(run_directory)
-            feature_repository = feature_repository_factory(write_connection)
-            with write_connection.transaction():
-                persisted = feature_repository.upsert(
-                    spool.rows(),
+            raise DataQualityError(quality.failed_rules, str(db_run_id))
+        _write_checksums(run_directory)
+        feature_repository = feature_repository_factory(write_connection)
+        persisted = 0
+        with write_connection.transaction():
+            for partition in artifact.partitions:
+                persisted += feature_repository.upsert(
+                    iter_parquet_rows(partition.artifact.path),
                     created_by_run_id=db_run_id,
                 )
-                if persisted != rows_built:
-                    raise ExtractionError(
-                        "FEATURE_PERSIST_COUNT_MISMATCH",
-                        "Persisted feature-row count differs from the artifact",
-                        {"artifactRows": rows_built, "persistedRows": persisted},
-                    )
-                run_repository.succeed(
-                    db_run_id,
-                    rows_read=input_rows,
-                    rows_written=rows_built,
+            if persisted != rows_built:
+                raise ExtractionError(
+                    "FEATURE_PERSIST_COUNT_MISMATCH",
+                    "Persisted feature-row count differs from the artifact",
+                    {"artifactRows": rows_built, "persistedRows": persisted},
                 )
+            run_repository.succeed(
+                db_run_id,
+                rows_read=input_rows,
+                rows_written=rows_built,
+            )
         terminal = True
         return FeatureBuildOutcome(
             artifact_run_id=identity.run_id,
@@ -373,7 +497,8 @@ def run_feature_build(
         _write_checksums(run_directory)
         raise wrapped from error
     finally:
-        spool_path.unlink(missing_ok=True)
+        for spool_path in spool_paths:
+            spool_path.unlink(missing_ok=True)
         if supply_connection is not None:
             supply_connection.close()
         if write_connection is not None:

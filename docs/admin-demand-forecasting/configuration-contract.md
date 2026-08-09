@@ -160,6 +160,32 @@ An empty Porto `POLYLINE` is classified as missing trajectory and excluded with
 `DQ_INVALID_PICKUP` failures. This distinction prevents an expected absence
 from weakening the coordinate-validity gate.
 
+### Frozen cell population and cost guards
+
+The Porto primary experiment uses `training_demand_coverage: 0.95`. Cell demand
+is counted only inside the chronological train split, ranked descending and
+selected until cumulative demand reaches 95%. Every cell tied with the boundary
+count is included. Validation/test observations cannot add or remove cells.
+`goride-local` uses `1.0` (`ALL_OBSERVED`) until an operational training split
+is approved.
+
+Feature artifacts are partitioned by target bucket UTC calendar month:
+
+```yaml
+features:
+  training_demand_coverage: 0.95
+
+artifacts:
+  feature_partition: target_month_utc
+  maximum_rows_per_partition: 1500000
+  maximum_rows_per_run: 15000000
+```
+
+The builder computes exact projected row counts after aggregation and cell
+selection. It fails before materialization when either guard is exceeded. A run
+manifest records requested/achieved coverage, train boundaries, boundary event
+count, selected cell IDs and every partition checksum/count.
+
 ## 5. Run directory
 
 Each invocation creates a new directory:

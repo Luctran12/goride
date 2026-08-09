@@ -59,6 +59,7 @@ def valid_config_mapping() -> dict[str, Any]:
         "features": {
             "demand_lags": [1, 4, 96, 672],
             "rolling_windows": [4, 96, 672],
+            "training_demand_coverage": 0.95,
             "include_temporal_features": True,
             "include_spatial_neighbors": True,
             "include_supply_features": False,
@@ -82,6 +83,9 @@ def valid_config_mapping() -> dict[str, Any]:
         "artifacts": {
             "feature_format": "parquet",
             "compression": "zstd",
+            "feature_partition": "target_month_utc",
+            "maximum_rows_per_partition": 1_500_000,
+            "maximum_rows_per_run": 15_000_000,
             "write_raw_predictions": True,
             "write_run_manifest": True,
             "checksum_algorithm": "sha256",

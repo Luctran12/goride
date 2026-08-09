@@ -172,13 +172,44 @@ def iter_feature_rows(
     snapshot_sha256: str,
     feature_artifact_id: UUID,
     supply: SupplySeries | None = None,
+    selected_cell_keys: tuple[tuple[int, int], ...] | None = None,
+    target_from_utc: datetime | None = None,
+    target_to_utc: datetime | None = None,
 ) -> Iterator[FeatureRow]:
     bucket = timedelta(minutes=config.temporal.bucket_minutes)
     timezone_name = ZoneInfo(config.temporal.source_timezone)
     lag_values = set(config.features.demand_lags)
     rolling_values = set(config.features.rolling_windows)
     supply = supply or SupplySeries()
-    cells_by_id = sorted(cube.cells.values(), key=lambda item: item.cell_id)
+    selected = set(selected_cell_keys) if selected_cell_keys is not None else None
+    cells_by_id = sorted(
+        (
+            cell
+            for key, cell in cube.cells.items()
+            if selected is None or key in selected
+        ),
+        key=lambda item: item.cell_id,
+    )
+    minimum_horizon = min(config.temporal.forecast_horizons_minutes) // (
+        config.temporal.bucket_minutes
+    )
+    maximum_horizon = max(config.temporal.forecast_horizons_minutes) // (
+        config.temporal.bucket_minutes
+    )
+    cutoff_start = 1
+    cutoff_stop = cube.bucket_count
+    if target_from_utc is not None:
+        target_from_index = int(
+            (target_from_utc - cube.from_utc).total_seconds()
+            // bucket.total_seconds()
+        )
+        cutoff_start = max(cutoff_start, target_from_index - maximum_horizon)
+    if target_to_utc is not None:
+        target_to_index = int(
+            (target_to_utc - cube.from_utc).total_seconds()
+            // bucket.total_seconds()
+        )
+        cutoff_stop = min(cutoff_stop, target_to_index - minimum_horizon)
     for cell in cells_by_id:
         key = (cell.grid_x, cell.grid_y)
         values = cube.series[key]
@@ -187,7 +218,7 @@ def iter_feature_rows(
         for value in values:
             running += value
             prefix.append(running)
-        for cutoff_index in range(1, cube.bucket_count):
+        for cutoff_index in range(cutoff_start, cutoff_stop):
             inference_cutoff = cube.from_utc + cutoff_index * bucket
             history_coverage = min(
                 cutoff_index / config.quality.minimum_history_buckets,
@@ -230,6 +261,10 @@ def iter_feature_rows(
                 if target_index >= cube.bucket_count:
                     continue
                 target_start = cube.from_utc + target_index * bucket
+                if target_from_utc is not None and target_start < target_from_utc:
+                    continue
+                if target_to_utc is not None and target_start >= target_to_utc:
+                    continue
                 local_target = target_start.astimezone(timezone_name)
                 minute_of_day = local_target.hour * 60 + local_target.minute
                 angle = 2 * math.pi * minute_of_day / (24 * 60)

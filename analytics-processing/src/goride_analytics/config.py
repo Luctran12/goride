@@ -81,6 +81,7 @@ class QualitySettings:
 class FeatureSettings:
     demand_lags: tuple[int, ...]
     rolling_windows: tuple[int, ...]
+    training_demand_coverage: float
     include_temporal_features: bool
     include_spatial_neighbors: bool
     include_supply_features: bool
@@ -105,6 +106,9 @@ class EvaluationSettings:
 class ArtifactSettings:
     feature_format: str
     compression: str
+    feature_partition: str
+    maximum_rows_per_partition: int
+    maximum_rows_per_run: int
     write_raw_predictions: bool
     write_run_manifest: bool
     checksum_algorithm: str
@@ -593,6 +597,7 @@ def load_config(path: str | Path) -> ProcessingConfig:
         {
             "demand_lags",
             "rolling_windows",
+            "training_demand_coverage",
             "include_temporal_features",
             "include_spatial_neighbors",
             "include_supply_features",
@@ -627,9 +632,19 @@ def load_config(path: str | Path) -> ProcessingConfig:
             "CONFIG_TEMPORAL_FEATURES_REQUIRED",
             "Feature schema version 1 requires temporal features",
         )
+    training_demand_coverage = _ratio(
+        features_raw["training_demand_coverage"],
+        "features.training_demand_coverage",
+    )
+    if training_demand_coverage <= 0:
+        raise ConfigurationError(
+            "CONFIG_CELL_COVERAGE_INVALID",
+            "features.training_demand_coverage must be greater than zero",
+        )
     features = FeatureSettings(
         demand_lags=demand_lags,
         rolling_windows=rolling_windows,
+        training_demand_coverage=training_demand_coverage,
         include_temporal_features=include_temporal_features,
         include_spatial_neighbors=_boolean(
             features_raw["include_spatial_neighbors"],
@@ -693,6 +708,11 @@ def load_config(path: str | Path) -> ProcessingConfig:
                 "Train, validation and test intervals must be chronological and non-overlapping",
             )
     evaluation = EvaluationSettings(strategy, metrics, train, validation, test)
+    if features.training_demand_coverage < 1 and evaluation.train is None:
+        raise ConfigurationError(
+            "CONFIG_CELL_ELIGIBILITY_TRAIN_SPLIT_REQUIRED",
+            "Training-demand cell selection requires a frozen train split",
+        )
 
     artifacts_raw = _mapping(root["artifacts"], "artifacts")
     _keys(
@@ -701,6 +721,9 @@ def load_config(path: str | Path) -> ProcessingConfig:
         {
             "feature_format",
             "compression",
+            "feature_partition",
+            "maximum_rows_per_partition",
+            "maximum_rows_per_run",
             "write_raw_predictions",
             "write_run_manifest",
             "checksum_algorithm",
@@ -721,9 +744,34 @@ def load_config(path: str | Path) -> ProcessingConfig:
             "CONFIG_CHECKSUM_ALGORITHM_INVALID",
             "Phase 1 supports only sha256",
         )
+    feature_partition = _string(
+        artifacts_raw["feature_partition"],
+        "artifacts.feature_partition",
+    )
+    if feature_partition != "target_month_utc":
+        raise ConfigurationError(
+            "CONFIG_FEATURE_PARTITION_INVALID",
+            "Phase 4 supports only target_month_utc feature partitions",
+        )
+    maximum_rows_per_partition = _integer(
+        artifacts_raw["maximum_rows_per_partition"],
+        "artifacts.maximum_rows_per_partition",
+    )
+    maximum_rows_per_run = _integer(
+        artifacts_raw["maximum_rows_per_run"],
+        "artifacts.maximum_rows_per_run",
+    )
+    if maximum_rows_per_partition > maximum_rows_per_run:
+        raise ConfigurationError(
+            "CONFIG_FEATURE_COST_GUARD_INVALID",
+            "Partition row guard cannot exceed the run row guard",
+        )
     artifacts = ArtifactSettings(
         feature_format=feature_format,
         compression=compression,
+        feature_partition=feature_partition,
+        maximum_rows_per_partition=maximum_rows_per_partition,
+        maximum_rows_per_run=maximum_rows_per_run,
         write_raw_predictions=_boolean(
             artifacts_raw["write_raw_predictions"],
             "artifacts.write_raw_predictions",

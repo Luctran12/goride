@@ -174,3 +174,26 @@ class FeatureSpool:
 
     def __exit__(self, *_args: object) -> None:
         self.close()
+
+
+def iter_parquet_rows(path: Path, *, batch_size: int = 10_000) -> Iterator[FeatureRow]:
+    try:
+        import pyarrow.parquet as pq
+    except ImportError as error:
+        raise ExtractionError(
+            "FEATURE_RUNTIME_MISSING",
+            "pyarrow is required to read feature Parquet artifacts",
+        ) from error
+    try:
+        parquet = pq.ParquetFile(path)
+        for batch in parquet.iter_batches(batch_size=batch_size):
+            for value in batch.to_pylist():
+                yield FeatureRow.from_dict(value)
+    except ExtractionError:
+        raise
+    except Exception as error:
+        raise ExtractionError(
+            "FEATURE_PARTITION_READ_FAILED",
+            "Could not read a generated feature partition",
+            {"file": path.name},
+        ) from error

@@ -63,15 +63,21 @@ class FeatureRow:
     @classmethod
     def from_storage_json(cls, payload: str) -> FeatureRow:
         value = json.loads(payload)
+        return cls.from_dict(value)
+
+    @classmethod
+    def from_dict(cls, value: dict[str, Any]) -> FeatureRow:
+        value = dict(value)
         for key in (
             "bucket_start_utc",
             "inference_cutoff_utc",
             "target_bucket_start_utc",
             "max_feature_source_time_utc",
         ):
-            if value[key] is not None:
+            if isinstance(value[key], str):
                 value[key] = datetime.fromisoformat(value[key].replace("Z", "+00:00"))
-        value["feature_artifact_id"] = UUID(value["feature_artifact_id"])
+        if not isinstance(value["feature_artifact_id"], UUID):
+            value["feature_artifact_id"] = UUID(value["feature_artifact_id"])
         return cls(**value)
 
     def to_dict(self) -> dict[str, Any]:

@@ -42,6 +42,7 @@ quality:
 features:
   demand_lags: [1, 2, 4, 96, 672]
   rolling_windows: [4, 12, 96, 672]
+  training_demand_coverage: 1.0
   include_temporal_features: true
   include_spatial_neighbors: true
   include_supply_features: true
@@ -53,6 +54,9 @@ evaluation:
 artifacts:
   feature_format: parquet
   compression: zstd
+  feature_partition: target_month_utc
+  maximum_rows_per_partition: 1500000
+  maximum_rows_per_run: 15000000
   write_raw_predictions: true
   write_run_manifest: true
   checksum_algorithm: sha256

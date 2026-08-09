@@ -226,6 +226,11 @@ train-only cell population and time-partition/cost-guard design. The recommended
 population is 95% cumulative training demand because it is leakage-safe,
 methodologically explicit and reduces projected rows by 89.2%.
 
+User approval: 2026-08-09. Freeze 95% cumulative train-demand coverage with
+boundary ties, UTC calendar-month partitions, a 1,500,000-row partition guard
+and a 15,000,000-row run guard. The corrective commit must preserve atomic
+database publication and record the selected population in artifact evidence.
+
 ---
 
 ## 7. Next Expected Work

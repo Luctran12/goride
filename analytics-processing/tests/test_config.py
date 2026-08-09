@@ -23,6 +23,8 @@ class ProcessingConfigTests(unittest.TestCase):
         self.assertEqual(first.spatial.grid_version, "square-zero-floor-v1")
         self.assertEqual(first.spatial.grid_origin_x_meters, 0)
         self.assertEqual(first.quality.maximum_duplicate_ratio, 0.001)
+        self.assertEqual(first.features.training_demand_coverage, 0.95)
+        self.assertEqual(first.artifacts.feature_partition, "target_month_utc")
         self.assertEqual(first.temporal.forecast_horizons_minutes, (15, 30, 60))
         self.assertFalse(first.features.include_supply_features)
 
@@ -135,6 +137,28 @@ class ProcessingConfigTests(unittest.TestCase):
             with self.assertRaises(ConfigurationError) as raised:
                 load_config(write_config(Path(temporary) / "profile.yml", mapping))
         self.assertEqual(raised.exception.code, "CONFIG_VALUE_INVALID")
+
+    def test_rejects_unbounded_or_inconsistent_feature_cost_guards(self) -> None:
+        mapping = valid_config_mapping()
+        mapping["artifacts"]["maximum_rows_per_partition"] = 101
+        mapping["artifacts"]["maximum_rows_per_run"] = 100
+        with tempfile.TemporaryDirectory() as temporary:
+            with self.assertRaises(ConfigurationError) as raised:
+                load_config(write_config(Path(temporary) / "profile.yml", mapping))
+        self.assertEqual(raised.exception.code, "CONFIG_FEATURE_COST_GUARD_INVALID")
+
+    def test_train_demand_coverage_requires_train_split(self) -> None:
+        mapping = valid_config_mapping()
+        mapping["evaluation"].pop("train")
+        mapping["evaluation"].pop("validation")
+        mapping["evaluation"].pop("test")
+        with tempfile.TemporaryDirectory() as temporary:
+            with self.assertRaises(ConfigurationError) as raised:
+                load_config(write_config(Path(temporary) / "profile.yml", mapping))
+        self.assertEqual(
+            raised.exception.code,
+            "CONFIG_CELL_ELIGIBILITY_TRAIN_SPLIT_REQUIRED",
+        )
 
 
 if __name__ == "__main__":
