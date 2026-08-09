@@ -140,6 +140,13 @@ one metric without a dimension.
 - The study-area bounds are derived once during profiling, reviewed and frozen
   in a versioned manifest before reported experiments.
 
+Version 1 freezes `square-zero-floor-v1`: projected X/Y are divided from a
+zero-metre origin and assigned with `floor`. The Porto WGS84 study bounds are
+longitude `[-8.75, -8.45)` and latitude `[41.05, 41.30)`; the GoRide-local
+bounds are longitude `[106.45, 107.05)` and latitude `[10.55, 11.05)`. The
+minimum edge is inclusive and the maximum edge is exclusive. These bounds are
+part of the versioned profile and must not be inferred again during a run.
+
 ## 7. Target definition
 
 For cell `c` and target bucket `b`:

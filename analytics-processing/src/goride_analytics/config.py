@@ -16,6 +16,8 @@ from .hashing import canonical_mapping_sha256
 _ENV_NAME = re.compile(r"^[A-Z][A-Z0-9_]*$")
 _SAFE_SLUG = re.compile(r"^[a-z0-9][a-z0-9-]*$")
 _METRICS = {"MAE", "RMSE", "WAPE"}
+_DEMAND_LAGS = {1, 2, 4, 96, 672}
+_ROLLING_WINDOWS = {4, 12, 96, 672}
 
 
 @dataclass(frozen=True)
@@ -38,9 +40,21 @@ class DatasetSettings:
 
 
 @dataclass(frozen=True)
+class StudyBounds:
+    minimum_longitude: float
+    minimum_latitude: float
+    maximum_longitude: float
+    maximum_latitude: float
+
+
+@dataclass(frozen=True)
 class SpatialSettings:
     source_srid: int
     projected_srid: int
+    grid_version: str
+    grid_origin_x_meters: float
+    grid_origin_y_meters: float
+    study_bounds_wgs84: StudyBounds
     primary_cell_size_meters: int
     evaluation_cell_sizes_meters: tuple[int, ...]
 
@@ -160,6 +174,23 @@ def _integer(value: Any, path: str, minimum: int = 1) -> int:
             {"path": path},
         )
     return value
+
+
+def _number(value: Any, path: str) -> float:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise ConfigurationError(
+            "CONFIG_VALUE_INVALID",
+            f"{path} must be a finite number",
+            {"path": path},
+        )
+    result = float(value)
+    if not (-float("inf") < result < float("inf")):
+        raise ConfigurationError(
+            "CONFIG_VALUE_INVALID",
+            f"{path} must be a finite number",
+            {"path": path},
+        )
+    return result
 
 
 def _boolean(value: Any, path: str) -> bool:
@@ -355,6 +386,10 @@ def load_config(path: str | Path) -> ProcessingConfig:
         {
             "source_srid",
             "projected_srid",
+            "grid_version",
+            "grid_origin_x_meters",
+            "grid_origin_y_meters",
+            "study_bounds_wgs84",
             "primary_cell_size_meters",
             "evaluation_cell_sizes_meters",
         },
@@ -373,11 +408,68 @@ def load_config(path: str | Path) -> ProcessingConfig:
             "Primary cell size must be included in evaluation cell sizes",
             {"primaryCellSizeMeters": primary_cell_size},
         )
+    grid_version = _string(spatial_raw["grid_version"], "spatial.grid_version")
+    if not _SAFE_SLUG.fullmatch(grid_version):
+        raise ConfigurationError(
+            "CONFIG_GRID_VERSION_INVALID",
+            "spatial.grid_version must be a lowercase safe slug",
+            {"gridVersion": grid_version},
+        )
+    bounds_raw = _mapping(
+        spatial_raw["study_bounds_wgs84"],
+        "spatial.study_bounds_wgs84",
+    )
+    _keys(
+        bounds_raw,
+        "spatial.study_bounds_wgs84",
+        {
+            "minimum_longitude",
+            "minimum_latitude",
+            "maximum_longitude",
+            "maximum_latitude",
+        },
+    )
+    bounds = StudyBounds(
+        minimum_longitude=_number(
+            bounds_raw["minimum_longitude"],
+            "spatial.study_bounds_wgs84.minimum_longitude",
+        ),
+        minimum_latitude=_number(
+            bounds_raw["minimum_latitude"],
+            "spatial.study_bounds_wgs84.minimum_latitude",
+        ),
+        maximum_longitude=_number(
+            bounds_raw["maximum_longitude"],
+            "spatial.study_bounds_wgs84.maximum_longitude",
+        ),
+        maximum_latitude=_number(
+            bounds_raw["maximum_latitude"],
+            "spatial.study_bounds_wgs84.maximum_latitude",
+        ),
+    )
+    if not (
+        -180 <= bounds.minimum_longitude < bounds.maximum_longitude <= 180
+        and -90 <= bounds.minimum_latitude < bounds.maximum_latitude <= 90
+    ):
+        raise ConfigurationError(
+            "CONFIG_STUDY_BOUNDS_INVALID",
+            "WGS84 study bounds must be ordered and within longitude/latitude limits",
+        )
     spatial = SpatialSettings(
         source_srid=_integer(spatial_raw["source_srid"], "spatial.source_srid"),
         projected_srid=_integer(
             spatial_raw["projected_srid"], "spatial.projected_srid"
         ),
+        grid_version=grid_version,
+        grid_origin_x_meters=_number(
+            spatial_raw["grid_origin_x_meters"],
+            "spatial.grid_origin_x_meters",
+        ),
+        grid_origin_y_meters=_number(
+            spatial_raw["grid_origin_y_meters"],
+            "spatial.grid_origin_y_meters",
+        ),
+        study_bounds_wgs84=bounds,
         primary_cell_size_meters=primary_cell_size,
         evaluation_cell_sizes_meters=cell_sizes,
     )
@@ -493,18 +585,35 @@ def load_config(path: str | Path) -> ProcessingConfig:
     rolling_windows = _integer_tuple(
         features_raw["rolling_windows"], "features.rolling_windows"
     )
+    unsupported_lags = sorted(set(demand_lags) - _DEMAND_LAGS)
+    unsupported_windows = sorted(set(rolling_windows) - _ROLLING_WINDOWS)
+    if unsupported_lags or unsupported_windows:
+        raise ConfigurationError(
+            "CONFIG_FEATURE_WINDOW_UNSUPPORTED",
+            "Demand lags and rolling windows must map to the frozen feature schema",
+            {
+                "unsupportedDemandLags": unsupported_lags,
+                "unsupportedRollingWindows": unsupported_windows,
+            },
+        )
     if quality.minimum_history_buckets < max((*demand_lags, *rolling_windows)):
         raise ConfigurationError(
             "CONFIG_HISTORY_TOO_SHORT",
             "minimum_history_buckets must cover every lag and rolling window",
         )
+    include_temporal_features = _boolean(
+        features_raw["include_temporal_features"],
+        "features.include_temporal_features",
+    )
+    if not include_temporal_features:
+        raise ConfigurationError(
+            "CONFIG_TEMPORAL_FEATURES_REQUIRED",
+            "Feature schema version 1 requires temporal features",
+        )
     features = FeatureSettings(
         demand_lags=demand_lags,
         rolling_windows=rolling_windows,
-        include_temporal_features=_boolean(
-            features_raw["include_temporal_features"],
-            "features.include_temporal_features",
-        ),
+        include_temporal_features=include_temporal_features,
         include_spatial_neighbors=_boolean(
             features_raw["include_spatial_neighbors"],
             "features.include_spatial_neighbors",

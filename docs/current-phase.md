@@ -1,6 +1,6 @@
 # GoRide Current Phase
 
-> Last updated: 2026-08-08, Asia/Ho_Chi_Minh
+> Last updated: 2026-08-09, Asia/Ho_Chi_Minh
 >
 > Purpose: source of truth before starting or reviewing the next backend commit.
 
@@ -22,35 +22,34 @@
 
 ---
 
-## 2. Active Phase Ready For Review
+## 2. Active Phase
 
-Phase 3 — Deterministic extraction and data quality from
+Phase 4 — Spatial-temporal aggregation and feature pipeline from
 [`admin-analytics-processing-layer-implementation-plan.md`](admin-analytics-processing-layer-implementation-plan.md).
 
-User approval to start Phase 3: 2026-08-08.
+User approval to start Phase 4: 2026-08-09.
 
-Completed commit:
+Planned commit:
 
 ```text
-3ead9e1 feat: add deterministic extraction and data quality gates
+feat: build versioned spatio-temporal demand features
 ```
 
 Scope:
 
-- implement bounded Porto ZIP/CSV and GoRide PostgreSQL source adapters;
-- emit the frozen canonical demand-event schema without passenger, driver,
-  payment, taxi or full-trajectory fields;
-- create deterministic snapshot UUID/checksum and stable row ordering;
-- implement Phase 3 quality rules with PASS/WARN/FAIL metrics;
-- stop promotion on FAIL while retaining run, quality and failure evidence;
-- persist processing lifecycle and quality results to the Phase 2 schema;
-- write dataset/run/quality/checksum artifacts outside Git;
-- prove repeated extraction checksum, cutoff isolation and read-only bounded SQL.
+- freeze grid version, zero-origin floor rule and profile study-area bounds;
+- aggregate canonical demand into continuous 15-minute cell buckets;
+- build calendar, demand lag, trailing rolling and spatial-neighbor features;
+- add optional cutoff-safe GoRide supply lag with visible coverage;
+- emit a versioned feature dictionary, manifest and deterministic Parquet;
+- enforce leakage, bucket continuity, grid assignment and coverage gates;
+- persist FEATURE_BUILD lifecycle, quality evidence and idempotent feature rows;
+- prove boundary, empty-bucket, DST, uniqueness and checksum behavior.
 
-Out of scope for Phase 3:
+Out of scope for Phase 4:
 
-- spatial grid aggregation and bucket materialization;
-- feature computation, model fitting, evaluation or prediction;
+- baseline/candidate model fitting, evaluation or prediction;
+- model registry and scheduled inference;
 - Spring forecast APIs;
 - frontend forecast screens.
 
@@ -143,10 +142,10 @@ isolation and ensured typed/unexpected failures try to close the DB lifecycle.
 
 ## 6. Next Expected Work
 
-Phase 3 stops at this user review gate. Phase 4 may add
-spatial-temporal aggregation and features only after deterministic snapshot,
-cutoff, quality and persistence evidence are approved. Full Porto validation
-requires this field in the external dataset manifest:
+After implementation, Phase 4 must stop at a user review gate. Phase 5 may add
+historical-mean and seasonal-naive baselines with walk-forward evaluation only
+after feature leakage, determinism and persistence evidence are approved. Full
+Porto validation still requires this field in the external dataset manifest:
 
 ```json
 "sourceRelativePath": "raw/porto-taxi/v1/train.csv.zip"

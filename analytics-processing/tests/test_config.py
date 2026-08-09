@@ -20,6 +20,8 @@ class ProcessingConfigTests(unittest.TestCase):
         self.assertEqual(first.config_hash, second.config_hash)
         self.assertEqual(first.profile.random_seed, 5537)
         self.assertEqual(first.spatial.projected_srid, 3763)
+        self.assertEqual(first.spatial.grid_version, "square-zero-floor-v1")
+        self.assertEqual(first.spatial.grid_origin_x_meters, 0)
         self.assertEqual(first.temporal.forecast_horizons_minutes, (15, 30, 60))
         self.assertFalse(first.features.include_supply_features)
 
@@ -85,6 +87,45 @@ class ProcessingConfigTests(unittest.TestCase):
         self.assertEqual(goride.profile.name, "goride-local")
         self.assertEqual(goride.dataset.source_type, "postgresql")
         self.assertTrue(goride.features.include_supply_features)
+        self.assertEqual(porto.spatial.study_bounds_wgs84.minimum_longitude, -8.75)
+
+    def test_rejects_invalid_or_unbounded_study_area(self) -> None:
+        mapping = valid_config_mapping()
+        mapping["spatial"]["study_bounds_wgs84"]["maximum_longitude"] = -9
+        with tempfile.TemporaryDirectory() as temporary:
+            with self.assertRaises(ConfigurationError) as raised:
+                load_config(write_config(Path(temporary) / "profile.yml", mapping))
+        self.assertEqual(raised.exception.code, "CONFIG_STUDY_BOUNDS_INVALID")
+
+    def test_rejects_unsafe_grid_version(self) -> None:
+        mapping = valid_config_mapping()
+        mapping["spatial"]["grid_version"] = "../../grid"
+        with tempfile.TemporaryDirectory() as temporary:
+            with self.assertRaises(ConfigurationError) as raised:
+                load_config(write_config(Path(temporary) / "profile.yml", mapping))
+        self.assertEqual(raised.exception.code, "CONFIG_GRID_VERSION_INVALID")
+
+    def test_rejects_feature_windows_not_represented_in_frozen_schema(self) -> None:
+        mapping = valid_config_mapping()
+        mapping["features"]["demand_lags"] = [1, 3]
+        with tempfile.TemporaryDirectory() as temporary:
+            with self.assertRaises(ConfigurationError) as raised:
+                load_config(write_config(Path(temporary) / "profile.yml", mapping))
+        self.assertEqual(
+            raised.exception.code,
+            "CONFIG_FEATURE_WINDOW_UNSUPPORTED",
+        )
+
+    def test_rejects_disabling_required_temporal_feature_schema(self) -> None:
+        mapping = valid_config_mapping()
+        mapping["features"]["include_temporal_features"] = False
+        with tempfile.TemporaryDirectory() as temporary:
+            with self.assertRaises(ConfigurationError) as raised:
+                load_config(write_config(Path(temporary) / "profile.yml", mapping))
+        self.assertEqual(
+            raised.exception.code,
+            "CONFIG_TEMPORAL_FEATURES_REQUIRED",
+        )
 
 
 if __name__ == "__main__":

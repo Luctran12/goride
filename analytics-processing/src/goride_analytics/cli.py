@@ -8,6 +8,7 @@ from typing import Any, Callable, Sequence, TextIO
 from .config import load_config
 from .errors import AnalyticsError, ConfigurationError, ExitCode
 from .extraction.pipeline import parse_utc_boundary, run_extraction
+from .features.pipeline import run_feature_build
 from .manifest import validate_dataset
 from .runs import build_run_identity
 from .stages import STAGE_COMMANDS, execute_placeholder
@@ -37,7 +38,18 @@ def build_parser() -> argparse.ArgumentParser:
     extract.add_argument("--config", required=True)
     extract.add_argument("--from-utc", required=True)
     extract.add_argument("--cutoff-utc", required=True)
-    for stage in (stage for stage in STAGE_COMMANDS if stage != "extract"):
+    build_features = subparsers.add_parser(
+        "build-features",
+        help="Build versioned leakage-safe spatial-temporal features",
+    )
+    build_features.add_argument("--config", required=True)
+    build_features.add_argument("--extraction-run", required=True)
+    build_features.add_argument("--cell-size-meters", type=int)
+    for stage in (
+        stage
+        for stage in STAGE_COMMANDS
+        if stage not in {"extract", "build-features"}
+    ):
         command = subparsers.add_parser(stage, help=f"Phase-gated {stage} stage")
         command.add_argument("--config", required=True)
     return parser
@@ -74,6 +86,7 @@ def main(
     stdout: TextIO | None = None,
     stderr: TextIO | None = None,
     extraction_runner: Callable[..., Any] = run_extraction,
+    feature_runner: Callable[..., Any] = run_feature_build,
 ) -> int:
     stdout = stdout or sys.stdout
     logger = JsonLogger(stderr or sys.stderr)
@@ -102,6 +115,20 @@ def main(
                 processingRunId=str(outcome.processing_run_id),
                 qualityStatus=outcome.quality.overall_status,
                 snapshotSha256=outcome.snapshot.sha256,
+            )
+        elif args.command == "build-features":
+            outcome = feature_runner(
+                config,
+                extraction_run=args.extraction_run,
+                cell_size_meters=args.cell_size_meters,
+            )
+            logger.info(
+                "analytics_feature_build_completed",
+                artifactRunId=outcome.artifact_run_id,
+                featureSetVersion=outcome.feature_set_version,
+                processingRunId=str(outcome.processing_run_id),
+                qualityStatus=outcome.quality.overall_status,
+                featureSha256=outcome.artifact.sha256,
             )
         elif args.command != "validate-config":
             execute_placeholder(args.command)

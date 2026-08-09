@@ -30,6 +30,15 @@ def valid_config_mapping() -> dict[str, Any]:
         "spatial": {
             "source_srid": 4326,
             "projected_srid": 3763,
+            "grid_version": "square-zero-floor-v1",
+            "grid_origin_x_meters": 0,
+            "grid_origin_y_meters": 0,
+            "study_bounds_wgs84": {
+                "minimum_longitude": -8.75,
+                "minimum_latitude": 41.05,
+                "maximum_longitude": -8.45,
+                "maximum_latitude": 41.30,
+            },
             "primary_cell_size_meters": 500,
             "evaluation_cell_sizes_meters": [500, 1000],
         },

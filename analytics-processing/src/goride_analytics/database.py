@@ -4,14 +4,24 @@ import json
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Mapping, Protocol, Sequence
+from typing import Any, Iterable, Mapping, Protocol, Sequence
 
 from .errors import DatabaseError
 from .quality import QualityResult
 from .runs import RunIdentity
+from .features.model import FeatureRow
 
 
 PROCESSING_RUN_NAMESPACE = uuid.UUID("30c041c7-f162-4f3c-aad2-e7cfcc7e5190")
+PROCESSING_RUN_TYPES = {
+    "EXTRACTION",
+    "QUALITY",
+    "FEATURE_BUILD",
+    "TRAINING",
+    "EVALUATION",
+    "FORECAST",
+    "ACTUAL_BACKFILL",
+}
 
 
 @dataclass(frozen=True)
@@ -185,6 +195,7 @@ class ProcessingRunRepository(Protocol):
         self,
         *,
         run_id: uuid.UUID,
+        run_type: str,
         identity: RunIdentity,
         source_profile: str,
         dataset_version: str,
@@ -219,12 +230,19 @@ class PostgresProcessingRunRepository:
         self,
         *,
         run_id: uuid.UUID,
+        run_type: str,
         identity: RunIdentity,
         source_profile: str,
         dataset_version: str,
         source_cutoff: datetime,
         input_manifest: Mapping[str, Any],
     ) -> int:
+        if run_type not in PROCESSING_RUN_TYPES:
+            raise DatabaseError(
+                "PROCESSING_RUN_TYPE_INVALID",
+                "Processing run type is not supported",
+                {"runType": run_type},
+            )
         try:
             with self._connection.transaction():
                 with self._connection.cursor() as cursor:
@@ -232,13 +250,14 @@ class PostgresProcessingRunRepository:
                         """
                         SELECT COALESCE(MAX(attempt_no), 0) + 1
                         FROM analytics.processing_runs
-                        WHERE run_type = 'EXTRACTION'
+                        WHERE run_type = %s
                           AND source_profile = %s
                           AND dataset_version = %s
                           AND config_hash = %s
                           AND source_cutoff = %s
                         """,
                         (
+                            run_type,
                             source_profile,
                             dataset_version,
                             identity.config_hash,
@@ -263,13 +282,14 @@ class PostgresProcessingRunRepository:
                             created_at,
                             started_at
                         ) VALUES (
-                            %s, %s, 'EXTRACTION', 'RUNNING', %s, %s, %s,
+                            %s, %s, %s, 'RUNNING', %s, %s, %s,
                             %s, %s, %s::JSONB, %s, %s, CURRENT_TIMESTAMP
                         )
                         """,
                         (
                             run_id,
                             identity.run_id,
+                            run_type,
                             source_profile,
                             dataset_version,
                             source_cutoff,
@@ -284,7 +304,7 @@ class PostgresProcessingRunRepository:
         except Exception as error:
             raise DatabaseError(
                 "PROCESSING_RUN_START_FAILED",
-                "Could not persist the extraction run start",
+                "Could not persist the processing run start",
                 {"processingRunId": str(run_id)},
             ) from error
 
@@ -404,6 +424,130 @@ class PostgresProcessingRunRepository:
         except Exception as error:
             raise DatabaseError(
                 "PROCESSING_RUN_FINISH_FAILED",
-                "Could not persist the extraction run terminal state",
+                "Could not persist the processing run terminal state",
                 {"processingRunId": str(run_id), "status": status},
+            ) from error
+
+
+class PostgresFeatureRepository:
+    def __init__(self, connection: Any) -> None:
+        self._connection = connection
+
+    @staticmethod
+    def _values(row: FeatureRow, created_by_run_id: uuid.UUID) -> tuple[Any, ...]:
+        return (
+            row.feature_set_version,
+            row.source_profile,
+            row.dataset_version,
+            row.demand_event_semantics,
+            row.grid_version,
+            row.projected_srid,
+            row.cell_id,
+            row.grid_x,
+            row.grid_y,
+            row.cell_size_meters,
+            row.bucket_start_utc,
+            row.inference_cutoff_utc,
+            row.target_bucket_start_utc,
+            row.horizon_minutes,
+            row.target_trip_requests,
+            row.lag_1,
+            row.lag_2,
+            row.lag_4,
+            row.lag_96,
+            row.lag_672,
+            row.rolling_mean_4,
+            row.rolling_mean_12,
+            row.rolling_mean_96,
+            row.rolling_mean_672,
+            row.hour_sin,
+            row.hour_cos,
+            row.day_of_week,
+            row.is_weekend,
+            row.neighbor_demand_lag_1,
+            row.available_driver_lag_1,
+            row.coverage_ratio,
+            row.quality_status,
+            created_by_run_id,
+        )
+
+    def upsert(
+        self,
+        rows: Iterable[FeatureRow],
+        *,
+        created_by_run_id: uuid.UUID,
+        batch_size: int = 2_000,
+    ) -> int:
+        statement = """
+            INSERT INTO analytics.demand_features (
+                feature_set_version, source_profile, dataset_version,
+                demand_event_semantics, grid_version, projected_srid,
+                cell_id, grid_x, grid_y, cell_size_meters,
+                bucket_start_utc, inference_cutoff_utc,
+                target_bucket_start_utc, horizon_minutes,
+                target_trip_requests, lag_1, lag_2, lag_4, lag_96, lag_672,
+                rolling_mean_4, rolling_mean_12, rolling_mean_96,
+                rolling_mean_672, hour_sin, hour_cos, day_of_week,
+                is_weekend, neighbor_demand_lag_1, available_driver_lag_1,
+                coverage_ratio, quality_status, created_by_run_id
+            ) VALUES (
+                %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                %s, %s, %s
+            )
+            ON CONFLICT (
+                feature_set_version, source_profile, dataset_version,
+                grid_version, cell_id, bucket_start_utc,
+                inference_cutoff_utc, horizon_minutes
+            ) DO UPDATE SET
+                demand_event_semantics = EXCLUDED.demand_event_semantics,
+                projected_srid = EXCLUDED.projected_srid,
+                grid_x = EXCLUDED.grid_x,
+                grid_y = EXCLUDED.grid_y,
+                cell_size_meters = EXCLUDED.cell_size_meters,
+                target_bucket_start_utc = EXCLUDED.target_bucket_start_utc,
+                target_trip_requests = EXCLUDED.target_trip_requests,
+                lag_1 = EXCLUDED.lag_1,
+                lag_2 = EXCLUDED.lag_2,
+                lag_4 = EXCLUDED.lag_4,
+                lag_96 = EXCLUDED.lag_96,
+                lag_672 = EXCLUDED.lag_672,
+                rolling_mean_4 = EXCLUDED.rolling_mean_4,
+                rolling_mean_12 = EXCLUDED.rolling_mean_12,
+                rolling_mean_96 = EXCLUDED.rolling_mean_96,
+                rolling_mean_672 = EXCLUDED.rolling_mean_672,
+                hour_sin = EXCLUDED.hour_sin,
+                hour_cos = EXCLUDED.hour_cos,
+                day_of_week = EXCLUDED.day_of_week,
+                is_weekend = EXCLUDED.is_weekend,
+                neighbor_demand_lag_1 = EXCLUDED.neighbor_demand_lag_1,
+                available_driver_lag_1 = EXCLUDED.available_driver_lag_1,
+                coverage_ratio = EXCLUDED.coverage_ratio,
+                quality_status = EXCLUDED.quality_status,
+                created_by_run_id = EXCLUDED.created_by_run_id,
+                created_at = CURRENT_TIMESTAMP
+        """
+        written = 0
+        batch: list[tuple[Any, ...]] = []
+        try:
+            with self._connection.transaction():
+                with self._connection.cursor() as cursor:
+                    for row in rows:
+                        batch.append(self._values(row, created_by_run_id))
+                        if len(batch) >= batch_size:
+                            cursor.executemany(statement, batch)
+                            written += len(batch)
+                            batch.clear()
+                    if batch:
+                        cursor.executemany(statement, batch)
+                        written += len(batch)
+            return written
+        except DatabaseError:
+            raise
+        except Exception as error:
+            raise DatabaseError(
+                "FEATURE_ROWS_PERSIST_FAILED",
+                "Could not persist demand-feature rows",
+                {"rowsWrittenBeforeFailure": written},
             ) from error

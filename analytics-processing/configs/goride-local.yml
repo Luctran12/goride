@@ -14,6 +14,14 @@ dataset:
 spatial:
   source_srid: 4326
   projected_srid: 32648
+  grid_version: square-zero-floor-v1
+  grid_origin_x_meters: 0
+  grid_origin_y_meters: 0
+  study_bounds_wgs84:
+    minimum_longitude: 106.45
+    minimum_latitude: 10.55
+    maximum_longitude: 107.05
+    maximum_latitude: 11.05
   primary_cell_size_meters: 500
   evaluation_cell_sizes_meters: [250, 500, 1000, 2000]
 

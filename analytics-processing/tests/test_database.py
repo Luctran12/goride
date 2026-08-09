@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import unittest
 
-from goride_analytics.database import DatabaseSettings
+from goride_analytics.database import DatabaseSettings, PostgresProcessingRunRepository
 from goride_analytics.errors import DatabaseError
 
 
@@ -23,6 +23,20 @@ class DatabaseSettingsTests(unittest.TestCase):
         with self.assertRaises(DatabaseError) as raised:
             DatabaseSettings.from_environment(environment)
         self.assertEqual(raised.exception.code, "DATABASE_ENV_MISSING")
+
+    def test_processing_repository_rejects_unknown_run_type_before_sql(self) -> None:
+        repository = PostgresProcessingRunRepository(object())
+        with self.assertRaises(DatabaseError) as raised:
+            repository.start(
+                run_id=None,
+                run_type="UNSUPPORTED",
+                identity=None,
+                source_profile="fixture",
+                dataset_version="v1",
+                source_cutoff=None,
+                input_manifest={},
+            )
+        self.assertEqual(raised.exception.code, "PROCESSING_RUN_TYPE_INVALID")
 
 
 if __name__ == "__main__":

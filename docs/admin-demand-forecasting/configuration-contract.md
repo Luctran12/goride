@@ -1,8 +1,9 @@
 # Analytics processing configuration contract
 
-> Version: 1.0
+> Version: 1.1
 >
-> Status: Frozen for Phase 0; implemented by the Phase 1 config loader
+> Status: Phase 0 contract, implemented by Phase 1 and extended for the
+> Phase 4 spatial-feature pipeline
 
 ## 1. External storage root
 
@@ -100,6 +101,44 @@ processing code must not reuse Ho Chi Minh City's EPSG:32648 default for Porto.
 - supported cell sizes: 250, 500, 1,000 and 2,000 m;
 - supply features: enabled only when snapshot coverage meets the quality gate;
 - database namespace: GoRide `analytics` schema.
+
+### Frozen spatial keys for Phase 4
+
+Both profiles use `grid_version: square-zero-floor-v1`. The version means that
+projected coordinates are assigned with a zero-metre origin and the rule
+`floor((coordinate - origin) / cell_size)`. Minimum study-bound coordinates
+are inclusive and maximum coordinates are exclusive.
+
+| Profile | Projected SRID | Origin (m) | Frozen WGS84 study bounds |
+| --- | ---: | ---: | --- |
+| `porto-thesis` | 3763 | `(0, 0)` | longitude `[-8.75, -8.45)`, latitude `[41.05, 41.30)` |
+| `goride-local` | 32648 | `(0, 0)` | longitude `[106.45, 107.05)`, latitude `[10.55, 11.05)` |
+
+The required `spatial` mapping is therefore:
+
+```yaml
+spatial:
+  source_srid: 4326
+  projected_srid: 3763
+  grid_version: square-zero-floor-v1
+  grid_origin_x_meters: 0
+  grid_origin_y_meters: 0
+  study_bounds_wgs84:
+    minimum_longitude: -8.75
+    minimum_latitude: 41.05
+    maximum_longitude: -8.45
+    maximum_latitude: 41.30
+  primary_cell_size_meters: 500
+  evaluation_cell_sizes_meters: [500, 1000, 2000]
+```
+
+The loader rejects unknown grid versions, invalid/global study bounds and
+feature lag/window values that cannot be represented by the frozen Phase 2
+feature schema. Version 1 requires temporal features because its persisted
+calendar columns are non-null; later ablation selects feature groups at model
+input rather than changing stored row semantics. Any change to origin,
+boundary rule or study bounds requires a new grid version rather than silently
+changing an existing experiment.
 
 ## 5. Run directory
 

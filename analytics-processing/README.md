@@ -1,14 +1,16 @@
 # GoRide Analytics Processing
 
 Deterministic Python command-line foundation for the Admin demand-forecasting
-processing layer. Phase 3 adds bounded Porto/GoRide extraction, a canonical
-demand-event snapshot, deterministic checksums, data-quality gates and lifecycle
-persistence. Feature building, training and forecast publication remain gated.
+processing layer. Phase 4 adds bounded Porto/GoRide extraction, deterministic
+canonical snapshots, spatial-temporal aggregation, leakage-safe features,
+Parquet evidence and PostgreSQL lifecycle/feature persistence. Training and
+forecast publication remain gated.
 
 ## Runtime
 
 - Python 3.11 or 3.12
-- PyYAML 6.0.3, tzdata 2026.3 and Psycopg 3.3.4
+- PyYAML 6.0.3, tzdata 2026.3, Psycopg 3.3.4, PyProj 3.7.2 and
+  PyArrow 25.0.0
 - External data root selected by `GORIDE_ANALYTICS_DATA_ROOT`
 
 Create an isolated environment from this directory:
@@ -62,6 +64,31 @@ The interval is exactly `[from-utc, cutoff-utc)`. Both boundaries must align
 to the configured bucket. Raw datasets and generated run evidence remain below
 the external analytics data root and are never committed.
 
+## Build leakage-safe features
+
+Use the successful extraction run directory printed by `extract`. A relative
+path is resolved below the configured analytics data root:
+
+```powershell
+python -m goride_analytics build-features `
+  --config configs\porto-thesis.yml `
+  --extraction-run runs\extraction\<artifact-run-id> `
+  --cell-size-meters 500
+```
+
+The command verifies every extraction checksum before reading data, projects
+WGS84 pickups into the profile CRS, applies the frozen zero-origin floor grid,
+materializes continuous UTC buckets and emits:
+
+- `demand-features.parquet` in stable cell/cutoff/horizon order;
+- `feature-dictionary.json` and `feature-manifest.json`;
+- `feature-quality.json`, run evidence and `checksums.sha256`;
+- idempotent rows in `analytics.demand_features`.
+
+Demand lag, rolling and neighbor features use only buckets closed at the row's
+inference cutoff. GoRide supply remains nullable and WARNs when coverage is
+missing; a sample recorded after its bucket closes fails the build.
+
 ## Stage commands
 
 ```text
@@ -72,8 +99,8 @@ evaluate
 forecast
 ```
 
-`extract` is implemented in Phase 3. The remaining commands are explicit
-placeholders: they validate their profile and then return exit code
+`extract` and `build-features` are implemented through Phase 4. The remaining
+commands are explicit placeholders: they validate their profile and return exit code
 `4`/`STAGE_NOT_IMPLEMENTED` without fabricated success artifacts.
 
 ## Run tests

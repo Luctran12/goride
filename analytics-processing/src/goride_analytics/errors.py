@@ -57,7 +57,7 @@ class StageNotImplementedError(AnalyticsError):
             "STAGE_NOT_IMPLEMENTED",
             f"Stage '{stage}' is intentionally not implemented in the current phase",
             ExitCode.STAGE_NOT_IMPLEMENTED,
-            {"stage": stage, "phase": 3},
+            {"stage": stage, "phase": 4},
         )
 
 

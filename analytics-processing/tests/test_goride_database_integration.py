@@ -10,6 +10,7 @@ from pathlib import Path
 from goride_analytics.database import DatabaseSettings, connect_database, verify_database
 from goride_analytics.extraction.canonical import CanonicalSpool
 from goride_analytics.extraction.goride import GoRidePostgresExtractor
+from goride_analytics.features.supply import load_supply_series
 
 
 @unittest.skipUnless(
@@ -45,6 +46,13 @@ class GoRideDatabaseExtractionIntegrationTests(unittest.TestCase):
             self.assertIsNotNone(result.query_plan)
             if result.stats.maximum_event_time_utc is not None:
                 self.assertLess(result.stats.maximum_event_time_utc, cutoff)
+            supply = load_supply_series(
+                connection,
+                from_utc=from_utc,
+                cutoff_utc=cutoff,
+                bucket_minutes=15,
+            )
+            self.assertIsNotNone(supply.values)
         finally:
             connection.close()
 

@@ -271,6 +271,7 @@ def run_extraction(
         )
         attempt_no = repository.start(
             run_id=db_run_id,
+            run_type="EXTRACTION",
             identity=identity,
             source_profile=config.profile.name,
             dataset_version=config.dataset.version,
