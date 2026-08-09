@@ -185,15 +185,52 @@ Known scale limitation: Phase 4 uses disk-backed feature uniqueness and batched
 database writes, but the compact demand cube remains proportional to active
 cells times bucket count and still needs a full Porto profile.
 
+### Full Porto follow-up (`e8ad1ac`)
+
+The repaired external manifest passed identity/path/SHA-256 validation. The
+first complete extraction correctly failed the original zero-tolerance policy,
+which exposed 74 canonical duplicate IDs and 5,901 empty polylines. Read-only
+profiling proved all 5,901 were missing trajectories rather than malformed or
+invalid WGS84 coordinates.
+
+Commit `e8ad1ac` (`fix: classify Porto source exclusions by quality policy`)
+freezes a 0.01% Porto duplicate-rate ceiling, keeps duplicate exclusion
+deterministic, classifies empty polylines as WARN/excluded missing trajectory,
+and preserves zero-tolerance invalid-coordinate failure.
+
+Full rerun evidence:
+
+- 1,710,670 source rows scanned in 212.8 seconds;
+- 1,704,685 canonical rows and 758,208,824-byte JSONL artifact;
+- `WARN` overall: 74 duplicates (0.004326%) and 5,911 missing trajectories
+  (0.345537%) excluded;
+- schema, checksum, event-time, cutoff and invalid-pickup FAIL gates all PASS;
+- snapshot SHA-256
+  `e1fbd4a7fbe44e48db508f69dacf83aba100e33fe6db8b4b91a8bcd337820153`;
+- Python 3.11/3.12 passed 57 tests; all 57 passed with PostgreSQL/PostGIS and
+  GoRide integrations enabled on Python 3.11.
+
+The scale dry-run stopped full materialization before database writes. At
+500 m, 1,238 active cells across 35,040 buckets would emit 130,126,180 rows.
+Training-only cumulative-demand populations are:
+
+| Coverage | Cells (including boundary ties) | Captured train demand | Projected all-year rows |
+| ---: | ---: | ---: | ---: |
+| 90% | 98 | 90.0209% | 10,300,780 |
+| 95% | 134 | 95.0648% | 14,084,740 |
+| 97% | 159 | 97.0136% | 16,712,490 |
+| 99% | 256 | 99.0072% | 26,908,160 |
+
+Decision required before the next Phase 4 corrective commit: approve a
+train-only cell population and time-partition/cost-guard design. The recommended
+population is 95% cumulative training demand because it is leakage-safe,
+methodologically explicit and reduces projected rows by 89.2%.
+
 ---
 
 ## 7. Next Expected Work
 
-After implementation, Phase 4 must stop at a user review gate. Phase 5 may add
-historical-mean and seasonal-naive baselines with walk-forward evaluation only
-after feature leakage, determinism and persistence evidence are approved. Full
-Porto validation still requires this field in the external dataset manifest:
-
-```json
-"sourceRelativePath": "raw/porto-taxi/v1/train.csv.zip"
-```
+Phase 4 remains at a decision gate. Do not run the full feature build until the
+cell population, partition size and maximum-row cost guard are frozen. Phase 5
+may add historical-mean and seasonal-naive baselines only after the bounded
+Phase 4 feature artifact passes leakage, determinism and persistence review.

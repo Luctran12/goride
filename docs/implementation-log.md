@@ -6,6 +6,87 @@
 
 ---
 
+## Commit: `e8ad1ac` - `fix: classify Porto source exclusions by quality policy`
+
+Branch: `codex/admin-demand-forecasting`
+
+Phase: Admin Demand Forecasting Phase 4 - full-data quality refinement
+
+### Muc tieu
+
+Dung Porto archive day du de kiem chung quality contract, phan biet missing
+trajectory voi pickup that su sai va ngan full feature build tao volume ngoai
+kiem soat.
+
+### Noi dung da trien khai
+
+- Them `quality.maximum_duplicate_ratio` vao strict config; Porto dong bang
+  `0.0001` (0.01%), GoRide operational giu zero tolerance.
+- Duplicate source ID van bi loai khoi canonical snapshot. Ty le duoi/within
+  threshold tra `WARN`, giu first immutable source occurrence; vuot threshold
+  van `FAIL`.
+- Phan loai Porto `POLYLINE=[]`/blank la missing trajectory, khong danh dong
+  voi malformed, non-numeric, non-finite hoac out-of-WGS84 pickup.
+- `DQ_MISSING_TRAJECTORY` loai va report `WARN`; `DQ_INVALID_PICKUP` tiep tuc la
+  zero-tolerance `FAIL`.
+- Cap nhat configuration/data contract va golden tests cho ratio range,
+  under-threshold duplicate va empty polyline.
+
+### Full-data validation da chay
+
+- Manifest ngoai Git validate thanh cong: source 533,605,607 bytes va SHA-256
+  khop contract.
+- Run dau tien voi zero-tolerance contract doc 1,710,670 rows va fail closed:
+  74 canonical duplicate, 5,901 empty polyline bi gom nham vao invalid pickup.
+- Read-only source profile xac nhan toan bo 5,901 pickup tren la empty list;
+  khong co malformed JSON, non-numeric hay out-of-WGS84 pickup. Raw source co
+  81 duplicate occurrences: 77 conflicting fingerprint va 4 identical; 74
+  xuat hien sau cac exclusion truoc canonical spool.
+- Run `e8ad1ac` thanh cong trong 212.8 giay: 1,704,685 canonical rows,
+  758,208,824 bytes, quality `WARN`, snapshot SHA-256
+  `e1fbd4a7fbe44e48db508f69dacf83aba100e33fe6db8b4b91a8bcd337820153`.
+- FAIL gates schema/checksum/missing-time/future/invalid-pickup deu `PASS`.
+  `DQ_DUPLICATE_TRIP` report 74/1,710,670 (0.004326%, duoi 0.01%);
+  `DQ_MISSING_TRAJECTORY` report 5,911/1,710,670 (0.345537%).
+- Python 3.11/3.12 pass 57 tests; Python 3.11 pass ca 57 khi bat PostgreSQL,
+  PostGIS va GoRide integration.
+- Database giu mot failed run va mot succeeded run lam audit, 14 quality rows,
+  va zero `demand_features` vi full build chua duoc phep.
+
+### Scale profile va manual review
+
+- 500 m full snapshot co 35,040 bucket, 1,238 active cells va 1,455 events
+  nam ngoai frozen study bounds.
+- Current all-active-cell policy se tao 130,126,180 feature rows; compact demand
+  arrays da can 173,518,080 bytes truoc SQLite, Parquet va PostgreSQL.
+- Full build da duoc stop truoc khi ghi feature rows; day la cost guard co chu
+  dich, khong phai pipeline failure.
+- Cell eligibility duoc profile chi bang train interval, khong dung validation
+  hay test: cumulative 90/95/97/99% demand lan luot can 98/134/159/256 cells va
+  du kien 10.30/14.08/16.71/26.91 trieu all-year horizon rows.
+- Khuyen nghi dong bang 95% cumulative train-demand coverage, include boundary
+  ties: 134 cells, 95.0648% train demand, boundary 1,089 train events/cell.
+
+### Files chinh
+
+- `analytics-processing/src/goride_analytics/extraction/porto.py`
+- `analytics-processing/src/goride_analytics/quality.py`
+- `analytics-processing/src/goride_analytics/config.py`
+- `analytics-processing/configs/*`
+- `analytics-processing/tests/test_{config,porto_extraction,quality}.py`
+- `docs/admin-demand-forecasting/{configuration-contract,data-contract}.md`
+
+### Known risks / decision gate
+
+- Full feature build khong nen chay voi 1,238 cells/130.13M rows. Can user dong
+  bang cell-eligibility population truoc khi code partition/cost guard.
+- Khuyen nghi 95% cumulative training-demand coverage vi co semantics hoc thuat,
+  khong chon threshold tuy tien va khong leakage validation/test.
+- Successful run manifest co `gitDirty=true` chi vi user-owned `.env.example`
+  dang modified va khong nam trong commit; code/config logic tro dung
+  `e8ad1ac` va config hash `9743878588d6...`.
+- Dung tai decision gate. Chua chay full feature build va chua bat dau Phase 5.
+
 ## Commit: `39abdb3` - `feat: build versioned spatio-temporal demand features`
 
 Branch: `codex/admin-demand-forecasting`
