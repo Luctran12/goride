@@ -104,9 +104,24 @@ def build_quality_report(
     stats: ExtractionStats,
     *,
     checksum_verified: bool,
+    maximum_duplicate_ratio: float,
     include_missing_trajectory_rule: bool,
     include_supply_coverage_rule: bool,
 ) -> QualityReport:
+    duplicate_ratio = (
+        stats.duplicate_trip_breaches / stats.rows_in_interval
+        if stats.rows_in_interval
+        else 0.0
+    )
+    if stats.duplicate_trip_breaches == 0:
+        duplicate_status = "PASS"
+        duplicate_severity = "FAIL"
+    elif duplicate_ratio <= maximum_duplicate_ratio:
+        duplicate_status = "WARN"
+        duplicate_severity = "WARN"
+    else:
+        duplicate_status = "FAIL"
+        duplicate_severity = "FAIL"
     results: list[QualityResult] = [
         QualityResult(
             "DQ_SCHEMA",
@@ -127,11 +142,15 @@ def build_quality_report(
         ),
         QualityResult(
             "DQ_DUPLICATE_TRIP",
-            "FAIL",
-            _status(stats.duplicate_trip_breaches, "FAIL"),
+            duplicate_severity,
+            duplicate_status,
             stats.rows_in_interval,
             stats.duplicate_trip_breaches,
-            threshold={"maximumDuplicates": 0},
+            metric_value=duplicate_ratio,
+            threshold={
+                "actionWithinThreshold": "EXCLUDE_KEEP_FIRST_AND_REPORT",
+                "maximumDuplicateRatio": maximum_duplicate_ratio,
+            },
         ),
         QualityResult(
             "DQ_MISSING_EVENT_TIME",

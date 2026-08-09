@@ -16,6 +16,7 @@ class QualityRuleTests(unittest.TestCase):
         report = build_quality_report(
             stats,
             checksum_verified=True,
+            maximum_duplicate_ratio=0.001,
             include_missing_trajectory_rule=False,
             include_supply_coverage_rule=True,
         )
@@ -35,6 +36,7 @@ class QualityRuleTests(unittest.TestCase):
         report = build_quality_report(
             stats,
             checksum_verified=True,
+            maximum_duplicate_ratio=0.001,
             include_missing_trajectory_rule=True,
             include_supply_coverage_rule=False,
         )
@@ -58,6 +60,7 @@ class QualityRuleTests(unittest.TestCase):
         report = build_quality_report(
             stats,
             checksum_verified=False,
+            maximum_duplicate_ratio=0.001,
             include_missing_trajectory_rule=True,
             include_supply_coverage_rule=True,
         )
@@ -80,6 +83,27 @@ class QualityRuleTests(unittest.TestCase):
         for item in by_code.values():
             self.assertGreaterEqual(item.records_checked, item.records_breached)
             self.assertTrue(item.threshold)
+
+    def test_small_duplicate_ratio_is_excluded_and_reported_as_warn(self) -> None:
+        stats = ExtractionStats(
+            rows_scanned=20_000,
+            rows_in_interval=20_000,
+            accepted_rows=19_999,
+            duplicate_trip_breaches=1,
+        )
+        report = build_quality_report(
+            stats,
+            checksum_verified=True,
+            maximum_duplicate_ratio=0.0001,
+            include_missing_trajectory_rule=False,
+            include_supply_coverage_rule=False,
+        )
+        duplicate = next(
+            item for item in report.results if item.rule_code == "DQ_DUPLICATE_TRIP"
+        )
+        self.assertEqual(report.overall_status, "WARN")
+        self.assertEqual(duplicate.result_status, "WARN")
+        self.assertEqual(duplicate.metric_value, 0.00005)
 
 
 if __name__ == "__main__":

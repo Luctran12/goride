@@ -72,6 +72,7 @@ class QualitySettings:
     reject_missing_trajectory: bool
     reject_invalid_coordinate: bool
     reject_future_timestamp: bool
+    maximum_duplicate_ratio: float
     minimum_history_buckets: int
     fail_on_checksum_mismatch: bool
 
@@ -188,6 +189,17 @@ def _number(value: Any, path: str) -> float:
         raise ConfigurationError(
             "CONFIG_VALUE_INVALID",
             f"{path} must be a finite number",
+            {"path": path},
+        )
+    return result
+
+
+def _ratio(value: Any, path: str) -> float:
+    result = _number(value, path)
+    if not 0 <= result <= 1:
+        raise ConfigurationError(
+            "CONFIG_VALUE_INVALID",
+            f"{path} must be between 0 and 1",
             {"path": path},
         )
     return result
@@ -537,6 +549,7 @@ def load_config(path: str | Path) -> ProcessingConfig:
             "reject_missing_trajectory",
             "reject_invalid_coordinate",
             "reject_future_timestamp",
+            "maximum_duplicate_ratio",
             "minimum_history_buckets",
             "fail_on_checksum_mismatch",
         },
@@ -553,6 +566,10 @@ def load_config(path: str | Path) -> ProcessingConfig:
         reject_future_timestamp=_boolean(
             quality_raw["reject_future_timestamp"],
             "quality.reject_future_timestamp",
+        ),
+        maximum_duplicate_ratio=_ratio(
+            quality_raw["maximum_duplicate_ratio"],
+            "quality.maximum_duplicate_ratio",
         ),
         minimum_history_buckets=_integer(
             quality_raw["minimum_history_buckets"],

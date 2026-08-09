@@ -29,6 +29,10 @@ Phase 4 — Spatial-temporal aggregation and feature pipeline from
 
 User approval to start Phase 4: 2026-08-09.
 
+User approval to continue after external Porto manifest repair: 2026-08-09.
+The full-data validation follow-up remains in Phase 4 until the empirical
+quality findings and projected feature volume are reviewed.
+
 Planned commit:
 
 ```text
@@ -45,6 +49,8 @@ Scope:
 - enforce leakage, bucket continuity, grid assignment and coverage gates;
 - persist FEATURE_BUILD lifecycle, quality evidence and idempotent feature rows;
 - prove boundary, empty-bucket, DST, uniqueness and checksum behavior.
+- profile the complete Porto archive, classify source exclusions and freeze a
+  bounded duplicate-rate threshold before full feature materialization;
 
 Out of scope for Phase 4:
 

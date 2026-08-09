@@ -230,11 +230,11 @@ creation time.
 | --- | --- | --- |
 | `DQ_SCHEMA` | FAIL | Required fields and types exist |
 | `DQ_CHECKSUM` | FAIL | Source checksum matches manifest |
-| `DQ_DUPLICATE_TRIP` | FAIL | Canonical source identity is unique |
+| `DQ_DUPLICATE_TRIP` | WARN/excluded below configured ratio; FAIL above | Canonical source identity is unique; the first immutable source occurrence wins |
 | `DQ_MISSING_EVENT_TIME` | FAIL | Demand event time exists |
 | `DQ_FUTURE_EVENT` | FAIL | Event time is not after extraction cutoff |
 | `DQ_INVALID_PICKUP` | FAIL | Pickup is valid EPSG:4326 and transformable |
-| `DQ_MISSING_TRAJECTORY` | WARN/excluded | Porto source declares missing trajectory |
+| `DQ_MISSING_TRAJECTORY` | WARN/excluded | Porto declares missing data or has an empty trajectory |
 | `DQ_BUCKET_CONTINUITY` | FAIL | Expected bucket index is continuous after completeness validation |
 | `DQ_CELL_COVERAGE` | WARN | Cell lacks minimum training history |
 | `DQ_SUPPLY_COVERAGE` | WARN/feature disabled | GoRide supply snapshots are incomplete |

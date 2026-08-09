@@ -52,6 +52,7 @@ def valid_config_mapping() -> dict[str, Any]:
             "reject_missing_trajectory": True,
             "reject_invalid_coordinate": True,
             "reject_future_timestamp": True,
+            "maximum_duplicate_ratio": 0.001,
             "minimum_history_buckets": 672,
             "fail_on_checksum_mismatch": True,
         },

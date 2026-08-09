@@ -22,6 +22,7 @@ class ProcessingConfigTests(unittest.TestCase):
         self.assertEqual(first.spatial.projected_srid, 3763)
         self.assertEqual(first.spatial.grid_version, "square-zero-floor-v1")
         self.assertEqual(first.spatial.grid_origin_x_meters, 0)
+        self.assertEqual(first.quality.maximum_duplicate_ratio, 0.001)
         self.assertEqual(first.temporal.forecast_horizons_minutes, (15, 30, 60))
         self.assertFalse(first.features.include_supply_features)
 
@@ -126,6 +127,14 @@ class ProcessingConfigTests(unittest.TestCase):
             raised.exception.code,
             "CONFIG_TEMPORAL_FEATURES_REQUIRED",
         )
+
+    def test_rejects_duplicate_ratio_outside_probability_range(self) -> None:
+        mapping = valid_config_mapping()
+        mapping["quality"]["maximum_duplicate_ratio"] = 1.1
+        with tempfile.TemporaryDirectory() as temporary:
+            with self.assertRaises(ConfigurationError) as raised:
+                load_config(write_config(Path(temporary) / "profile.yml", mapping))
+        self.assertEqual(raised.exception.code, "CONFIG_VALUE_INVALID")
 
 
 if __name__ == "__main__":

@@ -49,18 +49,22 @@ def _missing_data(raw: str | None) -> bool | None:
     return None
 
 
-def _pickup(raw: str | None) -> tuple[float, float] | None:
+def _pickup(
+    raw: str | None,
+) -> tuple[tuple[float, float] | None, str | None]:
     if raw is None or not raw.strip():
-        return None
+        return None, "MISSING_TRAJECTORY"
     try:
         polyline: Any = json.loads(raw)
     except json.JSONDecodeError:
-        return None
-    if not isinstance(polyline, list) or not polyline:
-        return None
+        return None, "INVALID_PICKUP"
+    if isinstance(polyline, list) and not polyline:
+        return None, "MISSING_TRAJECTORY"
+    if not isinstance(polyline, list):
+        return None, "INVALID_PICKUP"
     first = polyline[0]
     if not isinstance(first, list) or len(first) != 2:
-        return None
+        return None, "INVALID_PICKUP"
     longitude, latitude = first
     if (
         isinstance(longitude, bool)
@@ -68,7 +72,7 @@ def _pickup(raw: str | None) -> tuple[float, float] | None:
         or not isinstance(longitude, (int, float))
         or not isinstance(latitude, (int, float))
     ):
-        return None
+        return None, "INVALID_PICKUP"
     longitude = float(longitude)
     latitude = float(latitude)
     if (
@@ -77,8 +81,8 @@ def _pickup(raw: str | None) -> tuple[float, float] | None:
         or not -180 <= longitude <= 180
         or not -90 <= latitude <= 90
     ):
-        return None
-    return longitude, latitude
+        return None, "INVALID_PICKUP"
+    return (longitude, latitude), None
 
 
 class PortoArchiveExtractor:
@@ -185,9 +189,12 @@ class PortoArchiveExtractor:
         if missing_data:
             stats.missing_trajectory_warnings += 1
             return
-        pickup = _pickup(str(row.get("POLYLINE") or ""))
+        pickup, pickup_issue = _pickup(str(row.get("POLYLINE") or ""))
         if pickup is None:
-            stats.invalid_pickup_breaches += 1
+            if pickup_issue == "MISSING_TRAJECTORY":
+                stats.missing_trajectory_warnings += 1
+            else:
+                stats.invalid_pickup_breaches += 1
             return
         longitude, latitude = pickup
         event = CanonicalDemandEvent(

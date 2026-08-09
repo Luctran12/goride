@@ -140,6 +140,26 @@ input rather than changing stored row semantics. Any change to origin,
 boundary rule or study bounds requires a new grid version rather than silently
 changing an existing experiment.
 
+### Frozen source-quality threshold for Phase 4
+
+The complete Porto archive profile measured a canonical duplicate rate below
+`0.0001` (0.01%). The profile therefore freezes:
+
+```yaml
+quality:
+  maximum_duplicate_ratio: 0.0001
+```
+
+Duplicate source identities are never emitted twice. At or below the threshold
+the later occurrence is excluded deterministically, the rule reports `WARN`,
+and the run may continue. A higher ratio is `FAIL`. `goride-local` retains a
+zero threshold because operational trip identifiers are database keys.
+
+An empty Porto `POLYLINE` is classified as missing trajectory and excluded with
+`DQ_MISSING_TRAJECTORY`; malformed/non-numeric/out-of-WGS84 pickup values remain
+`DQ_INVALID_PICKUP` failures. This distinction prevents an expected absence
+from weakening the coordinate-validity gate.
+
 ## 5. Run directory
 
 Each invocation creates a new directory:

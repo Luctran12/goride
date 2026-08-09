@@ -340,6 +340,7 @@ def run_extraction(
                 dataset.source_type != "archive"
                 or dataset.sha256 == dataset_payload.get("sha256")
             ),
+            maximum_duplicate_ratio=config.quality.maximum_duplicate_ratio,
             include_missing_trajectory_rule=dataset.source_type == "archive",
             include_supply_coverage_rule=(
                 dataset.source_type == "postgresql"

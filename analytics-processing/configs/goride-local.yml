@@ -35,6 +35,7 @@ quality:
   reject_missing_trajectory: false
   reject_invalid_coordinate: true
   reject_future_timestamp: true
+  maximum_duplicate_ratio: 0
   minimum_history_buckets: 672
   fail_on_checksum_mismatch: false
 

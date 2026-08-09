@@ -43,6 +43,7 @@ class PortoExtractionTests(unittest.TestCase):
         report = build_quality_report(
             stats,
             checksum_verified=True,
+            maximum_duplicate_ratio=0.001,
             include_missing_trajectory_rule=True,
             include_supply_coverage_rule=False,
         )
@@ -55,6 +56,30 @@ class PortoExtractionTests(unittest.TestCase):
         self.assertEqual(stats.missing_trajectory_warnings, 1)
         self.assertEqual(stats.outside_interval_rows, 1)
         self.assertEqual(report.overall_status, "FAIL")
+
+    def test_empty_polyline_is_missing_trajectory_not_invalid_coordinate(self) -> None:
+        start = datetime(2013, 7, 1, tzinfo=timezone.utc)
+        cutoff = datetime(2013, 7, 2, tzinfo=timezone.utc)
+        inside = int(datetime(2013, 7, 1, 1, tzinfo=timezone.utc).timestamp())
+        with tempfile.TemporaryDirectory() as temporary:
+            root = create_porto_data_root(
+                Path(temporary),
+                [porto_row("empty", inside, polyline="[]")],
+            )
+            with CanonicalSpool(root / "spool.db") as spool:
+                stats = PortoArchiveExtractor().extract(
+                    root / "raw/test-dataset/v1/source.zip",
+                    spool,
+                    source_profile="porto-test",
+                    dataset_version="v1",
+                    from_utc=start,
+                    cutoff_utc=cutoff,
+                    snapshot_id=uuid.uuid4(),
+                )
+
+        self.assertEqual(stats.missing_trajectory_warnings, 1)
+        self.assertEqual(stats.invalid_pickup_breaches, 0)
+        self.assertEqual(stats.accepted_rows, 0)
 
 
 if __name__ == "__main__":
