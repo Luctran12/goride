@@ -6,6 +6,100 @@
 
 ---
 
+## Commit: `39abdb3` - `feat: build versioned spatio-temporal demand features`
+
+Branch: `codex/admin-demand-forecasting`
+
+Phase: Admin Demand Forecasting Phase 4 - spatial-temporal aggregation and
+feature pipeline
+
+### Muc tieu
+
+Chuyen canonical snapshot cua Phase 3 thanh supervised feature artifact co
+version, khong leakage, tai lap duoc va persist idempotent vao schema Phase 2.
+
+### Noi dung da trien khai
+
+- Dong bang `square-zero-floor-v1`, zero-metre origin, min-inclusive/
+  max-exclusive study bounds va SRID rieng cho Porto/GoRide.
+- Them PyProj transform va grid assignment; cell ID gom grid version, SRID,
+  cell size, grid X/Y va dung cung cong thuc `FLOOR` voi heatmap PostGIS.
+- Aggregate canonical demand thanh chuoi bucket UTC 15 phut lien tuc; bucket
+  khong co event trong coverage hop le duoc materialize thanh zero.
+- Sinh calendar, demand lag 1/2/4/96/672, trailing rolling 4/12/96/672,
+  eight-neighbor lag va optional GoRide driver-supply lag.
+- Moi feature row co horizon 15/30/60, target label, coverage, quality status,
+  maximum feature source time va source snapshot checksum.
+- Them SQLite disk spool de enforce uniqueness/stable order va xuat
+  deterministic Parquet Zstandard cung feature dictionary/manifest/quality.
+- Feature input bat buoc nam trong analytics root, co day du extraction evidence
+  va checksum coverage; checksum tampering hoac unsigned evidence bi fail-fast.
+- Them `build-features` CLI, `FEATURE_BUILD` lifecycle, quality persistence va
+  batched PostgreSQL upsert. Feature rows va terminal `SUCCEEDED` nam trong
+  cung transaction; loi terminal rollback rows va ghi run `FAILED`.
+- Dong bo config/data contract, runtime lock va README cho Phase 4.
+
+### Validation da chay
+
+- Python 3.11 va 3.12: 54/54 tests pass; 3.12 skip 5 opt-in database tests.
+- Python 3.11 voi PostgreSQL/PostGIS va GoRide integration bat day du: 54/54
+  tests pass.
+- Hai feature build cung snapshot/config/commit cho cung Parquet SHA-256; lan
+  upsert sau giu dung 6 unique rows va chuyen ownership sang run moi.
+- Inject loi terminal state chung minh feature rows rollback ve 0 va processing
+  run duoc ghi `FAILED`.
+- PyProj va PostGIS cho cung grid X/Y tren golden Porto coordinate theo
+  zero-origin floor contract.
+- Golden fixtures pass cho exact boundary, out-of-study bound, empty bucket,
+  Porto DST fallback, leakage, missing supply, duplicate row va checksum
+  tampering/coverage.
+- Sau integration cleanup, `processing_runs`, `data_quality_results` va
+  `demand_features` tren `goride_analytics_porto` deu bang 0.
+- `compileall`, dependency-lock contract, `git diff --check` va staged
+  credential scan pass; `.env.example` cua user khong nam trong commit.
+
+### Manual review findings
+
+- Dua feature upsert va terminal success vao cung outer transaction de tranh
+  publish partial state neu lifecycle update that bai.
+- Bat buoc checksum bao phu moi extraction evidence file, khong chi canonical
+  JSONL, truoc khi promote snapshot.
+- Supply feature chi doc interval bounded, dung previous closed bucket va fail
+  neu `sampled_at` vuot thoi diem bucket dong.
+- Reject viec tat temporal feature trong schema v1 vi calendar columns trong
+  database la non-null; ablation ve sau se chon model input columns.
+- Xoa Parquet temporary file neu writer that bai va khong dua hidden spool vao
+  evidence checksum.
+- Dung disk spool va batched DB writes de bounded Python object retention;
+  demand cube van la in-memory array theo active cells va full interval.
+
+### Files chinh
+
+- `analytics-processing/src/goride_analytics/features/*`
+- `analytics-processing/src/goride_analytics/database.py`
+- `analytics-processing/src/goride_analytics/cli.py`
+- `analytics-processing/configs/*`
+- `analytics-processing/tests/test_feature_*.py`
+- `analytics-processing/tests/test_database_integration.py`
+- `docs/admin-demand-forecasting/{configuration-contract,data-contract}.md`
+- `docs/current-phase.md`
+
+### Known risks / review gate
+
+- Full Porto feature build chua chay vi external manifest van thieu
+  `sourceRelativePath: raw/porto-taxi/v1/train.csv.zip`; validation fail closed
+  bang exit code 3.
+- Porto-scale throughput, Parquet size va peak memory chua co evidence. Demand
+  cube dung compact arrays nhung van tang theo `active_cells * bucket_count`;
+  can profile full dataset truoc khi ket luan kha nang scale.
+- Study bounds da dong bang trong profile de lap lai thi nghiem, nhung can duoc
+  trinh bay la thesis experiment bounds, khong suy dien thanh GoRide production
+  service coverage.
+- Operational GoRide rows co the drift giua cac run; moi run duoc isolated va
+  checksum, nhung source backfill van tao feature-set version moi.
+- Dung tai review gate. Chi bat dau Phase 5 sau khi user review leakage,
+  determinism, grid compatibility va persistence evidence.
+
 ## Commit: `3ead9e1` - `feat: add deterministic extraction and data quality gates`
 
 Branch: `codex/admin-demand-forecasting`

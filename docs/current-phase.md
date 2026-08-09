@@ -113,7 +113,8 @@ separate from Phase 1 artifact-directory identities by design.
 
 ## 5. Phase 3 Evidence
 
-Implementation and review are complete. User review is required before Phase 4.
+Phase 3 was approved when the user requested Phase 4. Its extraction and
+quality evidence remains the immutable input contract for feature builds.
 
 Validation evidence:
 
@@ -140,7 +141,47 @@ isolation and ensured typed/unexpected failures try to close the DB lifecycle.
 
 ---
 
-## 6. Next Expected Work
+## 6. Phase 4 Evidence
+
+Implementation commit: `39abdb3`
+(`feat: build versioned spatio-temporal demand features`).
+
+Implementation and manual review are complete. User review is required before
+Phase 5.
+
+Validation evidence:
+
+- Python 3.11 and 3.12 passed 54 tests; Python 3.12 skipped five opt-in database
+  integrations, while Python 3.11 passed all 54 with both databases enabled.
+- Repeated builds from the same extraction snapshot/config/commit emitted the
+  same deterministic Parquet SHA-256 and six unique persisted rows.
+- PostgreSQL upsert remained idempotent; an injected terminal-state failure
+  rolled back feature rows atomically and recorded the processing run as
+  `FAILED`.
+- Python/PyProj and PostgreSQL/PostGIS produced the same grid coordinates for
+  the golden transform using the historical zero-origin `FLOOR` rule.
+- Golden fixtures cover grid boundaries, minimum-inclusive/maximum-exclusive
+  study bounds, continuous empty buckets, Porto DST fallback, feature leakage,
+  supply cutoff, duplicate rows and extraction-evidence tampering.
+- The Phase 4 artifact includes a versioned dictionary, manifest, quality
+  results, deterministic Parquet and complete SHA-256 evidence.
+- PostgreSQL integration cleanup left `processing_runs`,
+  `data_quality_results` and `demand_features` at zero rows.
+- Both runtimes passed `compileall`; dependency locks, `git diff --check` and
+  the staged credential scan passed. `.env.example` remained outside commit.
+
+Manual review made feature-row publication and terminal success one atomic
+transaction, required checksum coverage for every input evidence file, rejected
+schema-incompatible feature switches and removed partial Parquet temporary
+files on failure.
+
+Known scale limitation: Phase 4 uses disk-backed feature uniqueness and batched
+database writes, but the compact demand cube remains proportional to active
+cells times bucket count and still needs a full Porto profile.
+
+---
+
+## 7. Next Expected Work
 
 After implementation, Phase 4 must stop at a user review gate. Phase 5 may add
 historical-mean and seasonal-naive baselines with walk-forward evaluation only
