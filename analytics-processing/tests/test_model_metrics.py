@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import math
+import os
 import unittest
 
 import numpy as np
 
-from goride_analytics.models.pipeline import VectorAccumulator
+from goride_analytics.models.pipeline import VectorAccumulator, _peak_working_set_bytes
 
 
 class CandidateMetricTests(unittest.TestCase):
@@ -24,6 +25,13 @@ class CandidateMetricTests(unittest.TestCase):
         accumulator.update(np.asarray([0.0, 0.0]), np.asarray([0.0, 2.0]))
 
         self.assertIsNone(accumulator.result()["wape"])
+
+    def test_peak_memory_collector_returns_process_measurement_on_windows(self) -> None:
+        value = _peak_working_set_bytes()
+
+        if os.name == "nt":
+            self.assertIsNotNone(value)
+            self.assertGreater(value, 0)
 
 
 if __name__ == "__main__":

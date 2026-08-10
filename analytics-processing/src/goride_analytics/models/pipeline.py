@@ -569,8 +569,17 @@ def _peak_working_set_bytes() -> int | None:
 
         counters = Counters()
         counters.cb = ctypes.sizeof(Counters)
-        handle = ctypes.windll.kernel32.GetCurrentProcess()
-        if not ctypes.windll.psapi.GetProcessMemoryInfo(handle, ctypes.byref(counters), counters.cb):
+        get_current_process = ctypes.windll.kernel32.GetCurrentProcess
+        get_current_process.restype = wintypes.HANDLE
+        get_process_memory = ctypes.windll.psapi.GetProcessMemoryInfo
+        get_process_memory.argtypes = [
+            wintypes.HANDLE,
+            ctypes.POINTER(Counters),
+            wintypes.DWORD,
+        ]
+        get_process_memory.restype = wintypes.BOOL
+        handle = get_current_process()
+        if not get_process_memory(handle, ctypes.byref(counters), counters.cb):
             return None
         return int(counters.PeakWorkingSetSize)
     except Exception:
