@@ -6,6 +6,105 @@
 
 ---
 
+## Commit: `19eb69f` - `feat: resume feature persistence with bulk staging`
+
+Branch: `codex/admin-demand-forecasting`
+
+Phase: Admin Demand Forecasting Phase 4 - bounded full-scale persistence
+
+### Muc tieu
+
+Publish immutable Porto feature partitions at full scale without regenerating
+the artifact after a client interruption, while retaining checksum gates,
+idempotency and all-or-nothing database visibility.
+
+### Noi dung da trien khai
+
+- Thay row-wise `executemany` bang PostgreSQL `COPY` vao temporary staging table
+  va mot conflict-aware merge cho moi partition.
+- Giu 12 partition merges va terminal `SUCCEEDED` trong mot outer transaction;
+  terminal failure van rollback toan bo feature rows.
+- Them CLI `persist-features --feature-run ...` de resume tu immutable artifact.
+- Resume fail-closed truoc DB connection neu source run/profile/config khong
+  khop; top-level checksum thieu/sai; dataset/partition SHA, byte count hoac
+  Parquet row count sai; quality co FAIL; hoac vuot cost guard.
+- Persistence tao evidence run rieng tham chieu feature artifact goc; khong sua
+  source feature manifest/Parquet.
+- Cap nhat README va data contract cho `POSTGRES_TEMP_STAGING_COPY_V1`.
+
+### Full-data evidence
+
+- Source feature artifact run:
+  `20260809T153840318116Z-6f2ea5e3b834-porto-thesis-4cf869ca75a0`.
+- 134 cells (gom boundary ties), 95.0648104% train demand, 12 UTC-month
+  partitions, 14,084,740 rows, 118,864,225 bytes.
+- Dataset SHA-256:
+  `4e226e38bb97c5eb560310cd951438223d739f162e028175e93d51f7e8859d5b`.
+- Lan publish row-wise dau tien bi client interrupt truoc commit; DB visibility
+  van 0 rows. Audit da dong `FAILED/FEATURE_BUILD_CLIENT_INTERRUPTED`; artifact
+  12 Parquet duoc giu nguyen de resume.
+- Bulk persistence run:
+  `20260810T054210932454Z-19eb69f94c04-porto-thesis-4cf869ca75a0`, processing
+  run `69f7dbfb-45b9-5193-81a2-bd465b59cccd`, `SUCCEEDED` sau khoang 65 phut.
+- Audit DB ghi attempt 2, code commit `19eb69f`,
+  `rows_read = rows_written = 14,084,740`; 7 quality rules, 0 FAIL, 2 WARN.
+- Independent DB QA sau autovacuum: exact `COUNT(*) = 14,084,740`; `pg_stats`
+  ghi 134 cells, 3 horizons `{15,30,60}`, 1 feature-set va 1 creator run. UTC
+  month grouping khop dung 12 partition/row counts trong manifest; inference
+  cutoff nam trong `2013-07-01T00:15Z..2014-06-30T23:30Z`, target bucket nam
+  trong `2013-07-01T00:30Z..2014-06-30T23:45Z`.
+- `DQ_LEAKAGE`, feature uniqueness/population, grid assignment va bucket
+  continuity deu PASS; WARN chi gom expected cell coverage va study-area
+  exclusions.
+- Persistence evidence checksum verify pass; source artifact van quality `WARN`.
+- `analytics.demand_features` chiem khoang 15.96 GB gom table/index sau bulk
+  publication.
+
+### Validation va manual review
+
+- Python 3.11 va 3.12: 66 tests pass, 5 opt-in DB tests skip.
+- Python 3.11 voi PostgreSQL/PostGIS that: 65 available tests pass; chi GoRide
+  read-only integration skip khi khong bat flag rieng.
+- Real DB regression cover COPY path, idempotency va multi-partition rollback
+  khi terminal success bi inject failure.
+- Resume tests cover two-partition success, second-partition failure va Parquet
+  tampering bi chan truoc DB connection.
+- `compileall`, `git diff --check` va staged credential scan pass.
+- Manual review: staging table la transaction-local, SQL identifier la constant,
+  source path bi gioi han trong `runs/feature-build`, manifest rows phai bang
+  tong partition rows, va artifact goc khong bi overwrite.
+- User-owned `.env.example` van modified local va khong nam trong commit.
+
+### Known risks / next gate
+
+- Full feature table lon; Phase 5 phai stream/filter theo split va feature-set,
+  khong load 14.08M rows vao RAM mot lan.
+- Bulk publication van mat khoang 65 phut tren may local va can du disk cho
+  staging/WAL/index. Resume giai quyet client interruption, khong thay the
+  production scheduling/monitoring.
+- Dung tai Phase 4 review gate. Chi bat dau baseline Phase 5 sau user approval.
+
+## Commit: `6f2ea5e` - `feat: bound Porto feature population and partitions`
+
+Branch: `codex/admin-demand-forecasting`
+
+Phase: Admin Demand Forecasting Phase 4 - bounded population and cost guards
+
+### Tom tat
+
+- Dong bang 95% cumulative train-demand coverage, include boundary ties: 134
+  cells va achieved coverage 95.0648104%; validation/test khong tham gia chon.
+- Partition feature theo UTC target month; 12 partitions, partition lon nhat
+  1,196,352 rows va full run 14,084,740 rows.
+- Them guard 1,500,000 rows/partition va 15,000,000 rows/run truoc
+  materialization; SQLite spool chi ton tai mot thang tai mot thoi diem.
+- Ghi `cell-eligibility.json`, partition manifest/checksum va persist tat ca
+  partition cung terminal success trong mot outer transaction.
+- Python 3.11/3.12 pass 62 tests; Python 3.11 real PostgreSQL/PostGIS suite pass
+  toan bo 62 tests truoc full-scale run.
+
+---
+
 ## Commit: `e8ad1ac` - `fix: classify Porto source exclusions by quality policy`
 
 Branch: `codex/admin-demand-forecasting`

@@ -1,6 +1,6 @@
 # GoRide Current Phase
 
-> Last updated: 2026-08-09, Asia/Ho_Chi_Minh
+> Last updated: 2026-08-10, Asia/Ho_Chi_Minh
 >
 > Purpose: source of truth before starting or reviewing the next backend commit.
 
@@ -30,13 +30,15 @@ Phase 4 — Spatial-temporal aggregation and feature pipeline from
 User approval to start Phase 4: 2026-08-09.
 
 User approval to continue after external Porto manifest repair: 2026-08-09.
-The full-data validation follow-up remains in Phase 4 until the empirical
-quality findings and projected feature volume are reviewed.
+The bounded full-data artifact and PostgreSQL publication are complete. Phase 4
+remains active only for final evidence review before the Phase 5 gate.
 
-Planned commit:
+Implementation commits:
 
 ```text
-feat: build versioned spatio-temporal demand features
+39abdb3 feat: build versioned spatio-temporal demand features
+6f2ea5e feat: bound Porto feature population and partitions
+19eb69f feat: resume feature persistence with bulk staging
 ```
 
 Scope:
@@ -231,11 +233,45 @@ boundary ties, UTC calendar-month partitions, a 1,500,000-row partition guard
 and a 15,000,000-row run guard. The corrective commit must preserve atomic
 database publication and record the selected population in artifact evidence.
 
+### Bounded full-scale build and publication
+
+- Fresh source snapshot under config hash `4cf869ca75a0...`: 1,704,685
+  canonical rows, 758,208,824 bytes, SHA-256
+  `837011e6a8f113a744fa2abb0b3d4f87d4fce1ef49ee4c2ace23e3be22636375`.
+- Feature artifact run
+  `20260809T153840318116Z-6f2ea5e3b834-porto-thesis-4cf869ca75a0`:
+  134 train-selected cells, 95.0648104% train-demand coverage, 12 UTC-month
+  partitions, 14,084,740 rows and 118,864,225 Parquet bytes.
+- Feature dataset SHA-256:
+  `4e226e38bb97c5eb560310cd951438223d739f162e028175e93d51f7e8859d5b`;
+  quality `WARN`, with no FAIL rule.
+- The first row-wise database publication was client-interrupted before commit;
+  PostgreSQL exposed zero feature rows and the audit run was closed as
+  `FEATURE_BUILD_CLIENT_INTERRUPTED`. The immutable Parquet artifact was kept.
+- Commit `19eb69f` adds checksum/quality/cost-guarded resume and PostgreSQL
+  temporary-staging `COPY` while retaining one outer atomic transaction.
+- Persistence run
+  `20260810T054210932454Z-19eb69f94c04-porto-thesis-4cf869ca75a0`
+  succeeded in about 65 minutes. Processing run
+  `69f7dbfb-45b9-5193-81a2-bd465b59cccd` records
+  `rows_read = rows_written = 14,084,740`, attempt 2 and code commit `19eb69f`.
+- PostgreSQL/PostGIS integration proves idempotency and complete rollback when
+  terminal success fails. Python 3.11/3.12 pass 66 tests; the Python 3.11 real
+  analytics database suite passes 65 available tests with one opt-in GoRide
+  read-only test skipped.
+- Independent post-commit QA returns exact `COUNT(*) = 14,084,740`; PostgreSQL
+  statistics identify 134 cells, horizons 15/30/60, one feature set and one
+  creator run. UTC grouping returns exactly the 12 manifest months and their
+  row counts; `DQ_LEAKAGE`, uniqueness, population, grid and continuity PASS.
+- Persisted `analytics.demand_features` consumes about 15.96 GB including
+  indexes. Training/evaluation must stream/filter by split rather than load the
+  full table into memory.
+
 ---
 
 ## 7. Next Expected Work
 
-Phase 4 remains at a decision gate. Do not run the full feature build until the
-cell population, partition size and maximum-row cost guard are frozen. Phase 5
-may add historical-mean and seasonal-naive baselines only after the bounded
-Phase 4 feature artifact passes leakage, determinism and persistence review.
+Review the bounded Phase 4 evidence and commit the final documentation update.
+After user approval, Phase 5 may add historical-mean and seasonal-naive
+baselines against this frozen feature set. Do not start candidate model tuning
+before the baseline/evaluation contract is reviewed.
