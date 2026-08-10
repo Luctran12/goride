@@ -137,6 +137,32 @@ summaries, quality gates, manifests and SHA-256 checksums. Raw predictions are
 required in Phase 5 so every reported aggregate can be traced to a fold and
 observation.
 
+## Train and evaluate the candidate
+
+Phase 6 freezes model family, search budget, sampling policy, feature ablations
+and selection rule in `configs/porto-phase6-hgb.yml` before the final holdout is
+opened:
+
+```powershell
+python -m goride_analytics train `
+  --config configs\porto-thesis.yml `
+  --experiment-config configs\porto-phase6-hgb.yml `
+  --feature-run <feature-build-artifact-run-id> `
+  --baseline-run <evaluation-artifact-run-id>
+```
+
+The command verifies the immutable feature and baseline artifacts, tunes every
+HGB configuration for A0/A1/A2 on D1-D4 only, then locks one configuration per
+feature group. Training uses a bounded deterministic hash sample with inverse
+stratum weights; validation and FINAL metrics always use the complete frozen
+population. Candidate and baseline rows must match for every fold/horizon.
+
+The training artifact contains development search evidence, selected model
+card, serialized A2 horizon models, full candidate predictions, baseline
+comparisons, resource measurements, quality gates and SHA-256 checksums.
+Prediction intervals remain disabled because Phase 6 has no frozen calibrated
+interval method.
+
 ## Stage commands
 
 ```text
@@ -148,10 +174,10 @@ evaluate
 forecast
 ```
 
-`extract`, `build-features`, `persist-features` and `evaluate` are implemented
-through Phase 5. `train` and `forecast` remain explicit placeholders: they
-validate their profile and return exit code `4`/`STAGE_NOT_IMPLEMENTED`
-without fabricated success artifacts.
+`extract`, `build-features`, `persist-features`, `evaluate` and `train` are
+implemented through Phase 6. `forecast` remains an explicit placeholder: it
+validates its profile and returns exit code `4`/`STAGE_NOT_IMPLEMENTED` without
+fabricated success artifacts.
 
 ## Run tests
 
@@ -179,7 +205,7 @@ python -m unittest discover -s tests -v
 Errors and lifecycle events are JSON lines on stderr. Password, secret, token
 and credential fields are redacted by key.
 
-## Model compatibility spike
+## Candidate model runtime
 
 The candidate family is represented by scikit-learn's
 `HistGradientBoostingRegressor`. Verify the optional local stack without adding
@@ -189,5 +215,5 @@ it to runtime commands:
 python scripts\check_model_runtime.py
 ```
 
-This smoke check only verifies import, deterministic fit/predict and dependency
-versions. It is not model evaluation evidence.
+This smoke check verifies import, deterministic fit/predict and dependency
+versions. Reported model evidence is produced only by the `train` command.

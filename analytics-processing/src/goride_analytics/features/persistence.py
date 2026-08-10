@@ -56,6 +56,7 @@ class ResumableFeatureArtifact:
     quality_status: str
     quality_results: tuple[QualityResult, ...]
     partitions: tuple[PersistedPartition, ...]
+    cell_size_meters: int | None = None
 
 
 @dataclass(frozen=True)
@@ -279,6 +280,7 @@ def load_resumable_feature_artifact(
         )
     try:
         row_count = int(manifest["rowCount"])
+        cell_size_meters = int(manifest["cellSizeMeters"])
         artifact_sha256 = str(manifest["sha256"])
         artifact_id = UUID(str(manifest["featureArtifactId"]))
         feature_set_version = str(manifest["featureSetVersion"])
@@ -405,6 +407,7 @@ def load_resumable_feature_artifact(
         quality_status=quality_status,
         quality_results=quality_results,
         partitions=tuple(partitions),
+        cell_size_meters=cell_size_meters,
     )
 
 

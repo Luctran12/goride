@@ -47,7 +47,7 @@ class AnalyticsCliTests(unittest.TestCase):
             stderr = io.StringIO()
             with patch.dict("os.environ", {"TEST_ANALYTICS_ROOT": str(root)}, clear=False):
                 exit_code = main(
-                    ["train", "--config", str(config_path)],
+                    ["forecast", "--config", str(config_path)],
                     stdout=stdout,
                     stderr=stderr,
                 )
@@ -248,6 +248,63 @@ class AnalyticsCliTests(unittest.TestCase):
         self.assertEqual(exit_code, ExitCode.SUCCESS)
         self.assertEqual(captured["feature_run"], "source-feature-run")
         self.assertEqual(json.loads(stdout.getvalue())["qualityStatus"], "PASS")
+
+    def test_train_dispatches_frozen_candidate_contract(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            base = Path(temporary)
+            root = create_data_root(base / "data")
+            config_path = write_config(base / "profile.yml")
+            experiment_path = base / "experiment.yml"
+            experiment_path.write_text("frozen: true\n", encoding="utf-8")
+            captured = {}
+
+            class Outcome:
+                artifact_run_id = "training-run"
+                baseline_artifact_run_id = "baseline-run"
+                source_artifact_run_id = "feature-run"
+                experiment_hash = "d" * 64
+                model_sha256 = "e" * 64
+                model_version = "candidate-v1"
+                processing_run_id = uuid.UUID(int=4)
+                quality_status = "PASS"
+                raw_prediction_rows = 360
+                raw_prediction_sha256 = "f" * 64
+
+                @staticmethod
+                def to_dict():
+                    return {
+                        "artifactRunId": "training-run",
+                        "candidateArtifact": {"modelVersion": "candidate-v1"},
+                        "qualityStatus": "PASS",
+                    }
+
+            def train(_config, **kwargs):
+                captured.update(kwargs)
+                return Outcome()
+
+            stdout = io.StringIO()
+            with patch.dict("os.environ", {"TEST_ANALYTICS_ROOT": str(root)}, clear=False):
+                exit_code = main(
+                    [
+                        "train",
+                        "--config",
+                        str(config_path),
+                        "--feature-run",
+                        "feature-run",
+                        "--baseline-run",
+                        "baseline-run",
+                        "--experiment-config",
+                        str(experiment_path),
+                    ],
+                    stdout=stdout,
+                    stderr=io.StringIO(),
+                    training_runner=train,
+                )
+
+        self.assertEqual(exit_code, ExitCode.SUCCESS)
+        self.assertEqual(captured["feature_run"], "feature-run")
+        self.assertEqual(captured["baseline_run"], "baseline-run")
+        self.assertEqual(captured["experiment_config"], str(experiment_path))
 
 
 if __name__ == "__main__":

@@ -12,6 +12,7 @@ from .features.pipeline import run_feature_build
 from .features.persistence import run_feature_persistence
 from .evaluation.pipeline import run_evaluation
 from .manifest import validate_dataset
+from .models.pipeline import run_candidate_training
 from .runs import build_run_identity
 from .stages import STAGE_COMMANDS, execute_placeholder
 from .structured_logging import JsonLogger
@@ -59,10 +60,19 @@ def build_parser() -> argparse.ArgumentParser:
     )
     evaluate.add_argument("--config", required=True)
     evaluate.add_argument("--feature-run", required=True)
+    train = subparsers.add_parser(
+        "train",
+        help="Tune and evaluate the frozen gradient-boosted-tree candidate",
+    )
+    train.add_argument("--config", required=True)
+    train.add_argument("--feature-run", required=True)
+    train.add_argument("--baseline-run", required=True)
+    train.add_argument("--experiment-config", required=True)
     for stage in (
         stage
         for stage in STAGE_COMMANDS
-        if stage not in {"extract", "build-features", "persist-features", "evaluate"}
+        if stage
+        not in {"extract", "build-features", "persist-features", "evaluate", "train"}
     ):
         command = subparsers.add_parser(stage, help=f"Phase-gated {stage} stage")
         command.add_argument("--config", required=True)
@@ -103,6 +113,7 @@ def main(
     feature_runner: Callable[..., Any] = run_feature_build,
     persistence_runner: Callable[..., Any] = run_feature_persistence,
     evaluation_runner: Callable[..., Any] = run_evaluation,
+    training_runner: Callable[..., Any] = run_candidate_training,
 ) -> int:
     stdout = stdout or sys.stdout
     logger = JsonLogger(stderr or sys.stderr)
@@ -163,6 +174,26 @@ def main(
                 "analytics_evaluation_completed",
                 artifactRunId=outcome.artifact_run_id,
                 featureSetVersion=outcome.feature_set_version,
+                processingRunId=str(outcome.processing_run_id),
+                qualityStatus=outcome.quality_status,
+                rawPredictionRows=outcome.raw_prediction_rows,
+                rawPredictionSha256=outcome.raw_prediction_sha256,
+                sourceArtifactRunId=outcome.source_artifact_run_id,
+            )
+        elif args.command == "train":
+            outcome = training_runner(
+                config,
+                feature_run=args.feature_run,
+                baseline_run=args.baseline_run,
+                experiment_config=args.experiment_config,
+            )
+            logger.info(
+                "analytics_candidate_training_completed",
+                artifactRunId=outcome.artifact_run_id,
+                baselineArtifactRunId=outcome.baseline_artifact_run_id,
+                experimentHash=outcome.experiment_hash,
+                modelSha256=outcome.model_sha256,
+                modelVersion=outcome.model_version,
                 processingRunId=str(outcome.processing_run_id),
                 qualityStatus=outcome.quality_status,
                 rawPredictionRows=outcome.raw_prediction_rows,

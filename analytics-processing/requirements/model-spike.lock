@@ -1,5 +1,4 @@
-# Phase 1 compatibility spike only. The production model lock is frozen again
-# with the selected model implementation in Phase 5/6.
+# Phase 6 candidate-model runtime, frozen from the reviewed compatibility spike.
 joblib==1.5.3
 numpy==1.26.4
 scikit-learn==1.9.0

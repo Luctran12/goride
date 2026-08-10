@@ -1,0 +1,80 @@
+version: porto-hgb-v1
+model_family: GRADIENT_BOOSTED_TREES
+implementation: sklearn.ensemble.HistGradientBoostingRegressor
+primary_metric: WAPE
+secondary_metrics: [MAE, RMSE]
+random_seed: 5537
+maximum_prediction_rows: 25000000
+
+training_sample:
+  strategy: deterministic_hash_stratified_weighted
+  positive_row_quota: 50000
+  zero_row_quota: 50000
+  preserve_population_with_sample_weight: true
+
+feature_sets:
+  A0:
+    - hour_sin
+    - hour_cos
+    - day_of_week
+    - is_weekend
+  A1:
+    - hour_sin
+    - hour_cos
+    - day_of_week
+    - is_weekend
+    - lag_1
+    - lag_2
+    - lag_4
+    - lag_96
+    - lag_672
+    - rolling_mean_4
+    - rolling_mean_12
+    - rolling_mean_96
+    - rolling_mean_672
+  A2:
+    - hour_sin
+    - hour_cos
+    - day_of_week
+    - is_weekend
+    - lag_1
+    - lag_2
+    - lag_4
+    - lag_96
+    - lag_672
+    - rolling_mean_4
+    - rolling_mean_12
+    - rolling_mean_96
+    - rolling_mean_672
+    - neighbor_demand_lag_1
+
+search_space:
+  - id: HGB_C1
+    learning_rate: 0.08
+    max_iter: 60
+    max_leaf_nodes: 15
+    min_samples_leaf: 50
+    l2_regularization: 1.0
+  - id: HGB_C2
+    learning_rate: 0.06
+    max_iter: 80
+    max_leaf_nodes: 31
+    min_samples_leaf: 50
+    l2_regularization: 1.0
+  - id: HGB_C3
+    learning_rate: 0.05
+    max_iter: 100
+    max_leaf_nodes: 31
+    min_samples_leaf: 100
+    l2_regularization: 2.0
+
+selection_rule:
+  scope: DEVELOPMENT_D1_D4_ONLY
+  aggregate: pooled_absolute_error_over_pooled_actual
+  tie_breakers: [MAE, CONFIG_ORDER]
+  selected_feature_set: A2
+  final_holdout_once: true
+
+prediction_interval:
+  enabled: false
+  reason: no calibrated interval method is frozen for Phase 6
