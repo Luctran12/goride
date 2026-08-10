@@ -11,8 +11,8 @@
 - Active feature: Admin demand-forecasting processing layer.
 - Current branch: `codex/admin-demand-forecasting`.
 - Backend base: `develop` commit `ae3dac2` (`merge admin-v2`).
-- Frontend integration baseline: `goride-web` branch `codex/admin_v2`, commit
-  `5acdf06` (`docs: record phase 11 release hardening review`).
+- Frontend integration: `goride-web` branch `codex/admin-demand-forecasting`,
+  commit `835635b` (`docs: record demand forecasting phase 9 review`).
 - Branch-base exception: the repository convention normally starts features
   from `main`, but `main` does not contain Admin Analytics Phase 0-8. This
   feature starts from `develop` because its schema, PostGIS grid, telemetry and
@@ -24,13 +24,13 @@
 
 ## 2. Active Phase
 
-Phase 8 — Spring Boot serving API from
+Phase 9 — Frontend foundation and Processing/Model UI from
 [`admin-analytics-processing-layer-implementation-plan.md`](admin-analytics-processing-layer-implementation-plan.md).
 
-User approval to start Phase 8: 2026-08-10. The read-only processing, quality,
-model, forecast, hotspot, evaluation and run-history API is implemented and
-verified against PostgreSQL/PostGIS. Phase 8 is at the review gate before the
-Phase 9 frontend foundation.
+User approval to start Phase 9: 2026-08-10. The frontend foundation, Processing
+Status, Data Quality, Model Registry/Evaluation and run-history screens are
+implemented and verified. Phase 9 is at the review gate before Phase 10
+Forecast Heatmap and hotspot exploration.
 
 Phase 7 implementation commits:
 
@@ -45,23 +45,30 @@ Phase 8 implementation commit:
 b9e00e2 feat: expose admin demand forecasting APIs
 ```
 
+Phase 9 frontend implementation commits:
+
+```text
+40a5170 feat: add demand forecasting frontend foundation
+376b99d feat: add analytics processing status UI
+913a44f feat: add model evaluation analytics UI
+835635b docs: record demand forecasting phase 9 review
+```
+
 Completed scope:
 
-- eight Admin-only read endpoints under `/api/v1/admin/analytics`;
-- set-based JDBC adapters for processing, quality, models, forecasts, hotspots,
-  evaluation and history;
-- GeoJSON forecast cells with server-supplied actual/error/interval, lineage,
-  units, quality, availability and freshness;
-- explicit `AVAILABLE_RESEARCH` / `HISTORICAL_EVALUATION` labelling for Porto;
-- bounded ranges, horizons, grids, bounds, pages and response sizes;
-- 10-second read timeout, global rate-limit integration, metrics and structured
-  logs;
-- additive serving/hotspot indexes with PostGIS query-plan evidence;
-- security, controller, service and PostgreSQL/PostGIS integration tests.
+- frontend constants, whitelist mappers, service and normalized error states;
+- Processing Status with stale/fresh metadata, row counts and PASS/WARN/FAIL;
+- filtered/paginated processing history and run-level Data Quality rules;
+- model registry/card with lifecycle, lineage, hyperparameters and checksum;
+- backend MAE/RMSE/WAPE cards, table and error chart with model/horizon/grid filters;
+- forecast-run history with actual coverage, freshness and quality;
+- visible Porto `RESEARCH_DEMONSTRATION` boundary;
+- responsive layouts, ARIA tabs and keyboard navigation;
+- 48 frontend test files / 217 tests plus successful production build.
 
-Out of scope for Phase 8:
+Out of scope for Phase 9:
 
-- Admin frontend processing/model/evaluation screens and forecast heatmap.
+- Forecast Heatmap, hotspots, Actual/Forecast/Error and cell-detail exploration.
 - browser-triggered training, model approval or forecast publication.
 - production approval of a Porto-trained model for Ho Chi Minh City.
 
@@ -386,9 +393,26 @@ database publication and record the selected population in artifact evidence.
 
 ---
 
-## 11. Next Expected Work
+## 11. Phase 9 Evidence
 
-Review the Phase 8 read-only API and research-scope evidence. After user
-approval, Phase 9 may implement the frontend foundation plus Processing Status,
-Data Quality and Model Evaluation screens. Porto evidence must remain visibly
-separated from live Ho Chi Minh City operations.
+- Two new `/analytics` tabs consume the Phase 8 read contract without runtime
+  mocks or legacy trip-filter requests.
+- Evaluation metrics remain backend-owned; the UI does not recompute or average
+  MAE/RMSE/WAPE.
+- Model artifact paths remain absent; only safe metadata and shortened checksum
+  are displayed.
+- Distinct empty/stale/403/404/422/429/503 states and keyboard tab navigation
+  are covered by component/page tests.
+- Frontend lint passes, 48 test files / 217 tests pass and production build
+  transforms 2,607 modules successfully.
+- Full evidence and limitations are recorded in
+  [`admin-demand-forecasting/phase-09-frontend-evidence.md`](admin-demand-forecasting/phase-09-frontend-evidence.md).
+
+---
+
+## 12. Next Expected Work
+
+Review the Phase 9 processing/model UI and research-scope evidence. After user
+approval, Phase 10 may implement Forecast Heatmap, Actual/Forecast/Error,
+hotspots, uncertainty/freshness and cell-detail exploration. Porto evidence
+must remain visibly separated from live Ho Chi Minh City operations.
