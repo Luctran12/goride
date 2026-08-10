@@ -79,7 +79,7 @@ class ThreeWordLocationControllerTests {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.error.code").value("VALIDATION_ERROR"))
-                .andExpect(jsonPath("$.error.details.lng").value("Request parameter is required"));
+                .andExpect(jsonPath("$.error.details.lng").value("Required request parameter is missing"));
     }
 
     @Test
@@ -89,7 +89,8 @@ class ThreeWordLocationControllerTests {
                         .param("lng", "106.7009"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error.code").value("VALIDATION_ERROR"))
-                .andExpect(jsonPath("$.error.details.lat").value("Request parameter value is invalid"));
+                .andExpect(jsonPath("$.error.details.lat")
+                        .value("Request parameter has an unsupported value or format"));
     }
 
     @Test

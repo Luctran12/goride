@@ -2,6 +2,7 @@ package com.example.goride.common.observability;
 
 import com.example.goride.analytics.repository.DriverSupplySnapshotRepository;
 import com.example.goride.analytics.repository.DirectAnalyticsQueryPort;
+import com.example.goride.analytics.repository.DemandForecastQueryPort;
 import com.example.goride.analytics.repository.MatchingOfferEventRepository;
 import com.example.goride.analytics.repository.MatchingRunRepository;
 import com.example.goride.booking.repository.PricingConfigRepository;
@@ -95,6 +96,9 @@ class ObservabilityMetricsIntegrationTests {
 
     @MockitoBean
     private DirectAnalyticsQueryPort directAnalyticsQueryPort;
+
+    @MockitoBean
+    private DemandForecastQueryPort demandForecastQueryPort;
 
     @Resource
     private MockMvc mockMvc;
