@@ -88,6 +88,10 @@ emits:
 - `feature-quality.json`, run evidence and `checksums.sha256`;
 - idempotent rows in `analytics.demand_features`.
 
+Database publication uses PostgreSQL `COPY` into a transaction-local staging
+table followed by one conflict-aware merge per partition. All partition merges
+and the terminal `SUCCEEDED` transition remain in one outer transaction.
+
 Demand lag, rolling and neighbor features use only buckets closed at the row's
 inference cutoff. GoRide supply remains nullable and WARNs when coverage is
 missing; a sample recorded after its bucket closes fails the build.
@@ -97,19 +101,35 @@ of demand in the train split. Validation/test demand never influences that
 population. Planning fails before Parquet/feature-row writes above 1,500,000
 rows per target-month partition or 15,000,000 rows for the run.
 
+If feature generation finishes but the database client is interrupted before
+commit, resume directly from the immutable artifact instead of rebuilding it:
+
+```powershell
+python -m goride_analytics persist-features `
+  --config configs\porto-thesis.yml `
+  --feature-run <feature-build-artifact-run-id>
+```
+
+The resume command verifies the source run/config, top-level checksums, every
+partition's SHA-256/byte count/Parquet row count, quality gates and cost guards
+before opening the database connection. It writes a separate persistence run
+that references the original feature artifact; it never edits that artifact.
+
 ## Stage commands
 
 ```text
 extract
 build-features
+persist-features
 train
 evaluate
 forecast
 ```
 
-`extract` and `build-features` are implemented through Phase 4. The remaining
-commands are explicit placeholders: they validate their profile and return exit code
-`4`/`STAGE_NOT_IMPLEMENTED` without fabricated success artifacts.
+`extract`, `build-features` and `persist-features` are implemented through
+Phase 4. The remaining commands are explicit placeholders: they validate their
+profile and return exit code `4`/`STAGE_NOT_IMPLEMENTED` without fabricated
+success artifacts.
 
 ## Run tests
 

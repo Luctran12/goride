@@ -430,6 +430,8 @@ class PostgresProcessingRunRepository:
 
 
 class PostgresFeatureRepository:
+    _STAGING_TABLE = "demand_features_stage"
+
     def __init__(self, connection: Any) -> None:
         self._connection = connection
 
@@ -476,9 +478,8 @@ class PostgresFeatureRepository:
         rows: Iterable[FeatureRow],
         *,
         created_by_run_id: uuid.UUID,
-        batch_size: int = 2_000,
     ) -> int:
-        statement = """
+        insert_statement = f"""
             INSERT INTO analytics.demand_features (
                 feature_set_version, source_profile, dataset_version,
                 demand_event_semantics, grid_version, projected_srid,
@@ -490,12 +491,19 @@ class PostgresFeatureRepository:
                 rolling_mean_672, hour_sin, hour_cos, day_of_week,
                 is_weekend, neighbor_demand_lag_1, available_driver_lag_1,
                 coverage_ratio, quality_status, created_by_run_id
-            ) VALUES (
-                %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
-                %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
-                %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
-                %s, %s, %s
             )
+            SELECT
+                feature_set_version, source_profile, dataset_version,
+                demand_event_semantics, grid_version, projected_srid,
+                cell_id, grid_x, grid_y, cell_size_meters,
+                bucket_start_utc, inference_cutoff_utc,
+                target_bucket_start_utc, horizon_minutes,
+                target_trip_requests, lag_1, lag_2, lag_4, lag_96, lag_672,
+                rolling_mean_4, rolling_mean_12, rolling_mean_96,
+                rolling_mean_672, hour_sin, hour_cos, day_of_week,
+                is_weekend, neighbor_demand_lag_1, available_driver_lag_1,
+                coverage_ratio, quality_status, created_by_run_id
+            FROM {self._STAGING_TABLE}
             ON CONFLICT (
                 feature_set_version, source_profile, dataset_version,
                 grid_version, cell_id, bucket_start_utc,
@@ -528,20 +536,41 @@ class PostgresFeatureRepository:
                 created_by_run_id = EXCLUDED.created_by_run_id,
                 created_at = CURRENT_TIMESTAMP
         """
+        copy_statement = f"""
+            COPY {self._STAGING_TABLE} (
+                feature_set_version, source_profile, dataset_version,
+                demand_event_semantics, grid_version, projected_srid,
+                cell_id, grid_x, grid_y, cell_size_meters,
+                bucket_start_utc, inference_cutoff_utc,
+                target_bucket_start_utc, horizon_minutes,
+                target_trip_requests, lag_1, lag_2, lag_4, lag_96, lag_672,
+                rolling_mean_4, rolling_mean_12, rolling_mean_96,
+                rolling_mean_672, hour_sin, hour_cos, day_of_week,
+                is_weekend, neighbor_demand_lag_1, available_driver_lag_1,
+                coverage_ratio, quality_status, created_by_run_id
+            ) FROM STDIN
+        """
         written = 0
-        batch: list[tuple[Any, ...]] = []
         try:
             with self._connection.transaction():
                 with self._connection.cursor() as cursor:
-                    for row in rows:
-                        batch.append(self._values(row, created_by_run_id))
-                        if len(batch) >= batch_size:
-                            cursor.executemany(statement, batch)
-                            written += len(batch)
-                            batch.clear()
-                    if batch:
-                        cursor.executemany(statement, batch)
-                        written += len(batch)
+                    cursor.execute(
+                        f"""
+                        CREATE TEMP TABLE IF NOT EXISTS {self._STAGING_TABLE}
+                        (LIKE analytics.demand_features INCLUDING DEFAULTS)
+                        ON COMMIT DROP
+                        """
+                    )
+                    cursor.execute(f"TRUNCATE {self._STAGING_TABLE}")
+                    with cursor.copy(copy_statement) as copy:
+                        for row in rows:
+                            copy.write_row(self._values(row, created_by_run_id))
+                            written += 1
+                    cursor.execute(insert_statement)
+                    if cursor.rowcount != written:
+                        raise RuntimeError(
+                            "bulk feature merge count does not match staged rows"
+                        )
             return written
         except DatabaseError:
             raise

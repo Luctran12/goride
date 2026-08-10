@@ -178,6 +178,19 @@ Feature rows are partitioned by `target_bucket_start_utc` calendar month. The
 partition dimension changes storage/layout only, not feature or target
 semantics.
 
+Database publication copies one verified Parquet partition at a time into a
+transaction-local PostgreSQL staging table, then merges it idempotently into
+`analytics.demand_features`. All partitions and the processing-run terminal
+transition share one outer transaction: readers observe either the complete
+feature set or none of it.
+
+An interrupted database publication may resume from an existing immutable
+feature artifact. Resume must revalidate the source run/config, top-level
+checksums, dataset-manifest checksum, each partition's SHA-256/byte count/
+Parquet row count, quality status and row cost guards before connecting to the
+database. Resume writes a new audit/evidence run that references the original
+feature artifact and never mutates it.
+
 ## 8. Feature availability contract
 
 A feature used to predict target bucket `b` at inference cutoff `t` is valid
