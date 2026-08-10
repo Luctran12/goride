@@ -12,7 +12,7 @@
 - Current branch: `codex/admin-demand-forecasting`.
 - Backend base: `develop` commit `ae3dac2` (`merge admin-v2`).
 - Frontend integration: `goride-web` branch `codex/admin-demand-forecasting`,
-  commit `835635b` (`docs: record demand forecasting phase 9 review`).
+  commit `8a384b7` (`docs: record demand forecasting phase 10 review`).
 - Branch-base exception: the repository convention normally starts features
   from `main`, but `main` does not contain Admin Analytics Phase 0-8. This
   feature starts from `develop` because its schema, PostGIS grid, telemetry and
@@ -24,13 +24,13 @@
 
 ## 2. Active Phase
 
-Phase 9 — Frontend foundation and Processing/Model UI from
+Phase 10 — Forecast Heatmap and hotspot exploration from
 [`admin-analytics-processing-layer-implementation-plan.md`](admin-analytics-processing-layer-implementation-plan.md).
 
-User approval to start Phase 9: 2026-08-10. The frontend foundation, Processing
-Status, Data Quality, Model Registry/Evaluation and run-history screens are
-implemented and verified. Phase 9 is at the review gate before Phase 10
-Forecast Heatmap and hotspot exploration.
+User approval to continue implementation: 2026-08-10. The Forecast Heatmap,
+Actual/Forecast/Absolute Error exploration, run/time/horizon/grid/bounds controls,
+hotspots and cell evidence are implemented and verified. Phase 10 is at the
+review gate before Phase 11 end-to-end evaluation and thesis artifacts.
 
 Phase 7 implementation commits:
 
@@ -54,23 +54,35 @@ Phase 9 frontend implementation commits:
 835635b docs: record demand forecasting phase 9 review
 ```
 
+Phase 10 frontend implementation commits:
+
+```text
+ca010ab feat: add forecast exploration foundation
+8572fd1 feat: add forecast heatmap exploration UI
+42c0b74 test: harden forecast exploration states
+8a384b7 docs: record demand forecasting phase 10 review
+```
+
 Completed scope:
 
-- frontend constants, whitelist mappers, service and normalized error states;
-- Processing Status with stale/fresh metadata, row counts and PASS/WARN/FAIL;
-- filtered/paginated processing history and run-level Data Quality rules;
-- model registry/card with lifecycle, lineage, hyperparameters and checksum;
-- backend MAE/RMSE/WAPE cards, table and error chart with model/horizon/grid filters;
-- forecast-run history with actual coverage, freshness and quality;
-- visible Porto `RESEARCH_DEMONSTRATION` boundary;
-- responsive layouts, ARIA tabs and keyboard navigation;
-- 48 frontend test files / 217 tests plus successful production build.
+- forecast/hotspot endpoint integration with exact contract params and whitelist mappers;
+- GeoJSON heatmap with Forecast/Actual/Absolute Error and target-bucket slider;
+- run, UTC range, horizon, grid-size and map-bounds controls with local limits;
+- backend uncertainty, freshness, quality, actual coverage and demand units;
+- backend-ranked hotspot table and cell-detail evidence drawer;
+- request cancellation/race protection and oversized payload guard;
+- visible Porto `RESEARCH_DEMONSTRATION` and stale boundaries;
+- responsive and accessible map/legend/table/filter/drawer states;
+- 50 frontend test files / 237 tests plus successful 2,610-module build.
 
-Out of scope for Phase 9:
+Out of scope for Phase 10:
 
-- Forecast Heatmap, hotspots, Actual/Forecast/Error and cell-detail exploration.
+- Vehicle/service-area forecast filters, because Phase 8 does not expose those
+  dimensions on forecast rows or accept the query parameters.
 - browser-triggered training, model approval or forecast publication.
 - production approval of a Porto-trained model for Ho Chi Minh City.
+- authenticated E2E, failure recovery, load/storage/privacy measurements and
+  final thesis artifact traceability; these belong to Phase 11.
 
 ---
 
@@ -410,9 +422,27 @@ database publication and record the selected population in artifact evidence.
 
 ---
 
-## 12. Next Expected Work
+## 12. Phase 10 Evidence
 
-Review the Phase 9 processing/model UI and research-scope evidence. After user
-approval, Phase 10 may implement Forecast Heatmap, Actual/Forecast/Error,
-hotspots, uncertainty/freshness and cell-detail exploration. Porto evidence
-must remain visibly separated from live Ho Chi Minh City operations.
+- The forecast tab renders backend GeoJSON cells with Forecast, Actual and
+  Absolute Error modes, UTC target-bucket navigation and map-bounds filtering.
+- Run, range, horizon and grid limits are validated before requests; changed
+  filters abort prior requests and hide stale map/hotspot responses.
+- Uncertainty, freshness, quality, demand units, actual coverage and Porto
+  `RESEARCH_DEMONSTRATION` boundaries remain visible.
+- Hotspot rank/error values remain backend-owned and open an auditable cell
+  drawer rather than being recomputed in the browser.
+- Frontend lint passes, 50 test files / 237 tests pass and production build
+  transforms 2,610 modules successfully.
+- Full evidence and limitations are recorded in
+  [`admin-demand-forecasting/phase-10-forecast-ui-evidence.md`](admin-demand-forecasting/phase-10-forecast-ui-evidence.md).
+
+---
+
+## 13. Next Expected Work
+
+Review the Phase 10 forecast exploration and contract-gap evidence. After user
+approval, Phase 11 may run the end-to-end pipeline/UI evaluation, controlled
+failure and performance measurements, privacy/security review and final thesis
+artifact traceability. Porto evidence must remain visibly separated from live
+Ho Chi Minh City operations.
