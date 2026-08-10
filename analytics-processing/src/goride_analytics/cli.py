@@ -13,6 +13,9 @@ from .features.persistence import run_feature_persistence
 from .evaluation.pipeline import run_evaluation
 from .manifest import validate_dataset
 from .models.pipeline import run_candidate_training
+from .operations.backfill import run_actual_backfill
+from .operations.forecast import run_forecast
+from .operations.registry import register_model, transition_model
 from .runs import build_run_identity
 from .stages import STAGE_COMMANDS, execute_placeholder
 from .structured_logging import JsonLogger
@@ -73,11 +76,56 @@ def build_parser() -> argparse.ArgumentParser:
     train.add_argument("--feature-run", required=True)
     train.add_argument("--baseline-run", required=True)
     train.add_argument("--experiment-config", required=True)
+    register = subparsers.add_parser(
+        "register-model",
+        help="Verify and register a Phase 6 candidate model",
+    )
+    register.add_argument("--config", required=True)
+    register.add_argument("--training-run", required=True)
+    register.add_argument("--actor", required=True)
+    register.add_argument("--reason", required=True)
+    for command_name, target_status in (
+        ("approve-model", "APPROVED"),
+        ("reject-model", "REJECTED"),
+        ("retire-model", "RETIRED"),
+    ):
+        lifecycle = subparsers.add_parser(
+            command_name,
+            help=f"Transition a registered model to {target_status}",
+        )
+        lifecycle.add_argument("--config", required=True)
+        lifecycle.add_argument("--model-version", required=True)
+        lifecycle.add_argument("--actor", required=True)
+        lifecycle.add_argument("--reason", required=True)
+    forecast = subparsers.add_parser(
+        "forecast",
+        help="Run checksum-gated scheduled inference",
+    )
+    forecast.add_argument("--config", required=True)
+    forecast.add_argument("--operations-config", required=True)
+    forecast.add_argument("--model-version", required=True)
+    forecast.add_argument("--inference-cutoff", required=True)
+    forecast.add_argument(
+        "--purpose",
+        choices=("EVALUATION", "PUBLISHED"),
+        default="EVALUATION",
+    )
+    backfill = subparsers.add_parser(
+        "backfill-actual",
+        help="Backfill actual demand and absolute error after watermark closure",
+    )
+    backfill.add_argument("--config", required=True)
+    backfill.add_argument("--operations-config", required=True)
+    backfill.add_argument("--forecast-run", required=True)
+    backfill.add_argument("--watermark-utc", required=True)
     for stage in (
         stage
         for stage in STAGE_COMMANDS
         if stage
-        not in {"extract", "build-features", "persist-features", "evaluate", "train"}
+        not in {
+            "extract", "build-features", "persist-features", "evaluate", "train",
+            "forecast",
+        }
     ):
         command = subparsers.add_parser(stage, help=f"Phase-gated {stage} stage")
         command.add_argument("--config", required=True)
@@ -119,6 +167,10 @@ def main(
     persistence_runner: Callable[..., Any] = run_feature_persistence,
     evaluation_runner: Callable[..., Any] = run_evaluation,
     training_runner: Callable[..., Any] = run_candidate_training,
+    registration_runner: Callable[..., Any] = register_model,
+    transition_runner: Callable[..., Any] = transition_model,
+    forecast_runner: Callable[..., Any] = run_forecast,
+    backfill_runner: Callable[..., Any] = run_actual_backfill,
 ) -> int:
     stdout = stdout or sys.stdout
     logger = JsonLogger(stderr or sys.stderr)
@@ -205,6 +257,76 @@ def main(
                 rawPredictionRows=outcome.raw_prediction_rows,
                 rawPredictionSha256=outcome.raw_prediction_sha256,
                 sourceArtifactRunId=outcome.source_artifact_run_id,
+            )
+        elif args.command == "register-model":
+            outcome = registration_runner(
+                config,
+                training_run=args.training_run,
+                actor=args.actor,
+                reason=args.reason,
+            )
+            logger.info(
+                "analytics_model_registered",
+                modelVersion=outcome.model_version,
+                modelVersionId=str(outcome.model_version_id),
+                lifecycleStatus=outcome.lifecycle_status,
+                approvalScope=outcome.approval_scope,
+                idempotent=outcome.idempotent,
+            )
+        elif args.command in {"approve-model", "reject-model", "retire-model"}:
+            target_status = {
+                "approve-model": "APPROVED",
+                "reject-model": "REJECTED",
+                "retire-model": "RETIRED",
+            }[args.command]
+            outcome = transition_runner(
+                config,
+                model_version=args.model_version,
+                target_status=target_status,
+                actor=args.actor,
+                reason=args.reason,
+            )
+            logger.info(
+                "analytics_model_lifecycle_updated",
+                modelVersion=outcome.model_version,
+                modelVersionId=str(outcome.model_version_id),
+                lifecycleStatus=outcome.lifecycle_status,
+                approvalScope=outcome.approval_scope,
+                idempotent=outcome.idempotent,
+            )
+        elif args.command == "forecast":
+            outcome = forecast_runner(
+                config,
+                operations_config=args.operations_config,
+                model_version=args.model_version,
+                inference_cutoff=args.inference_cutoff,
+                purpose=args.purpose,
+            )
+            logger.info(
+                "analytics_forecast_completed",
+                artifactRunId=outcome.artifact_run_id,
+                forecastRunId=str(outcome.forecast_run_id),
+                forecastRows=outcome.forecast_rows,
+                idempotent=outcome.idempotent,
+                modelVersion=outcome.model_version,
+                processingRunId=str(outcome.processing_run_id),
+                qualityStatus=outcome.quality_status,
+            )
+        elif args.command == "backfill-actual":
+            outcome = backfill_runner(
+                config,
+                operations_config=args.operations_config,
+                forecast_run=args.forecast_run,
+                watermark_utc=args.watermark_utc,
+            )
+            logger.info(
+                "analytics_actual_backfill_completed",
+                artifactRunId=outcome.artifact_run_id,
+                forecastRunId=str(outcome.forecast_run_id),
+                eligibleRows=outcome.eligible_rows,
+                updatedRows=outcome.updated_rows,
+                processingRunId=str(outcome.processing_run_id),
+                qualityStatus=outcome.quality_status,
             )
         elif args.command != "validate-config":
             execute_placeholder(args.command)

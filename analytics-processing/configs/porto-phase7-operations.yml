@@ -1,0 +1,7 @@
+version: porto-operations-v1
+approval_scope: RESEARCH_DEMONSTRATION
+stale_after_minutes: 30
+actual_watermark_delay_minutes: 15
+forecast_retention_days: 90
+maximum_rows_per_run: 10000
+allowed_purposes: [EVALUATION, PUBLISHED]

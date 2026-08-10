@@ -168,6 +168,61 @@ comparisons, resource measurements, quality gates and SHA-256 checksums.
 Prediction intervals remain disabled because Phase 6 has no frozen calibrated
 interval method.
 
+## Register and operationalize the research model
+
+Phase 7 verifies the complete training evidence before creating a registry
+entry. The database lifecycle name `VALIDATED` represents the research
+`CANDIDATE`; it is never auto-promoted from a metric:
+
+```powershell
+python -m goride_analytics register-model `
+  --config configs\porto-thesis.yml `
+  --training-run <training-artifact-run-id> `
+  --actor <admin-identity> `
+  --reason "validated Phase 6 research evidence"
+
+python -m goride_analytics approve-model `
+  --config configs\porto-thesis.yml `
+  --model-version <model-version> `
+  --actor <admin-identity> `
+  --reason "research demonstration only"
+```
+
+The approval scope is fixed to `RESEARCH_DEMONSTRATION`. A Porto model is not
+approved for production use in Ho Chi Minh City.
+
+Run checksum-gated inference from persisted feature rows at an aligned cutoff:
+
+```powershell
+python -m goride_analytics forecast `
+  --config configs\porto-thesis.yml `
+  --operations-config configs\porto-phase7-operations.yml `
+  --model-version <model-version> `
+  --inference-cutoff 2014-06-01T00:00:00Z `
+  --purpose EVALUATION
+```
+
+Equivalent successful runs are returned idempotently. Failed attempts retain
+their processing evidence and may retry only after the empty failed forecast
+header is removed by the controlled retry path. Forecast rows, terminal run
+state and processing success are published in one transaction.
+
+After the target bucket and configured watermark delay have closed, backfill
+actual demand and exact absolute error:
+
+```powershell
+python -m goride_analytics backfill-actual `
+  --config configs\porto-thesis.yml `
+  --operations-config configs\porto-phase7-operations.yml `
+  --forecast-run <forecast-run-uuid> `
+  --watermark-utc 2014-06-01T01:15:00Z
+```
+
+Real-time `PUBLISHED` runs additionally enforce the 30-minute freshness
+threshold. The frozen operations contract records a 90-day forecast retention
+policy; automated destructive pruning remains disabled until deployment owns a
+backup and retention schedule.
+
 ## Stage commands
 
 ```text

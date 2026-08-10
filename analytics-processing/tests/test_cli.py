@@ -38,24 +38,62 @@ class AnalyticsCliTests(unittest.TestCase):
         log = json.loads(stderr.getvalue())
         self.assertEqual(log["event"], "analytics_configuration_validated")
 
-    def test_stage_validates_then_returns_explicit_not_implemented(self) -> None:
+    def test_forecast_dispatches_operational_contract(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             base = Path(temporary)
             root = create_data_root(base / "data")
             config_path = write_config(base / "profile.yml")
+            operations_path = base / "operations.yml"
+            operations_path.write_text("frozen: true\n", encoding="utf-8")
             stdout = io.StringIO()
             stderr = io.StringIO()
+            captured = {}
+
+            class Outcome:
+                artifact_run_id = "forecast-run"
+                processing_run_id = uuid.UUID(int=10)
+                forecast_run_id = uuid.UUID(int=11)
+                forecast_rows = 30
+                idempotent = False
+                model_version = "candidate-v1"
+                quality_status = "PASS"
+
+                @staticmethod
+                def to_dict():
+                    return {
+                        "artifactRunId": "forecast-run",
+                        "forecastRun": {"forecastRows": 30},
+                        "qualityStatus": "PASS",
+                    }
+
+            def forecast(_config, **kwargs):
+                captured.update(kwargs)
+                return Outcome()
+
             with patch.dict("os.environ", {"TEST_ANALYTICS_ROOT": str(root)}, clear=False):
                 exit_code = main(
-                    ["forecast", "--config", str(config_path)],
+                    [
+                        "forecast",
+                        "--config",
+                        str(config_path),
+                        "--operations-config",
+                        str(operations_path),
+                        "--model-version",
+                        "candidate-v1",
+                        "--inference-cutoff",
+                        "2014-06-01T00:00:00Z",
+                        "--purpose",
+                        "EVALUATION",
+                    ],
                     stdout=stdout,
                     stderr=stderr,
+                    forecast_runner=forecast,
                 )
 
-        self.assertEqual(exit_code, ExitCode.STAGE_NOT_IMPLEMENTED)
-        self.assertEqual(stdout.getvalue(), "")
-        records = [json.loads(line) for line in stderr.getvalue().splitlines()]
-        self.assertEqual(records[-1]["errorCode"], "STAGE_NOT_IMPLEMENTED")
+        self.assertEqual(exit_code, ExitCode.SUCCESS)
+        self.assertEqual(captured["model_version"], "candidate-v1")
+        self.assertEqual(captured["purpose"], "EVALUATION")
+        self.assertEqual(json.loads(stdout.getvalue())["qualityStatus"], "PASS")
 
     def test_invalid_cli_arguments_use_config_exit_code(self) -> None:
         stderr = io.StringIO()
@@ -307,6 +345,100 @@ class AnalyticsCliTests(unittest.TestCase):
         self.assertEqual(captured["feature_run"], "feature-run")
         self.assertEqual(captured["baseline_run"], "baseline-run")
         self.assertEqual(captured["experiment_config"], str(experiment_path))
+
+    def test_register_and_approve_model_dispatch_audited_lifecycle(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            base = Path(temporary)
+            root = create_data_root(base / "data")
+            config_path = write_config(base / "profile.yml")
+            calls = []
+
+            class Outcome:
+                model_version_id = uuid.UUID(int=20)
+                model_name = "research-model"
+                model_version = "candidate-v1"
+                lifecycle_status = "VALIDATED"
+                artifact_sha256 = "a" * 64
+                approval_scope = "RESEARCH_DEMONSTRATION"
+                idempotent = False
+
+                @staticmethod
+                def to_dict():
+                    return {"modelRegistry": {"lifecycleStatus": "VALIDATED"}}
+
+            def register(_config, **kwargs):
+                calls.append(("register", kwargs))
+                return Outcome()
+
+            def transition(_config, **kwargs):
+                calls.append(("transition", kwargs))
+                Outcome.lifecycle_status = kwargs["target_status"]
+                return Outcome()
+
+            with patch.dict("os.environ", {"TEST_ANALYTICS_ROOT": str(root)}, clear=False):
+                register_exit = main(
+                    [
+                        "register-model", "--config", str(config_path),
+                        "--training-run", "training-run", "--actor", "admin",
+                        "--reason", "research evidence",
+                    ],
+                    stdout=io.StringIO(), stderr=io.StringIO(),
+                    registration_runner=register,
+                )
+                approve_exit = main(
+                    [
+                        "approve-model", "--config", str(config_path),
+                        "--model-version", "candidate-v1", "--actor", "admin",
+                        "--reason", "research demonstration only",
+                    ],
+                    stdout=io.StringIO(), stderr=io.StringIO(),
+                    transition_runner=transition,
+                )
+
+        self.assertEqual(register_exit, ExitCode.SUCCESS)
+        self.assertEqual(approve_exit, ExitCode.SUCCESS)
+        self.assertEqual(calls[0][1]["training_run"], "training-run")
+        self.assertEqual(calls[1][1]["target_status"], "APPROVED")
+
+    def test_backfill_dispatches_watermark_contract(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            base = Path(temporary)
+            root = create_data_root(base / "data")
+            config_path = write_config(base / "profile.yml")
+            operations_path = base / "operations.yml"
+            operations_path.write_text("frozen: true\n", encoding="utf-8")
+            captured = {}
+
+            class Outcome:
+                artifact_run_id = "backfill-run"
+                processing_run_id = uuid.UUID(int=30)
+                forecast_run_id = uuid.UUID(int=31)
+                eligible_rows = 10
+                updated_rows = 10
+                quality_status = "PASS"
+
+                @staticmethod
+                def to_dict():
+                    return {"actualBackfill": {"updatedRows": 10}, "qualityStatus": "PASS"}
+
+            def backfill(_config, **kwargs):
+                captured.update(kwargs)
+                return Outcome()
+
+            with patch.dict("os.environ", {"TEST_ANALYTICS_ROOT": str(root)}, clear=False):
+                exit_code = main(
+                    [
+                        "backfill-actual", "--config", str(config_path),
+                        "--operations-config", str(operations_path),
+                        "--forecast-run", str(uuid.UUID(int=31)),
+                        "--watermark-utc", "2014-06-01T01:15:00Z",
+                    ],
+                    stdout=io.StringIO(), stderr=io.StringIO(),
+                    backfill_runner=backfill,
+                )
+
+        self.assertEqual(exit_code, ExitCode.SUCCESS)
+        self.assertEqual(captured["watermark_utc"], "2014-06-01T01:15:00Z")
 
 
 if __name__ == "__main__":
