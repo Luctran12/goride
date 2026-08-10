@@ -44,7 +44,7 @@ fbffcb4 feat: explain forecast privacy suppression (frontend)
 
 - Frozen verifier: 296 files / 2,074,459,267 bytes, PASS.
 - Python 3.11 và 3.12: mỗi runtime 98 test pass, 5 opt-in skip.
-- Spring backend: 135 suites / 584 test pass, 0 failure/error/skip.
+- Spring backend: 134 suites / 583 test pass, 0 failure/error/skip.
 - Admin Web: 50 files / 238 test pass; lint và production build pass.
 - Synthetic serving benchmark (100 calls/endpoint): demand P95 8.241 ms,
   hotspots P95 9.524 ms.

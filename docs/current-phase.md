@@ -91,7 +91,7 @@ Completed scope:
 - synthetic PostGIS serving benchmark with explicit non-accuracy claim;
 - model card, data sheet, evaluation report, architecture, runbook and final
   Definition-of-Done traceability;
-- 135 backend suites / 584 tests and 50 frontend files / 238 tests, plus lint
+- 134 backend suites / 583 tests and 50 frontend files / 238 tests, plus lint
   and successful 2,610-module production build.
 
 Remaining deployment scope:
@@ -467,8 +467,8 @@ database publication and record the selected population in artifact evidence.
 - Synthetic PostGIS serving P95 is 8.241 ms for demand GeoJSON and 9.524 ms for
   hotspots over 100 measured calls per endpoint. This is plumbing evidence,
   not a production load or accuracy claim.
-- Python 3.11/3.12 each pass 98 tests (five opt-in skips); Spring passes 135
-  suites / 584 tests with no skip; Admin Web passes 50 files / 238 tests, lint
+- Python 3.11/3.12 each pass 98 tests (five opt-in skips); Spring passes 134
+  suites / 583 tests with no skip; Admin Web passes 50 files / 238 tests, lint
   and production build.
 - Final traceability, failure matrix, security boundary and limitations are in
   [`admin-demand-forecasting/phase-11-final-evidence.md`](admin-demand-forecasting/phase-11-final-evidence.md).

@@ -99,7 +99,7 @@ GB including indexes; G1000/G2000 sensitivity artifacts are Parquet-only.
 
 - Python 3.11: 98 tests pass, 5 opt-in integrations skipped.
 - Python 3.12: 98 tests pass, 5 opt-in integrations skipped.
-- Spring backend: 135 suites / 584 tests pass, no failure, error or skip.
+- Spring backend: 134 suites / 583 tests pass, no failure, error or skip.
 - Admin Web: 50 files / 238 tests pass; lint and production build pass (2,610
   modules).
 
