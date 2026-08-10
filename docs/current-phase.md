@@ -24,14 +24,15 @@
 
 ## 2. Active Phase
 
-Phase 7 — Model registry and scheduled inference from
+Phase 8 — Spring Boot serving API from
 [`admin-analytics-processing-layer-implementation-plan.md`](admin-analytics-processing-layer-implementation-plan.md).
 
-User approval to start Phase 7: 2026-08-10. Registry, research approval,
-inference, idempotency, rollback/retry, backfill and independent verification
-are complete. Phase 7 is at the review gate before Spring serving APIs.
+User approval to start Phase 8: 2026-08-10. The read-only processing, quality,
+model, forecast, hotspot, evaluation and run-history API is implemented and
+verified against PostgreSQL/PostGIS. Phase 8 is at the review gate before the
+Phase 9 frontend foundation.
 
-Implementation commit:
+Phase 7 implementation commits:
 
 ```text
 9177be9 feat: operationalize registered demand forecasts
@@ -40,18 +41,22 @@ cc2c935 fix: canonicalize idempotent forecast cutoff
 
 Completed scope:
 
-- checksum-gated registration of the selected G500 A2 model;
-- explicit audited `VALIDATED` to `APPROVED` research lifecycle;
-- scheduler-ready inference for horizons 15/30/60 with freshness and cost
-  guards;
-- idempotent forecast identity and atomic forecast/processing publication;
-- watermark-safe actual-demand and absolute-error backfill;
-- controlled retry after an empty failed forecast header while retaining
-  failed processing and artifact evidence.
+- eight Admin-only read endpoints under `/api/v1/admin/analytics`;
+- set-based JDBC adapters for processing, quality, models, forecasts, hotspots,
+  evaluation and history;
+- GeoJSON forecast cells with server-supplied actual/error/interval, lineage,
+  units, quality, availability and freshness;
+- explicit `AVAILABLE_RESEARCH` / `HISTORICAL_EVALUATION` labelling for Porto;
+- bounded ranges, horizons, grids, bounds, pages and response sizes;
+- 10-second read timeout, global rate-limit integration, metrics and structured
+  logs;
+- additive serving/hotspot indexes with PostGIS query-plan evidence;
+- security, controller, service and PostgreSQL/PostGIS integration tests.
 
-Out of scope for Phase 7:
+Out of scope for Phase 8:
 
-- Spring forecast APIs and Admin forecast UI.
+- Admin frontend processing/model/evaluation screens and forecast heatmap.
+- browser-triggered training, model approval or forecast publication.
 - production approval of a Porto-trained model for Ho Chi Minh City.
 
 ---
@@ -355,9 +360,29 @@ database publication and record the selected population in artifact evidence.
 
 ---
 
-## 10. Next Expected Work
+## 10. Phase 8 Evidence
 
-Review the Phase 7 research-only operational evidence. After user approval,
-Phase 8 may expose read-only Spring Admin endpoints for models, forecasts,
-hotspots, evaluation, freshness, quality and run history. Porto evidence must
-remain visibly separated from live Ho Chi Minh City operations.
+- Eight read-only endpoints cover processing, quality, model registry, forecast
+  GeoJSON, hotspots, evaluation and run history.
+- Porto `EVALUATION` responses are labelled `AVAILABLE_RESEARCH` and
+  `HISTORICAL_EVALUATION`; operational `PUBLISHED` responses have an explicit
+  fresh/stale contract.
+- Payload/range/page/bounds guards, 10-second query timeout, Admin RBAC, global
+  rate limiting and stable `400/403/404/429/503` contracts are in place.
+- MAE/RMSE/WAPE are supplied by PostgreSQL from the evaluation store or
+  actual-backfilled rows; the UI does not recalculate them.
+- Serving/hotspot indexes and the existing geometry GiST index are verified by
+  Testcontainers query plans.
+- Phase 8 focused suite passes 11/11; the existing Admin Analytics regression
+  suite passes 19/19.
+- Full contract and limitations are recorded in
+  [`admin-demand-forecasting/phase-08-serving-api-evidence.md`](admin-demand-forecasting/phase-08-serving-api-evidence.md).
+
+---
+
+## 11. Next Expected Work
+
+Review the Phase 8 read-only API and research-scope evidence. After user
+approval, Phase 9 may implement the frontend foundation plus Processing Status,
+Data Quality and Model Evaluation screens. Porto evidence must remain visibly
+separated from live Ho Chi Minh City operations.

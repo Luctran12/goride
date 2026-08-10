@@ -108,6 +108,9 @@ public class AnalyticsQueryRouter {
                     (bucket != null || operation == AnalyticsQueryOperation.DEMAND_HEATMAP)
                             && isLocalHourBoundary(filter.from().atZone(filter.reportingTimezone()))
                             && isLocalHourBoundary(filter.to().atZone(filter.reportingTimezone()));
+            case PROCESSING_STATUS, PROCESSING_RUNS, DATA_QUALITY, MODEL_VERSIONS,
+                    FORECAST_DEMAND, FORECAST_HOTSPOTS, FORECAST_EVALUATION,
+                    FORECAST_RUNS -> false;
         };
         if (!supported) {
             return Optional.empty();

@@ -6,6 +6,44 @@
 
 ---
 
+## Commit: `feat: expose admin demand forecasting APIs`
+
+Branch: `codex/admin-demand-forecasting`
+
+Phase: Admin Demand Forecasting Phase 8 - Spring Boot serving API
+
+### Nội dung đã triển khai
+
+- Thêm 8 endpoint read-only cho processing status/history, data quality, model
+  registry, forecast GeoJSON, hotspots, evaluation và forecast history.
+- Tách query port/JDBC adapter set-based; aggregate quality/row coverage bằng
+  CTE, không query theo từng cell/run.
+- Trả model/feature/run lineage, approval scope, units, actual/error/interval,
+  freshness và availability; không lộ artifact URI/model binary.
+- Gắn `AVAILABLE_RESEARCH` và `HISTORICAL_EVALUATION` cho Porto evaluation,
+  tách khỏi operational forecast TP.HCM.
+- Validate range/timezone/horizon/cell/bounds/page; giới hạn payload, timeout
+  read transaction 10 giây và dùng rate-limit hiện hữu.
+- Thêm structured observation, stable `404/503` errors và OpenAPI contract.
+- Thêm serving/hotspot index release; Testcontainers xác nhận hotspot index và
+  PostGIS GiST geometry index được planner sử dụng.
+
+### Validation
+
+- Unit/service/controller tests pass, gồm `ROLE_PASSENGER -> 403`, invalid
+  filter `-> 400`, stale/unavailable và backend metric fallback.
+- PostgreSQL 15 + PostGIS 3.3 + Redis 7 integration: 2/2 pass.
+- `.env.example` của user không nằm trong thay đổi Phase 8.
+
+### Giới hạn
+
+- Phase 8 chỉ là backend read contract; Phase 9/10 mới triển khai UI và forecast
+  heatmap.
+- Serving index release chưa tự động áp vào database developer; deploy theo
+  `precheck -> apply -> verify`.
+
+---
+
 ## Commit: `cc2c935` - `fix: canonicalize idempotent forecast cutoff`
 
 Branch: `codex/admin-demand-forecasting`

@@ -14,10 +14,13 @@ spatio-temporal demand-forecasting extension of Admin Analytics.
 
 - [Phase 6 candidate-model evidence](phase-06-candidate-evidence.md)
 - [Phase 7 model-registry and inference evidence](phase-07-operational-evidence.md)
+- [Phase 8 Spring serving API evidence](phase-08-serving-api-evidence.md)
 
 The historical Admin Analytics subsystem remains documented in
 [`../admin-analytics`](../admin-analytics/README.md). The forecasting layer is
-an extension and must not be described as an existing Phase 8 capability.
+an extension. Phase 8 now provides the read-only Spring Admin contract;
+frontend processing/model screens and the forecast map remain Phase 9 and
+Phase 10 work.
 
 ## Claim boundary
 
