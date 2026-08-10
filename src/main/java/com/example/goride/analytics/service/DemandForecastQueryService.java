@@ -251,7 +251,7 @@ public class DemandForecastQueryService {
                     .toList();
             return new ForecastDemandResponse(
                     "FeatureCollection",
-                    forecastMetadata(run, filter, !features.isEmpty()),
+                    forecastMetadata(run, filter, !features.isEmpty(), suppressedActualRows(rows)),
                     features
             );
         });
@@ -317,13 +317,13 @@ public class DemandForecastQueryService {
                         row.predictedDemand(),
                         row.predictionLower(),
                         row.predictionUpper(),
-                        row.actualDemand(),
-                        row.absoluteError(),
+                        publishedActualDemand(row),
+                        publishedAbsoluteError(row),
                         evaluationStatus(row)
                 ));
             }
             return new ForecastHotspotsResponse(
-                    forecastMetadata(run, filter, !hotspots.isEmpty()),
+                    forecastMetadata(run, filter, !hotspots.isEmpty(), suppressedActualRows(rows)),
                     List.copyOf(hotspots)
             );
         });
@@ -524,9 +524,9 @@ public class DemandForecastQueryService {
                         row.predictedDemand(),
                         row.predictionLower(),
                         row.predictionUpper(),
-                        row.actualDemand(),
-                        row.absoluteError(),
-                        row.evaluatedAt(),
+                        publishedActualDemand(row),
+                        publishedAbsoluteError(row),
+                        actualSuppressed(row) ? null : row.evaluatedAt(),
                         evaluationStatus(row)
                 )
         );
@@ -557,7 +557,28 @@ public class DemandForecastQueryService {
     }
 
     private String evaluationStatus(DemandForecastQueryPort.ForecastPointRow row) {
-        return row.actualDemand() == null ? "ACTUAL_PENDING" : "ACTUAL_AVAILABLE";
+        if (row.actualDemand() == null) {
+            return "ACTUAL_PENDING";
+        }
+        return actualSuppressed(row) ? "ACTUAL_SUPPRESSED" : "ACTUAL_AVAILABLE";
+    }
+
+    private boolean actualSuppressed(DemandForecastQueryPort.ForecastPointRow row) {
+        return row.actualDemand() != null
+                && row.actualDemand() > 0
+                && row.actualDemand() < properties.getMinimumActualDemandCount();
+    }
+
+    private Integer publishedActualDemand(DemandForecastQueryPort.ForecastPointRow row) {
+        return actualSuppressed(row) ? null : row.actualDemand();
+    }
+
+    private BigDecimal publishedAbsoluteError(DemandForecastQueryPort.ForecastPointRow row) {
+        return actualSuppressed(row) ? null : row.absoluteError();
+    }
+
+    private long suppressedActualRows(List<DemandForecastQueryPort.ForecastPointRow> rows) {
+        return rows.stream().filter(this::actualSuppressed).count();
     }
 
     private ForecastEvaluationResponse.Metric evaluationMetric(
@@ -621,7 +642,8 @@ public class DemandForecastQueryService {
     private ForecastResponseMetadata forecastMetadata(
             DemandForecastQueryPort.SelectedForecastRunRow run,
             ForecastFilter filter,
-            boolean hasRows
+            boolean hasRows,
+            long suppressedActualRows
     ) {
         Freshness freshness = freshness(
                 run.runPurpose(),
@@ -672,6 +694,8 @@ public class DemandForecastQueryService {
                 DEMAND_UNIT,
                 run.forecastRows(),
                 run.evaluatedRows(),
+                properties.getMinimumActualDemandCount(),
+                suppressedActualRows,
                 quality(run.quality())
         );
     }
@@ -701,6 +725,8 @@ public class DemandForecastQueryService {
                 filter.horizonMinutes(),
                 DEMAND_UNIT,
                 0,
+                0,
+                properties.getMinimumActualDemandCount(),
                 0,
                 new ProcessingStatusResponse.QualitySummary(0, 0, 0)
         );

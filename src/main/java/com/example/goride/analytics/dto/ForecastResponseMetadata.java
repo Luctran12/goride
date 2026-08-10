@@ -31,6 +31,8 @@ public record ForecastResponseMetadata(
         String demandUnit,
         long forecastRows,
         long evaluatedRows,
+        int minimumAggregateCount,
+        long suppressedActualRows,
         ProcessingStatusResponse.QualitySummary quality
 ) {
 }

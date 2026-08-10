@@ -68,7 +68,7 @@ class DemandForecastQueryServiceTests {
                 eq(15),
                 eq(null),
                 anyInt()
-        )).thenReturn(List.of(point("3.250000", 2, "1.250000")));
+        )).thenReturn(List.of(point("3.250000", 3, "0.250000")));
 
         var response = service.getDemandForecast(
                 OffsetDateTime.parse("2014-06-01T00:00:00Z"),
@@ -95,10 +95,47 @@ class DemandForecastQueryServiceTests {
         assertThat(response.features()).singleElement().satisfies(feature -> {
             assertThat(feature.geometry().type()).isEqualTo("Polygon");
             assertThat(feature.properties().predictedDemand()).isEqualByComparingTo("3.250000");
-            assertThat(feature.properties().actualDemand()).isEqualTo(2);
-            assertThat(feature.properties().absoluteError()).isEqualByComparingTo("1.250000");
+            assertThat(feature.properties().actualDemand()).isEqualTo(3);
+            assertThat(feature.properties().absoluteError()).isEqualByComparingTo("0.250000");
             assertThat(feature.properties().evaluationStatus()).isEqualTo("ACTUAL_AVAILABLE");
         });
+        assertThat(response.metadata().minimumAggregateCount()).isEqualTo(3);
+        assertThat(response.metadata().suppressedActualRows()).isZero();
+    }
+
+    @Test
+    void suppressesLowCountActualAndErrorAtTheServingBoundary() {
+        var run = selectedEvaluationRun();
+        when(queryPort.selectForecastRun(null, run.modelVersion(), "EVALUATION", 500))
+                .thenReturn(Optional.of(run));
+        when(queryPort.demandForecasts(
+                eq(FORECAST_RUN_ID), any(), any(), eq(15), eq(null), anyInt()
+        )).thenReturn(List.of(point("3.250000", 2, "1.250000")));
+
+        var response = service.getDemandForecast(
+                OffsetDateTime.parse("2014-06-01T00:00:00Z"),
+                OffsetDateTime.parse("2014-06-01T01:00:00Z"),
+                "UTC",
+                15,
+                500,
+                run.modelVersion(),
+                null,
+                "EVALUATION",
+                null,
+                null,
+                null,
+                null
+        );
+
+        assertThat(response.features()).singleElement().satisfies(feature -> {
+            assertThat(feature.properties().predictedDemand()).isEqualByComparingTo("3.250000");
+            assertThat(feature.properties().actualDemand()).isNull();
+            assertThat(feature.properties().absoluteError()).isNull();
+            assertThat(feature.properties().evaluatedAt()).isNull();
+            assertThat(feature.properties().evaluationStatus()).isEqualTo("ACTUAL_SUPPRESSED");
+        });
+        assertThat(response.metadata().minimumAggregateCount()).isEqualTo(3);
+        assertThat(response.metadata().suppressedActualRows()).isEqualTo(1);
     }
 
     @Test

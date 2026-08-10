@@ -14,6 +14,7 @@ public class DemandForecastServingProperties {
     private int maximumPageSize = 100;
     private int maximumEvaluationRows = 1000;
     private int maximumRangeDays = 31;
+    private int minimumActualDemandCount = 3;
     private Duration publishedStaleAfter = Duration.ofMinutes(30);
     private Duration processingStaleAfter = Duration.ofHours(24);
 
@@ -69,6 +70,17 @@ public class DemandForecastServingProperties {
 
     public void setMaximumRangeDays(int maximumRangeDays) {
         this.maximumRangeDays = requirePositive(maximumRangeDays, "maximum-range-days");
+    }
+
+    public int getMinimumActualDemandCount() {
+        return minimumActualDemandCount;
+    }
+
+    public void setMinimumActualDemandCount(int minimumActualDemandCount) {
+        this.minimumActualDemandCount = requirePositive(
+                minimumActualDemandCount,
+                "minimum-actual-demand-count"
+        );
     }
 
     public Duration getPublishedStaleAfter() {
