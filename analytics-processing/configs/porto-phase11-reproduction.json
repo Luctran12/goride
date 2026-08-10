@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "profileConfig": "configs/porto-thesis.yml",
+  "evidenceContract": "configs/porto-phase11-evidence.yml",
+  "experimentConfig": "configs/porto-phase6-hgb.yml",
+  "operationsConfig": "configs/porto-phase7-operations.yml",
+  "extractFromUtc": "2013-07-01T00:00:00Z",
+  "sourceCutoffUtc": "2014-07-01T00:00:00Z",
+  "cellSizeMeters": 500,
+  "inferenceCutoffUtc": "2014-06-01T00:00:00Z",
+  "actualWatermarkUtc": "2014-06-01T01:15:00Z",
+  "forecastPurpose": "EVALUATION",
+  "actor": "thesis-reproduction",
+  "reason": "Controlled Phase 11 reproducibility run"
+}

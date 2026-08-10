@@ -19,6 +19,7 @@ from .operations.registry import register_model, transition_model
 from .runs import build_run_identity
 from .stages import STAGE_COMMANDS, execute_placeholder
 from .structured_logging import JsonLogger
+from .thesis import run_thesis_verification
 
 
 class AnalyticsArgumentParser(argparse.ArgumentParser):
@@ -118,6 +119,13 @@ def build_parser() -> argparse.ArgumentParser:
     backfill.add_argument("--operations-config", required=True)
     backfill.add_argument("--forecast-run", required=True)
     backfill.add_argument("--watermark-utc", required=True)
+    verify_thesis = subparsers.add_parser(
+        "verify-thesis-evidence",
+        help="Verify frozen Phase 11 lineage, checksums, privacy and storage evidence",
+    )
+    verify_thesis.add_argument("--config", required=True)
+    verify_thesis.add_argument("--evidence-contract", required=True)
+    verify_thesis.add_argument("--output-directory", required=True)
     for stage in (
         stage
         for stage in STAGE_COMMANDS
@@ -171,6 +179,7 @@ def main(
     transition_runner: Callable[..., Any] = transition_model,
     forecast_runner: Callable[..., Any] = run_forecast,
     backfill_runner: Callable[..., Any] = run_actual_backfill,
+    thesis_verification_runner: Callable[..., Any] = run_thesis_verification,
 ) -> int:
     stdout = stdout or sys.stdout
     logger = JsonLogger(stderr or sys.stderr)
@@ -327,6 +336,21 @@ def main(
                 updatedRows=outcome.updated_rows,
                 processingRunId=str(outcome.processing_run_id),
                 qualityStatus=outcome.quality_status,
+            )
+        elif args.command == "verify-thesis-evidence":
+            outcome = thesis_verification_runner(
+                config,
+                dataset_result,
+                evidence_contract=args.evidence_contract,
+                output_directory=args.output_directory,
+            )
+            logger.info(
+                "analytics_thesis_evidence_verified",
+                artifactRunId=outcome.artifact_run_id,
+                contractSha256=outcome.contract_sha256,
+                reportSha256=outcome.report_sha256,
+                verifiedBytes=outcome.verified_bytes,
+                verifiedFiles=outcome.verified_files,
             )
         elif args.command != "validate-config":
             execute_placeholder(args.command)

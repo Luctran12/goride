@@ -1,6 +1,7 @@
 package com.example.goride.integration;
 
 import com.example.goride.analytics.service.DemandForecastQueryService;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -14,8 +15,14 @@ import org.springframework.transaction.annotation.Transactional;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.time.Instant;
 import java.time.OffsetDateTime;
+import java.util.Arrays;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -43,6 +50,9 @@ class AdminDemandForecastServingIntegrationTests extends PostgresRedisIntegratio
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
+
+    @Autowired
+    private ObjectMapper objectMapper;
 
     @BeforeAll
     void applyForecastingSchema() throws IOException {
@@ -214,12 +224,25 @@ class AdminDemandForecastServingIntegrationTests extends PostgresRedisIntegratio
         );
         assertThat(demand.metadata().availabilityStatus()).isEqualTo("AVAILABLE_RESEARCH");
         assertThat(demand.metadata().approvalScope()).isEqualTo("RESEARCH_DEMONSTRATION");
+        assertThat(demand.metadata().minimumAggregateCount()).isEqualTo(3);
+        assertThat(demand.metadata().suppressedActualRows()).isEqualTo(1);
         assertThat(demand.features()).hasSize(2);
         assertThat(demand.features()).allSatisfy(feature -> {
             assertThat(feature.geometry().type()).isEqualTo("Polygon");
             assertThat(feature.geometry().coordinates().get(0)).hasSize(5);
-            assertThat(feature.properties().evaluationStatus()).isEqualTo("ACTUAL_AVAILABLE");
         });
+        assertThat(demand.features()).filteredOn(feature ->
+                "ACTUAL_SUPPRESSED".equals(feature.properties().evaluationStatus())
+        ).singleElement().satisfies(feature -> {
+            assertThat(feature.properties().actualDemand()).isNull();
+            assertThat(feature.properties().absoluteError()).isNull();
+            assertThat(feature.properties().evaluatedAt()).isNull();
+        });
+        assertThat(demand.features()).filteredOn(feature ->
+                "ACTUAL_AVAILABLE".equals(feature.properties().evaluationStatus())
+        ).singleElement().satisfies(feature ->
+                assertThat(feature.properties().actualDemand()).isEqualTo(3)
+        );
 
         var hotspots = forecastService.getForecastHotspots(
                 OffsetDateTime.parse("2014-06-01T00:00:00Z"),
@@ -300,6 +323,97 @@ class AdminDemandForecastServingIntegrationTests extends PostgresRedisIntegratio
 
         assertThat(hotspotPlan).contains("idx_demand_forecasts_hotspot_lookup");
         assertThat(mapPlan).contains("idx_demand_forecasts_geometry_gist");
+    }
+
+    @Test
+    void recordsSyntheticServingLatencyPayloadFreshnessAndStorageEvidence() throws Exception {
+        for (int index = 0; index < 10; index++) {
+            demandRequest();
+            hotspotRequest();
+        }
+        int samples = 100;
+        long[] demandNanos = new long[samples];
+        long[] hotspotNanos = new long[samples];
+        Object demand = null;
+        Object hotspots = null;
+        for (int index = 0; index < samples; index++) {
+            long started = System.nanoTime();
+            demand = demandRequest();
+            demandNanos[index] = System.nanoTime() - started;
+            started = System.nanoTime();
+            hotspots = hotspotRequest();
+            hotspotNanos[index] = System.nanoTime() - started;
+        }
+
+        Map<String, Object> evidence = new LinkedHashMap<>();
+        evidence.put("schemaVersion", 1);
+        evidence.put("measuredAtUtc", Instant.now().toString());
+        evidence.put("scope", "SYNTHETIC_TESTCONTAINER_INTEGRATION");
+        evidence.put("claimBoundary", "Performance plumbing evidence; not Porto thesis accuracy");
+        evidence.put("samplesPerEndpoint", samples);
+        evidence.put("demand", statistics(demandNanos, objectMapper.writeValueAsBytes(demand).length));
+        evidence.put("hotspots", statistics(hotspotNanos, objectMapper.writeValueAsBytes(hotspots).length));
+        evidence.put("storage", Map.of(
+                "demandForecastRows", jdbcTemplate.queryForObject(
+                        "SELECT COUNT(*) FROM analytics.demand_forecasts", Long.class
+                ),
+                "demandForecastTableBytes", jdbcTemplate.queryForObject(
+                        "SELECT pg_total_relation_size('analytics.demand_forecasts')", Long.class
+                )
+        ));
+        evidence.put("freshnessContract", "HISTORICAL_EVALUATION");
+
+        Path output = Path.of("target", "phase11", "forecast-serving-benchmark.json");
+        Files.createDirectories(output.getParent());
+        byte[] payload = objectMapper.writerWithDefaultPrettyPrinter().writeValueAsBytes(evidence);
+        Files.write(output, payload);
+        Files.writeString(
+                output.resolveSibling("forecast-serving-benchmark.sha256"),
+                sha256(payload) + "  forecast-serving-benchmark.json\n"
+        );
+        assertThat(statistics(demandNanos, payload.length).get("p95Milliseconds")).isNotNull();
+    }
+
+    private Object demandRequest() {
+        return forecastService.getDemandForecast(
+                OffsetDateTime.parse("2014-06-01T00:00:00Z"),
+                OffsetDateTime.parse("2014-06-01T01:00:00Z"),
+                "UTC", 15, 500, "phase8-hgb-v1", null, "EVALUATION",
+                null, null, null, null
+        );
+    }
+
+    private Object hotspotRequest() {
+        return forecastService.getForecastHotspots(
+                OffsetDateTime.parse("2014-06-01T00:00:00Z"),
+                OffsetDateTime.parse("2014-06-01T01:00:00Z"),
+                "UTC", 15, 500, "phase8-hgb-v1", null, "EVALUATION",
+                new java.math.BigDecimal("-8.63"), new java.math.BigDecimal("41.13"),
+                new java.math.BigDecimal("-8.60"), new java.math.BigDecimal("41.16"), 2
+        );
+    }
+
+    private Map<String, Object> statistics(long[] values, int payloadBytes) {
+        long[] sorted = Arrays.copyOf(values, values.length);
+        Arrays.sort(sorted);
+        return Map.of(
+                "p50Milliseconds", milliseconds(sorted[percentileIndex(sorted.length, 0.50)]),
+                "p95Milliseconds", milliseconds(sorted[percentileIndex(sorted.length, 0.95)]),
+                "maximumMilliseconds", milliseconds(sorted[sorted.length - 1]),
+                "payloadBytes", payloadBytes
+        );
+    }
+
+    private int percentileIndex(int size, double percentile) {
+        return Math.min(size - 1, Math.max(0, (int) Math.ceil(size * percentile) - 1));
+    }
+
+    private double milliseconds(long nanoseconds) {
+        return Math.round((nanoseconds / 1_000_000.0) * 1_000.0) / 1_000.0;
+    }
+
+    private String sha256(byte[] value) throws NoSuchAlgorithmException {
+        return java.util.HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(value));
     }
 
     private ForecastMetric metric(
