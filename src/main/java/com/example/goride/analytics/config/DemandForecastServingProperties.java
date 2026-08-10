@@ -77,10 +77,12 @@ public class DemandForecastServingProperties {
     }
 
     public void setMinimumActualDemandCount(int minimumActualDemandCount) {
-        this.minimumActualDemandCount = requirePositive(
-                minimumActualDemandCount,
-                "minimum-actual-demand-count"
-        );
+        if (minimumActualDemandCount < 3) {
+            throw new IllegalArgumentException(
+                    "app.analytics.forecast-serving.minimum-actual-demand-count must be at least 3"
+            );
+        }
+        this.minimumActualDemandCount = minimumActualDemandCount;
     }
 
     public Duration getPublishedStaleAfter() {

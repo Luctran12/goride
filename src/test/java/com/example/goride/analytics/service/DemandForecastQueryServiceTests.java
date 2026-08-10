@@ -218,6 +218,9 @@ class DemandForecastQueryServiceTests {
 
     @Test
     void validatesRangeHorizonCellBoundsAndResponseCost() {
+        assertThatThrownBy(() -> properties.setMinimumActualDemandCount(2))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("at least 3");
         assertThatThrownBy(() -> service.getDemandForecast(
                 OffsetDateTime.parse("2026-08-10T11:00:00Z"),
                 OffsetDateTime.parse("2026-08-10T10:00:00Z"),
