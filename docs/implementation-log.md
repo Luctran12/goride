@@ -6,6 +6,118 @@
 
 ---
 
+## Commit: `2ae7154` - `feat: support artifact-only sensitivity features`
+
+Branch: `codex/admin-demand-forecasting`
+
+Phase: Admin Demand Forecasting Phase 6 - cell-size sensitivity evidence
+
+### Mục tiêu
+
+Tạo feature G1000/G2000 có đầy đủ Parquet, checksum, quality và processing
+audit nhưng không nhân thêm hàng triệu dòng vào bảng
+`analytics.demand_features` đang chiếm khoảng 15.96 GB.
+
+### Nội dung đã triển khai
+
+- Thêm `build-features --artifact-only` và trường audit
+  `publicationMode = PARQUET_ONLY`.
+- Giữ nguyên extraction verification, cutoff-safe feature engineering, cost
+  guard, quality gate, Parquet manifest và terminal processing lifecycle.
+- Kết thúc trước `PostgresFeatureRepository`; DB audit vẫn ghi số hàng artifact
+  nhưng zero feature row được publication.
+- Test chứng minh artifact-only không thể khởi tạo feature repository, vẫn đóng
+  run `SUCCEEDED` và CLI truyền đúng persistence policy.
+
+### Full-data evidence
+
+- G1000 feature/baseline/candidate runs:
+  `20260810T091335355060Z-2ae7154c60d3-porto-thesis-4cf869ca75a0`,
+  `20260810T092314641438Z-2ae7154c60d3-porto-thesis-4cf869ca75a0`,
+  `20260810T092802643667Z-2ae7154c60d3-porto-thesis-4cf869ca75a0`.
+- G2000 feature/baseline/candidate runs:
+  `20260810T093527097412Z-2ae7154c60d3-porto-thesis-4cf869ca75a0`,
+  `20260810T093742000671Z-2ae7154c60d3-porto-thesis-4cf869ca75a0`,
+  `20260810T093827894213Z-2ae7154c60d3-porto-thesis-4cf869ca75a0`.
+- G1000: 4,309,510 feature rows, 4,273,512 baseline predictions và
+  6,410,268 candidate predictions.
+- G2000: 1,366,430 feature rows, 1,355,016 baseline predictions và
+  2,032,524 candidate predictions.
+- Cả sáu processing run `SUCCEEDED`, zero quality FAIL; hai feature build có
+  zero persisted feature row theo truy vấn DB độc lập.
+
+### Validation
+
+- Python 3.11/3.12: 86 tests pass, 5 opt-in integrations skip mặc định.
+- Independent QA verify checksum cấp run và SHA/bytes/Parquet metadata rows của
+  134 sensitivity files; hai joblib bundle load được đủ horizon 15/30/60.
+- `.env.example` của user không nằm trong commit.
+
+---
+
+## Commit: `9a612b2` - `fix: collect Windows candidate peak memory`
+
+Branch: `codex/admin-demand-forecasting`
+
+Phase: Admin Demand Forecasting Phase 6 - resource measurement correction
+
+### Nội dung đã triển khai
+
+- Khai báo đúng `ctypes` argument/return signatures cho Windows
+  `GetCurrentProcess` và `GetProcessMemoryInfo`, tránh pseudo-handle 64-bit bị
+  truncate.
+- Thêm Windows regression test và giữ collector fail-safe trên platform khác.
+- G500 đã hoàn tất trước fix nên `peakWorkingSetBytes` là null; không rerun FINAL
+  chỉ để điền metric tùy chọn. G1000/G2000 ghi lần lượt 678,674,432 và
+  531,931,136 bytes.
+
+---
+
+## Commit: `f4a4655` - `feat: evaluate and register demand forecasting candidate`
+
+Branch: `codex/admin-demand-forecasting`
+
+Phase: Admin Demand Forecasting Phase 6 - candidate, ablation and selection
+
+### Mục tiêu
+
+Đánh giá HistGradientBoosting có kiểm soát trên cùng fold/cutoff/population với
+hai baseline Phase 5, khóa selection trước FINAL và giữ cả kết quả âm.
+
+### Nội dung đã triển khai
+
+- Thêm experiment contract bất biến, 108 development fits, deterministic
+  zero/positive hash-stratified sample và inverse-stratum weights.
+- Tuning chỉ trên D1-D4; selection theo pooled WAPE, MAE rồi config order.
+- Thêm A0 calendar, A1 demand history và A2 spatial-neighbor ablation cho
+  horizon 15/30/60.
+- Xuất full-fold predictions, metric/comparison, search evidence, model card,
+  system metrics, quality, top-level checksums và joblib A2 horizon models.
+- Prediction interval bị disable có lý do vì chưa có calibrated method được
+  freeze trước FINAL.
+
+### Primary G500 evidence
+
+- Candidate run:
+  `20260810T083830837344Z-f4a46557d3fd-porto-thesis-4cf869ca75a0`;
+  processing run `25bc67cb-0359-58e9-a5cb-b2ef37149330`, `SUCCEEDED`.
+- A2 chọn HGB_C2; 20,950,632 raw prediction rows, 360 metric groups, raw SHA
+  `866cb7347e5477f81e71637e3ae2814ec854a759fc6999f8a00b286115525cdc`.
+- FINAL A2 WAPE H15/H30/H60: 1.009661/1.019189/1.027685. Historical mean là
+  0.951110 và seasonal naive là 1.105694.
+- Candidate không thắng historical mean trên primary MAE/WAPE, nhưng thắng
+  seasonal naive trên cả MAE/RMSE/WAPE. Kết quả negative được giữ và báo cáo.
+- A2 cải thiện nhẹ nhưng nhất quán so với A1; demand-history A1 tạo phần lớn
+  cải thiện so với calendar-only A0.
+
+### Decision gate
+
+Không mở rộng STGCN/deep learning sau khi xem FINAL. Hướng đó không cần thiết
+để trả lời RQ đã khóa, đòi hỏi một budget tuning/ablation công bằng mới và làm
+rộng phạm vi luận văn khi primary G500 chưa thắng strongest baseline.
+
+---
+
 ## Commit: `3c08e42` - `feat: add forecasting baselines and walk-forward evaluation`
 
 Branch: `codex/admin-demand-forecasting`

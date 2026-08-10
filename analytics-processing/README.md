@@ -77,6 +77,11 @@ python -m goride_analytics build-features `
   --cell-size-meters 500
 ```
 
+For cell-size sensitivity experiments that do not need database serving rows,
+add `--artifact-only`. The run still writes verified Parquet, quality evidence
+and a PostgreSQL processing audit, but records `publicationMode = PARQUET_ONLY`
+and does not insert into `analytics.demand_features`.
+
 The command verifies every extraction checksum before reading data, projects
 WGS84 pickups into the profile CRS, applies the frozen zero-origin floor grid,
 selects cells using training data only, materializes continuous UTC buckets and

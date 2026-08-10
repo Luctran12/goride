@@ -685,6 +685,10 @@ Mỗi phase là một review gate. Không tiếp tục phase sau trước khi co
 
 ### Phase 6 — Candidate model, ablation và model selection
 
+**Trạng thái:** Hoàn tất ngày 2026-08-10. Bằng chứng, kết quả âm/trung tính,
+ablation và sensitivity G500/G1000/G2000 được ghi tại
+[`admin-demand-forecasting/phase-06-candidate-evidence.md`](admin-demand-forecasting/phase-06-candidate-evidence.md).
+
 **Mục tiêu:** trả lời RQ1–RQ3 bằng một candidate model có kiểm soát.
 
 **Công việc:**

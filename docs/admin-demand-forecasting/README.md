@@ -10,6 +10,10 @@ spatio-temporal demand-forecasting extension of Admin Analytics.
 - [Evaluation protocol](evaluation-protocol.md)
 - [Configuration contract](configuration-contract.md)
 
+## Experiment evidence
+
+- [Phase 6 candidate-model evidence](phase-06-candidate-evidence.md)
+
 The historical Admin Analytics subsystem remains documented in
 [`../admin-analytics`](../admin-analytics/README.md). The forecasting layer is
 an extension and must not be described as an existing Phase 8 capability.

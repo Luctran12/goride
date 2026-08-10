@@ -24,36 +24,35 @@
 
 ## 2. Active Phase
 
-Phase 5 — Baselines and walk-forward evaluation from
+Phase 6 — Candidate model, ablation and model selection from
 [`admin-analytics-processing-layer-implementation-plan.md`](admin-analytics-processing-layer-implementation-plan.md).
 
-User approval to start Phase 5: 2026-08-10. Implementation, full Porto
-evaluation and independent evidence verification are complete. Phase 5 remains
-at the review gate before candidate-model work begins.
+User approval to start Phase 6: 2026-08-10. Implementation, G500/G1000/G2000
+experiments and independent evidence verification are complete. Phase 6 is at
+the review gate before model-registry and scheduled-inference work begins.
 
 Implementation commit:
 
 ```text
-3c08e42 feat: add forecasting baselines and walk-forward evaluation
+f4a4655 feat: evaluate and register demand forecasting candidate
+9a612b2 fix: collect Windows candidate peak memory
+2ae7154 feat: support artifact-only sensitivity features
 ```
 
 Completed scope:
 
-- historical-mean baseline fitted by cell and local weekly slot, with explicit
-  cell/global/zero fallback;
-- DST-aware seasonal-naive baseline using the most recent available value in
-  the same local weekly slot;
-- expanding D1-D4 rolling-origin development folds and one untouched FINAL
-  holdout, with local Lisbon boundaries converted immutably to UTC;
-- MAE, RMSE and WAPE overall and by horizon, training-fitted demand quantile
-  and local time-of-day slice;
-- immutable raw-prediction Parquet, model cards, fold/metric/quality manifests
-  and SHA-256 evidence;
-- PostgreSQL `EVALUATION` processing lifecycle and quality results.
+- frozen 108-fit HistGradientBoosting search on development folds D1-D4 only;
+- A0 calendar, A1 demand-history and A2 spatial-neighbor ablations;
+- G500 primary evaluation plus G1000/G2000 spatial sensitivity experiments;
+- complete FINAL evaluation against historical mean and seasonal naive at
+  15/30/60-minute horizons;
+- immutable raw predictions, selected model card, reloadable joblib models,
+  resource measurements, quality manifests and SHA-256 evidence;
+- artifact-only sensitivity feature builds that publish zero feature rows to
+  PostgreSQL while retaining processing and quality audit records.
 
-Out of scope for Phase 5:
+Out of scope for Phase 6:
 
-- candidate model fitting or hyperparameter selection;
 - model registry approval and scheduled forecast publication;
 - Spring forecast APIs and Admin forecast UI.
 
@@ -295,9 +294,44 @@ database publication and record the selected population in artifact evidence.
 
 ---
 
-## 8. Next Expected Work
+## 8. Phase 6 Evidence
 
-Review the Phase 5 baseline metrics, fold contract and immutable evidence.
-After user approval, Phase 6 may train the candidate gradient-boosted-tree
-model on development folds and compare it against these frozen baselines. The
-FINAL holdout must not participate in hyperparameter selection.
+- The frozen experiment hash is
+  `63f545298cd5fa879876efd0a82252c6aea4fccea9f95ab5e37ed6134eeb0788`;
+  HGB tuning used D1-D4 only and FINAL was evaluated after selection.
+- G500 candidate artifact
+  `20260810T083830837344Z-f4a46557d3fd-porto-thesis-4cf869ca75a0`
+  is the primary result. A2/HGB_C2 does not beat historical mean on FINAL MAE
+  or WAPE, but beats seasonal naive on MAE/RMSE/WAPE at all three horizons.
+- G1000 candidate artifact
+  `20260810T092802643667Z-2ae7154c60d3-porto-thesis-4cf869ca75a0`
+  has 6,410,268 raw prediction rows, 405 metric groups and quality `PASS`.
+- G2000 candidate artifact
+  `20260810T093827894213Z-2ae7154c60d3-porto-thesis-4cf869ca75a0`
+  has 2,032,524 raw prediction rows, 450 metric groups and quality `PASS`.
+- A2 improves A1 and A0 on FINAL WAPE for all nine grid/horizon tests. Against
+  historical mean, A2 improves all three metrics only for G2000-H15; against
+  seasonal naive it improves all three metrics for all nine tests.
+- Candidate runtime is 1,692.29 s at G500, 427.52 s at G1000 and 324.84 s at
+  G2000. G500 peak memory was not captured due a Windows collector defect;
+  `9a612b2` fixes it for later runs without reopening FINAL.
+- G1000/G2000 feature builds use `PARQUET_ONLY`. Database audit confirms six
+  sensitivity runs `SUCCEEDED`, zero quality FAIL and zero feature rows
+  published by those runs.
+- Independent QA verified top-level checksums and every sensitivity Parquet
+  SHA-256/byte/metadata-row count, and reloaded both model bundles with exactly
+  the 15/30/60-minute horizons.
+- Python 3.11 and 3.12 each pass 86 tests with five opt-in skips; the real
+  PostgreSQL/PostGIS suite passes 4/4.
+- Full tables, artifact identities, ablation, resource evidence and claim
+  boundaries are recorded in
+  [`admin-demand-forecasting/phase-06-candidate-evidence.md`](admin-demand-forecasting/phase-06-candidate-evidence.md).
+
+---
+
+## 9. Next Expected Work
+
+Review the Phase 6 mixed/negative primary result and immutable evidence. After
+user approval, Phase 7 may register the serialized A2 model as `CANDIDATE`,
+require explicit audited approval, and implement idempotent scheduled forecast
+publication. Phase 6 evidence must not auto-promote the model.
