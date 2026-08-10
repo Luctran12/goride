@@ -155,6 +155,28 @@ class FeaturePipelineTests(unittest.TestCase):
                             ),
                         )
                     )
+                artifact_only_identity = build_run_identity(
+                    config,
+                    "feature-build",
+                    created_at=datetime(2026, 1, 2, 1, 0, tzinfo=timezone.utc),
+                    git_state=GitState("d" * 40, False),
+                )
+
+                def reject_feature_repository(_connection):
+                    raise AssertionError(
+                        "artifact-only builds must not publish feature rows"
+                    )
+
+                artifact_only_outcome = run_feature_build(
+                    config,
+                    extraction_run=relative_extraction,
+                    environment=environment,
+                    identity=artifact_only_identity,
+                    connection_factory=lambda *_args, **_kwargs: _Connection(),
+                    repository_factory=lambda _connection: run_repository,
+                    feature_repository_factory=reject_feature_repository,
+                    persist_database=False,
+                )
 
             first_rows = [row for _run_id, row in feature_repositories[0].rows]
             first_directory = outcomes[0].run_directory
@@ -165,8 +187,20 @@ class FeaturePipelineTests(unittest.TestCase):
                 outcomes[0].feature_artifact_id,
                 outcomes[1].feature_artifact_id,
             )
-            self.assertEqual(len(run_repository.succeeded), 2)
+            self.assertEqual(
+                artifact_only_outcome.artifact.row_count,
+                outcomes[0].artifact.row_count,
+            )
+            self.assertEqual(len(run_repository.succeeded), 3)
             self.assertFalse(run_repository.failed)
+            self.assertEqual(
+                run_repository.started[-1]["input_manifest"]["publicationMode"],
+                "PARQUET_ONLY",
+            )
+            self.assertEqual(
+                run_repository.succeeded[-1][1],
+                {"rows_read": 2, "rows_written": 6},
+            )
             self.assertTrue(first_rows)
             self.assertTrue(
                 all(

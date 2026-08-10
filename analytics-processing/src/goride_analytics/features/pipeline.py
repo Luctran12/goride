@@ -211,6 +211,7 @@ def run_feature_build(
     ),
     feature_repository_factory: Callable[[Any], Any] = PostgresFeatureRepository,
     supplied_series: SupplySeries | None = None,
+    persist_database: bool = True,
 ) -> FeatureBuildOutcome:
     environment = environment or os.environ
     root = _analytics_root(config, environment)
@@ -277,6 +278,9 @@ def run_feature_build(
                 "sourceSnapshotSha256": snapshot.snapshot_sha256,
                 "trainingDemandCoverage": (
                     config.features.training_demand_coverage
+                ),
+                "publicationMode": (
+                    "POSTGRES_AND_PARQUET" if persist_database else "PARQUET_ONLY"
                 ),
             },
         )
@@ -421,6 +425,23 @@ def run_feature_build(
             _write_checksums(run_directory)
             raise DataQualityError(quality.failed_rules, str(db_run_id))
         _write_checksums(run_directory)
+        if not persist_database:
+            run_repository.succeed(
+                db_run_id,
+                rows_read=input_rows,
+                rows_written=rows_built,
+            )
+            terminal = True
+            return FeatureBuildOutcome(
+                artifact_run_id=identity.run_id,
+                processing_run_id=db_run_id,
+                feature_artifact_id=deterministic_artifact_id,
+                feature_set_version=version,
+                artifact=artifact,
+                quality=quality,
+                attempt_no=attempt_no,
+                run_directory=run_directory,
+            )
         feature_repository = feature_repository_factory(write_connection)
         persisted = 0
         with write_connection.transaction():

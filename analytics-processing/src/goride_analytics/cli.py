@@ -48,6 +48,11 @@ def build_parser() -> argparse.ArgumentParser:
     build_features.add_argument("--config", required=True)
     build_features.add_argument("--extraction-run", required=True)
     build_features.add_argument("--cell-size-meters", type=int)
+    build_features.add_argument(
+        "--artifact-only",
+        action="store_true",
+        help="Write verified Parquet evidence without publishing feature rows to PostgreSQL",
+    )
     persist_features = subparsers.add_parser(
         "persist-features",
         help="Resume atomic PostgreSQL persistence from a verified feature artifact",
@@ -148,6 +153,7 @@ def main(
                 config,
                 extraction_run=args.extraction_run,
                 cell_size_meters=args.cell_size_meters,
+                persist_database=not args.artifact_only,
             )
             logger.info(
                 "analytics_feature_build_completed",

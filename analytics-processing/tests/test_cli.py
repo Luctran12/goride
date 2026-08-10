@@ -139,6 +139,7 @@ class AnalyticsCliTests(unittest.TestCase):
                         "runs/extraction/source-run",
                         "--cell-size-meters",
                         "1000",
+                        "--artifact-only",
                     ],
                     stdout=stdout,
                     stderr=io.StringIO(),
@@ -147,6 +148,7 @@ class AnalyticsCliTests(unittest.TestCase):
 
         self.assertEqual(exit_code, ExitCode.SUCCESS)
         self.assertEqual(captured["cell_size_meters"], 1000)
+        self.assertFalse(captured["persist_database"])
         self.assertEqual(captured["extraction_run"], "runs/extraction/source-run")
         self.assertEqual(json.loads(stdout.getvalue())["qualityStatus"], "PASS")
 
