@@ -12,7 +12,7 @@
 - Current branch: `codex/admin-demand-forecasting`.
 - Backend base: `develop` commit `ae3dac2` (`merge admin-v2`).
 - Frontend integration: `goride-web` branch `codex/admin-demand-forecasting`,
-  commit `8a384b7` (`docs: record demand forecasting phase 10 review`).
+  commit `70e0cb2` (`docs: record demand forecasting phase 11 review`).
 - Branch-base exception: the repository convention normally starts features
   from `main`, but `main` does not contain Admin Analytics Phase 0-8. This
   feature starts from `develop` because its schema, PostGIS grid, telemetry and
@@ -24,13 +24,13 @@
 
 ## 2. Active Phase
 
-Phase 10 — Forecast Heatmap and hotspot exploration from
+Phase 11 — End-to-end evaluation and thesis artifacts from
 [`admin-analytics-processing-layer-implementation-plan.md`](admin-analytics-processing-layer-implementation-plan.md).
 
-User approval to continue implementation: 2026-08-10. The Forecast Heatmap,
-Actual/Forecast/Absolute Error exploration, run/time/horizon/grid/bounds controls,
-hotspots and cell evidence are implemented and verified. Phase 10 is at the
-review gate before Phase 11 end-to-end evaluation and thesis artifacts.
+User approval to continue implementation: 2026-08-10. Frozen-evidence
+verification, failure/privacy contracts, synthetic serving benchmarks, full
+backend/frontend regressions and the thesis artifact set are implemented and
+verified. Phase 11 is at the final review gate.
 
 Phase 7 implementation commits:
 
@@ -63,6 +63,17 @@ ca010ab feat: add forecast exploration foundation
 8a384b7 docs: record demand forecasting phase 10 review
 ```
 
+Phase 11 implementation commits:
+
+```text
+e2b8b56 feat: suppress low-count forecast actuals
+1345ff5 test: enforce forecast privacy contract
+ff35d7c feat: verify forecasting thesis evidence
+bb0bdbf test: restore full forecasting regression
+fbffcb4 feat: explain forecast privacy suppression (frontend)
+70e0cb2 docs: record demand forecasting phase 11 review (frontend)
+```
+
 Completed scope:
 
 - forecast/hotspot endpoint integration with exact contract params and whitelist mappers;
@@ -73,16 +84,24 @@ Completed scope:
 - request cancellation/race protection and oversized payload guard;
 - visible Porto `RESEARCH_DEMONSTRATION` and stale boundaries;
 - responsive and accessible map/legend/table/filter/drawer states;
-- 50 frontend test files / 237 tests plus successful 2,610-module build.
+- immutable evidence verification across 296 files / 2,074,459,267 bytes;
+- low-count actual suppression at a minimum threshold of three, with no direct
+  identifiers or artifact locations in serving DTOs;
+- one-command frozen verification and clean full-reproduction orchestration;
+- synthetic PostGIS serving benchmark with explicit non-accuracy claim;
+- model card, data sheet, evaluation report, architecture, runbook and final
+  Definition-of-Done traceability;
+- 135 backend suites / 584 tests and 50 frontend files / 238 tests, plus lint
+  and successful 2,610-module production build.
 
-Out of scope for Phase 10:
+Remaining deployment scope:
 
 - Vehicle/service-area forecast filters, because Phase 8 does not expose those
   dimensions on forecast rows or accept the query parameters.
 - browser-triggered training, model approval or forecast publication.
 - production approval of a Porto-trained model for Ho Chi Minh City.
-- authenticated E2E, failure recovery, load/storage/privacy measurements and
-  final thesis artifact traceability; these belong to Phase 11.
+- authenticated deployment UAT, production-traffic load tests, monitoring,
+  backups and an enabled destructive retention schedule.
 
 ---
 
@@ -439,10 +458,26 @@ database publication and record the selected population in artifact evidence.
 
 ---
 
-## 13. Next Expected Work
+## 13. Phase 11 Final Evidence
 
-Review the Phase 10 forecast exploration and contract-gap evidence. After user
-approval, Phase 11 may run the end-to-end pipeline/UI evaluation, controlled
-failure and performance measurements, privacy/security review and final thesis
-artifact traceability. Porto evidence must remain visibly separated from live
-Ho Chi Minh City operations.
+- Frozen verification passed for 296 files / 2,074,459,267 bytes. The report
+  checksum is `e64b5a8...ae433`.
+- Privacy suppression hides positive actual counts below three together with
+  error/evaluation time; aggregate forecast values remain available.
+- Synthetic PostGIS serving P95 is 8.241 ms for demand GeoJSON and 9.524 ms for
+  hotspots over 100 measured calls per endpoint. This is plumbing evidence,
+  not a production load or accuracy claim.
+- Python 3.11/3.12 each pass 98 tests (five opt-in skips); Spring passes 135
+  suites / 584 tests with no skip; Admin Web passes 50 files / 238 tests, lint
+  and production build.
+- Final traceability, failure matrix, security boundary and limitations are in
+  [`admin-demand-forecasting/phase-11-final-evidence.md`](admin-demand-forecasting/phase-11-final-evidence.md).
+
+---
+
+## 14. Review Gate
+
+Phase 11 implementation is complete and ready for user/thesis review. Porto
+evidence remains visibly separated from live Ho Chi Minh City operations.
+Further work is deployment hardening or a newly approved scope, not an
+unfinished Phase 11 requirement.

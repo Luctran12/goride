@@ -6,6 +6,59 @@
 
 ---
 
+## Commit set: Phase 11 - final thesis evidence and privacy hardening
+
+Branch: `codex/admin-demand-forecasting`
+
+Phase: Admin Demand Forecasting Phase 11 - end-to-end evaluation
+
+### Nội dung đã triển khai
+
+- Thêm ngưỡng bảo vệ dữ liệu tổng hợp: actual dương dưới 3 bị ẩn cùng
+  absolute error và evaluation time; forecast vẫn được phục vụ.
+- Khóa privacy contract bằng reflection test để DTO không lộ định danh trực
+  tiếp hoặc artifact URI.
+- Thêm cấu hình evidence/reproduction đóng băng, lệnh
+  `verify-thesis-evidence` và PowerShell orchestration cho `VerifyFrozen` hoặc
+  `FullReproduction`.
+- Verifier kiểm tra checksum dataset, mọi Parquet lồng nhau, lineage, grid,
+  horizon, candidate/forecast/backfill/rollback, research scope và storage.
+- Thêm synthetic PostGIS benchmark cho demand GeoJSON/hotspots, cùng model
+  card, data sheet, evaluation report, architecture, runbook và Definition of
+  Done cuối.
+- Bổ sung `DemandForecastQueryPort` mock vào các full Spring context test và
+  đồng bộ assertion location validation với global error contract hiện hành.
+
+### Commits
+
+```text
+e2b8b56 feat: suppress low-count forecast actuals
+1345ff5 test: enforce forecast privacy contract
+ff35d7c feat: verify forecasting thesis evidence
+bb0bdbf test: restore full forecasting regression
+fbffcb4 feat: explain forecast privacy suppression (frontend)
+70e0cb2 docs: record demand forecasting phase 11 review (frontend)
+```
+
+### Validation
+
+- Frozen verifier: 296 files / 2,074,459,267 bytes, PASS.
+- Python 3.11 và 3.12: mỗi runtime 98 test pass, 5 opt-in skip.
+- Spring backend: 135 suites / 584 test pass, 0 failure/error/skip.
+- Admin Web: 50 files / 238 test pass; lint và production build pass.
+- Synthetic serving benchmark (100 calls/endpoint): demand P95 8.241 ms,
+  hotspots P95 9.524 ms.
+
+### Giới hạn
+
+- Porto là bằng chứng nghiên cứu lịch sử, không phải model production TP.HCM.
+- Synthetic benchmark chỉ chứng minh đường đi API/PostGIS, không chứng minh độ
+  chính xác hoặc tải production.
+- Authenticated deployment UAT, monitoring, backup và retention schedule thuộc
+  deployment scope.
+
+---
+
 ## Commit: `b9e00e2` - `feat: expose admin demand forecasting APIs`
 
 Branch: `codex/admin-demand-forecasting`

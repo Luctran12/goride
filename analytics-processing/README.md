@@ -1,11 +1,10 @@
 # GoRide Analytics Processing
 
-Deterministic Python command-line foundation for the Admin demand-forecasting
-processing layer. Phase 5 adds bounded Porto/GoRide extraction, deterministic
-canonical snapshots, spatial-temporal aggregation, leakage-safe features,
-historical/seasonal baselines, rolling-origin evaluation, Parquet evidence and
-PostgreSQL lifecycle persistence. Candidate training and forecast publication
-remain gated.
+Deterministic Python command-line implementation for the Admin
+demand-forecasting processing layer. It provides bounded Porto/GoRide
+extraction, immutable snapshots, leakage-safe spatial-temporal features,
+baselines, rolling-origin evaluation, candidate training, model registry,
+forecast publication, actual backfill and Phase 11 evidence verification.
 
 ## Runtime
 
@@ -226,18 +225,40 @@ backup and retention schedule.
 ## Stage commands
 
 ```text
+validate-config
 extract
 build-features
 persist-features
-train
 evaluate
+train
+register-model
+approve-model
+reject-model
+retire-model
 forecast
+backfill-actual
+verify-thesis-evidence
 ```
 
-`extract`, `build-features`, `persist-features`, `evaluate` and `train` are
-implemented through Phase 6. `forecast` remains an explicit placeholder: it
-validates its profile and returns exit code `4`/`STAGE_NOT_IMPLEMENTED` without
-fabricated success artifacts.
+All commands above are implemented. Model lifecycle operations remain explicit:
+an evaluation metric never auto-approves a model.
+
+## Verify or reproduce the thesis evidence
+
+From the backend repository root, verify every frozen top-level and nested
+artifact checksum without reopening FINAL evaluation:
+
+```powershell
+.\scripts\run-demand-forecasting-thesis.ps1 `
+  -Mode VerifyFrozen `
+  -DataRoot D:\hoc\Project\LVTN\goride-analytics-data
+```
+
+For a clean database and data root, use `-Mode FullReproduction`. Its stage
+inputs and actors are frozen in
+`configs/porto-phase11-reproduction.json`; evidence roles, expected lineage and
+privacy/scope assertions are frozen in `configs/porto-phase11-evidence.yml`.
+See `docs/admin-demand-forecasting/runbook.md` before running the full workflow.
 
 ## Run tests
 

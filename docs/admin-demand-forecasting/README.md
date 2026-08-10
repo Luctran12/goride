@@ -12,6 +12,7 @@ spatio-temporal demand-forecasting extension of Admin Analytics.
 
 ## Experiment evidence
 
+- [Phase 11 final evidence and Definition of Done](phase-11-final-evidence.md)
 - [Phase 6 candidate-model evidence](phase-06-candidate-evidence.md)
 - [Phase 7 model-registry and inference evidence](phase-07-operational-evidence.md)
 - [Phase 8 Spring serving API evidence](phase-08-serving-api-evidence.md)
@@ -23,6 +24,14 @@ The historical Admin Analytics subsystem remains documented in
 an extension. Phase 8 provides the read-only Spring Admin contract, Phase 9
 provides the processing/data-quality/model-evaluation UI, and Phase 10 provides
 forecast-map and hotspot exploration.
+
+## Thesis artifacts
+
+- [Architecture](architecture.md)
+- [Data sheet](data-sheet.md)
+- [Evaluation report](evaluation-report.md)
+- [Model card](model-card.md)
+- [Operations runbook](runbook.md)
 
 ## Claim boundary
 
