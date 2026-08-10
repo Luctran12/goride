@@ -1,10 +1,11 @@
 # GoRide Analytics Processing
 
 Deterministic Python command-line foundation for the Admin demand-forecasting
-processing layer. Phase 4 adds bounded Porto/GoRide extraction, deterministic
+processing layer. Phase 5 adds bounded Porto/GoRide extraction, deterministic
 canonical snapshots, spatial-temporal aggregation, leakage-safe features,
-Parquet evidence and PostgreSQL lifecycle/feature persistence. Training and
-forecast publication remain gated.
+historical/seasonal baselines, rolling-origin evaluation, Parquet evidence and
+PostgreSQL lifecycle persistence. Candidate training and forecast publication
+remain gated.
 
 ## Runtime
 
@@ -115,6 +116,27 @@ partition's SHA-256/byte count/Parquet row count, quality gates and cost guards
 before opening the database connection. It writes a separate persistence run
 that references the original feature artifact; it never edits that artifact.
 
+## Evaluate immutable baselines
+
+Use the successful Phase 4 feature-build run, not a persistence-run ID:
+
+```powershell
+python -m goride_analytics evaluate `
+  --config configs\porto-thesis.yml `
+  --feature-run <feature-build-artifact-run-id>
+```
+
+The command evaluates historical mean and DST-aware seasonal naive on four
+expanding monthly development folds plus one untouched final holdout. It never
+shuffles observations. Demand-volume slice thresholds are fitted from each
+fold's training history only.
+
+Evidence is written under `runs/evaluation/<artifact-run-id>`: fold contract,
+two model cards, raw predictions partitioned by fold/model, MAE/RMSE/WAPE
+summaries, quality gates, manifests and SHA-256 checksums. Raw predictions are
+required in Phase 5 so every reported aggregate can be traced to a fold and
+observation.
+
 ## Stage commands
 
 ```text
@@ -126,10 +148,10 @@ evaluate
 forecast
 ```
 
-`extract`, `build-features` and `persist-features` are implemented through
-Phase 4. The remaining commands are explicit placeholders: they validate their
-profile and return exit code `4`/`STAGE_NOT_IMPLEMENTED` without fabricated
-success artifacts.
+`extract`, `build-features`, `persist-features` and `evaluate` are implemented
+through Phase 5. `train` and `forecast` remain explicit placeholders: they
+validate their profile and return exit code `4`/`STAGE_NOT_IMPLEMENTED`
+without fabricated success artifacts.
 
 ## Run tests
 

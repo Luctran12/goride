@@ -24,42 +24,38 @@
 
 ## 2. Active Phase
 
-Phase 4 — Spatial-temporal aggregation and feature pipeline from
+Phase 5 — Baselines and walk-forward evaluation from
 [`admin-analytics-processing-layer-implementation-plan.md`](admin-analytics-processing-layer-implementation-plan.md).
 
-User approval to start Phase 4: 2026-08-09.
+User approval to start Phase 5: 2026-08-10. Implementation, full Porto
+evaluation and independent evidence verification are complete. Phase 5 remains
+at the review gate before candidate-model work begins.
 
-User approval to continue after external Porto manifest repair: 2026-08-09.
-The bounded full-data artifact and PostgreSQL publication are complete. Phase 4
-remains active only for final evidence review before the Phase 5 gate.
-
-Implementation commits:
+Implementation commit:
 
 ```text
-39abdb3 feat: build versioned spatio-temporal demand features
-6f2ea5e feat: bound Porto feature population and partitions
-19eb69f feat: resume feature persistence with bulk staging
+3c08e42 feat: add forecasting baselines and walk-forward evaluation
 ```
 
-Scope:
+Completed scope:
 
-- freeze grid version, zero-origin floor rule and profile study-area bounds;
-- aggregate canonical demand into continuous 15-minute cell buckets;
-- build calendar, demand lag, trailing rolling and spatial-neighbor features;
-- add optional cutoff-safe GoRide supply lag with visible coverage;
-- emit a versioned feature dictionary, manifest and deterministic Parquet;
-- enforce leakage, bucket continuity, grid assignment and coverage gates;
-- persist FEATURE_BUILD lifecycle, quality evidence and idempotent feature rows;
-- prove boundary, empty-bucket, DST, uniqueness and checksum behavior.
-- profile the complete Porto archive, classify source exclusions and freeze a
-  bounded duplicate-rate threshold before full feature materialization;
+- historical-mean baseline fitted by cell and local weekly slot, with explicit
+  cell/global/zero fallback;
+- DST-aware seasonal-naive baseline using the most recent available value in
+  the same local weekly slot;
+- expanding D1-D4 rolling-origin development folds and one untouched FINAL
+  holdout, with local Lisbon boundaries converted immutably to UTC;
+- MAE, RMSE and WAPE overall and by horizon, training-fitted demand quantile
+  and local time-of-day slice;
+- immutable raw-prediction Parquet, model cards, fold/metric/quality manifests
+  and SHA-256 evidence;
+- PostgreSQL `EVALUATION` processing lifecycle and quality results.
 
-Out of scope for Phase 4:
+Out of scope for Phase 5:
 
-- baseline/candidate model fitting, evaluation or prediction;
-- model registry and scheduled inference;
-- Spring forecast APIs;
-- frontend forecast screens.
+- candidate model fitting or hyperparameter selection;
+- model registry approval and scheduled forecast publication;
+- Spring forecast APIs and Admin forecast UI.
 
 ---
 
@@ -269,9 +265,39 @@ database publication and record the selected population in artifact evidence.
 
 ---
 
-## 7. Next Expected Work
+## 7. Phase 5 Evidence
 
-Review the bounded Phase 4 evidence and commit the final documentation update.
-After user approval, Phase 5 may add historical-mean and seasonal-naive
-baselines against this frozen feature set. Do not start candidate model tuning
-before the baseline/evaluation contract is reviewed.
+- Successful evaluation artifact:
+  `20260810T075446729084Z-3c08e4269888-porto-thesis-4cf869ca75a0`.
+- Processing run `53fc1ba9-0d73-5789-a3a5-324393814f0e` is `SUCCEEDED` with
+  `rows_read = 14,084,740`, `rows_written = 13,967,088`, three quality rules
+  and zero FAIL results.
+- Five folds (`D1`-`D4`, `FINAL`), three horizons and two baselines produced
+  240 metric groups and 13,967,088 raw prediction rows in ten Parquet files.
+- Raw-prediction manifest SHA-256:
+  `87980eb5b7a073865cf7bf3a26af32eb29e978eabbc00f6ec44a33c81d7e1f3e`.
+- Independent verification recomputed every Parquet SHA-256, summed exact
+  metadata row counts, recomputed the manifest hash and verified all top-level
+  checksums. Raw Parquet totals 61,801,348 bytes.
+- All 15 fold/horizon populations match exactly between the two baselines.
+- FINAL holdout has 784,704 observations per horizon/model. Historical mean:
+  MAE `0.353124`, RMSE `0.755793`, WAPE `0.951110`. Seasonal naive: MAE
+  `0.410517`, RMSE `1.025132`, WAPE `1.105694`.
+- Baseline metrics are identical across horizons by design because both fixed
+  baselines predict from target calendar/history and do not consume
+  horizon-specific feature rows. The Phase 6 candidate will use features at
+  each inference cutoff and can therefore vary by horizon.
+- Python 3.11 and 3.12 pass 76 tests; five opt-in integrations skip in the
+  default suite. The real PostgreSQL/PostGIS suite passes all four tests.
+- Two earlier local attempts were terminated by terminal time limits before
+  Parquet finalization and are explicitly recorded as `FAILED` with zero
+  published rows; they are not evaluation evidence.
+
+---
+
+## 8. Next Expected Work
+
+Review the Phase 5 baseline metrics, fold contract and immutable evidence.
+After user approval, Phase 6 may train the candidate gradient-boosted-tree
+model on development folds and compare it against these frozen baselines. The
+FINAL holdout must not participate in hyperparameter selection.

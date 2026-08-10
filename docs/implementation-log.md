@@ -6,6 +6,69 @@
 
 ---
 
+## Commit: `3c08e42` - `feat: add forecasting baselines and walk-forward evaluation`
+
+Branch: `codex/admin-demand-forecasting`
+
+Phase: Admin Demand Forecasting Phase 5 - baselines and walk-forward evaluation
+
+### Muc tieu
+
+Tao benchmark hoc thuat co the tai lap tren feature artifact Phase 4 truoc khi
+fit candidate model, khong shuffle va khong cho FINAL holdout tham gia tuning.
+
+### Noi dung da trien khai
+
+- Them CLI `evaluate --feature-run ...` va PostgreSQL processing lifecycle
+  `EVALUATION`.
+- Dong bang D1-D4 expanding rolling-origin folds va FINAL holdout; boundary
+  local `Europe/Lisbon` duoc convert sang UTC, bao gom DST.
+- Them `HISTORICAL_MEAN` theo cell/local weekly slot voi fallback minh bach.
+- Them `SEASONAL_NAIVE` theo local weekly slot gan nhat, DST-aware va fallback
+  ve historical mean khi history bi thieu.
+- Tinh MAE/RMSE/WAPE theo fold, horizon, demand quantile fit tren train va
+  time-of-day. WAPE la null neu tong actual bang zero.
+- Ghi raw prediction Parquet theo fold/model, fold contract, model cards,
+  metrics, quality, manifest va SHA-256 checksums.
+- Them population gate de hai baseline dung cung dung observation set.
+
+### Full-data evidence
+
+- Source feature run:
+  `20260809T153840318116Z-6f2ea5e3b834-porto-thesis-4cf869ca75a0`.
+- Evaluation run:
+  `20260810T075446729084Z-3c08e4269888-porto-thesis-4cf869ca75a0`;
+  processing run `53fc1ba9-0d73-5789-a3a5-324393814f0e`, attempt 3,
+  `SUCCEEDED`.
+- 5 folds, 2 models, 3 horizons, 240 metric groups va 13,967,088 raw rows.
+- 10 Parquet files, 61,801,348 bytes; raw manifest SHA-256
+  `87980eb5b7a073865cf7bf3a26af32eb29e978eabbc00f6ec44a33c81d7e1f3e`.
+- DB audit: `rows_read = 14,084,740`, `rows_written = 13,967,088`; 3 quality
+  rules, 0 FAIL.
+- FINAL, moi model/horizon co 784,704 observations. Historical mean dat
+  MAE 0.353124, RMSE 0.755793, WAPE 0.951110; seasonal naive dat MAE
+  0.410517, RMSE 1.025132, WAPE 1.105694.
+- Hai lan chay truoc bi terminal time limit ket thuc truoc khi writer finalize;
+  audit duoc dong FAILED, zero rows published va khong duoc dung lam evidence.
+
+### Validation va manual review
+
+- Python 3.11/3.12: 76 tests pass, 5 opt-in integrations skip mac dinh.
+- PostgreSQL/PostGIS that: 4/4 integration tests pass.
+- Metric hand tests cover MAE/RMSE/WAPE va zero-demand denominator; baseline
+  tests cover leakage, missing history, fold boundaries va DST weekly slot.
+- Independent QA recompute SHA-256 tung Parquet, exact metadata row count,
+  canonical raw-manifest hash, top-level checksums va 15/15 model-population
+  groups.
+- `.env.example` cua user khong nam trong commit.
+
+### Next gate
+
+Phase 6 chi duoc fit/tune candidate model tren development folds. FINAL holdout
+chi duoc danh gia mot lan sau khi khoa configuration.
+
+---
+
 ## Commit: `19eb69f` - `feat: resume feature persistence with bulk staging`
 
 Branch: `codex/admin-demand-forecasting`
