@@ -709,6 +709,10 @@ ablation và sensitivity G500/G1000/G2000 được ghi tại
 
 ### Phase 7 — Model registry và scheduled inference
 
+**Trạng thái:** Hoàn tất ngày 2026-08-10 trong phạm vi research demonstration.
+Bằng chứng registry, inference, idempotency, rollback/retry và backfill được ghi
+tại [`admin-demand-forecasting/phase-07-operational-evidence.md`](admin-demand-forecasting/phase-07-operational-evidence.md).
+
 **Mục tiêu:** biến model được chọn thành pipeline dự báo vận hành có kiểm soát.
 
 **Công việc:**

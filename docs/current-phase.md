@@ -24,37 +24,35 @@
 
 ## 2. Active Phase
 
-Phase 6 — Candidate model, ablation and model selection from
+Phase 7 — Model registry and scheduled inference from
 [`admin-analytics-processing-layer-implementation-plan.md`](admin-analytics-processing-layer-implementation-plan.md).
 
-User approval to start Phase 6: 2026-08-10. Implementation, G500/G1000/G2000
-experiments and independent evidence verification are complete. Phase 6 is at
-the review gate before model-registry and scheduled-inference work begins.
+User approval to start Phase 7: 2026-08-10. Registry, research approval,
+inference, idempotency, rollback/retry, backfill and independent verification
+are complete. Phase 7 is at the review gate before Spring serving APIs.
 
 Implementation commit:
 
 ```text
-f4a4655 feat: evaluate and register demand forecasting candidate
-9a612b2 fix: collect Windows candidate peak memory
-2ae7154 feat: support artifact-only sensitivity features
+9177be9 feat: operationalize registered demand forecasts
+cc2c935 fix: canonicalize idempotent forecast cutoff
 ```
 
 Completed scope:
 
-- frozen 108-fit HistGradientBoosting search on development folds D1-D4 only;
-- A0 calendar, A1 demand-history and A2 spatial-neighbor ablations;
-- G500 primary evaluation plus G1000/G2000 spatial sensitivity experiments;
-- complete FINAL evaluation against historical mean and seasonal naive at
-  15/30/60-minute horizons;
-- immutable raw predictions, selected model card, reloadable joblib models,
-  resource measurements, quality manifests and SHA-256 evidence;
-- artifact-only sensitivity feature builds that publish zero feature rows to
-  PostgreSQL while retaining processing and quality audit records.
+- checksum-gated registration of the selected G500 A2 model;
+- explicit audited `VALIDATED` to `APPROVED` research lifecycle;
+- scheduler-ready inference for horizons 15/30/60 with freshness and cost
+  guards;
+- idempotent forecast identity and atomic forecast/processing publication;
+- watermark-safe actual-demand and absolute-error backfill;
+- controlled retry after an empty failed forecast header while retaining
+  failed processing and artifact evidence.
 
-Out of scope for Phase 6:
+Out of scope for Phase 7:
 
-- model registry approval and scheduled forecast publication;
 - Spring forecast APIs and Admin forecast UI.
+- production approval of a Porto-trained model for Ho Chi Minh City.
 
 ---
 
@@ -329,9 +327,37 @@ database publication and record the selected population in artifact evidence.
 
 ---
 
-## 9. Next Expected Work
+## 9. Phase 7 Evidence
 
-Review the Phase 6 mixed/negative primary result and immutable evidence. After
-user approval, Phase 7 may register the serialized A2 model as `CANDIDATE`,
-require explicit audited approval, and implement idempotent scheduled forecast
-publication. Phase 6 evidence must not auto-promote the model.
+- Model version `porto-hgb-v1-g500-63f545298c-f4a46557d3` is registered as
+  `APPROVED` only under `RESEARCH_DEMONSTRATION`, with two audited lifecycle
+  events and artifact SHA-256 `8643527f...b5b4`.
+- Official inference artifact
+  `20260810T102601474464Z-9177be915f0a-porto-thesis-4cf869ca75a0`
+  wrote exactly 402 rows for 134 cells and three horizons in 0.3464 seconds.
+- Identical reruns return the same forecast/processing IDs with
+  `idempotent = true` and create no duplicate rows.
+- Backfill artifact
+  `20260810T102748599113Z-cc2c935f50cc-porto-thesis-4cf869ca75a0`
+  updated 402/402 actual/error rows after the closed watermark. Its rerun
+  observed 402 evaluated rows and updated zero.
+- Fault injection after forecast inserts rolled publication back to zero rows,
+  recorded `PHASE7_INJECTED_TERMINAL_FAILURE`, and retained failed evidence.
+  Controlled attempt 2 then published 402 rows under the same deterministic
+  forecast UUID.
+- Independent QA found zero negative predictions, invalid geometries, quality
+  FAIL results or absolute-error mismatches. All official Phase 7 artifact
+  checksums were recomputed successfully.
+- Python 3.11 and 3.12 each pass 96 tests; the real PostgreSQL/PostGIS suite
+  passes 4/4, in addition to a full rollback-only Phase 7 lifecycle rehearsal.
+- Full evidence and limitations are recorded in
+  [`admin-demand-forecasting/phase-07-operational-evidence.md`](admin-demand-forecasting/phase-07-operational-evidence.md).
+
+---
+
+## 10. Next Expected Work
+
+Review the Phase 7 research-only operational evidence. After user approval,
+Phase 8 may expose read-only Spring Admin endpoints for models, forecasts,
+hotspots, evaluation, freshness, quality and run history. Porto evidence must
+remain visibly separated from live Ho Chi Minh City operations.

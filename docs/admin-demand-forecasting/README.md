@@ -13,6 +13,7 @@ spatio-temporal demand-forecasting extension of Admin Analytics.
 ## Experiment evidence
 
 - [Phase 6 candidate-model evidence](phase-06-candidate-evidence.md)
+- [Phase 7 model-registry and inference evidence](phase-07-operational-evidence.md)
 
 The historical Admin Analytics subsystem remains documented in
 [`../admin-analytics`](../admin-analytics/README.md). The forecasting layer is

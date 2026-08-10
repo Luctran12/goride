@@ -6,6 +6,89 @@
 
 ---
 
+## Commit: `cc2c935` - `fix: canonicalize idempotent forecast cutoff`
+
+Branch: `codex/admin-demand-forecasting`
+
+Phase: Admin Demand Forecasting Phase 7 - stable UTC response contract
+
+### Nội dung đã triển khai
+
+- Chuẩn hóa `TIMESTAMPTZ` do PostgreSQL trả theo session timezone về UTC `Z`
+  trong response của forecast idempotent.
+- Thêm regression test với cùng instant ở offset `+07:00`; JSON bắt buộc trả
+  `2014-06-01T00:00:00Z`.
+
+---
+
+## Commit: `9177be9` - `feat: operationalize registered demand forecasts`
+
+Branch: `codex/admin-demand-forecasting`
+
+Phase: Admin Demand Forecasting Phase 7 - model registry and inference
+
+### Mục tiêu
+
+Biến model A2/G500 đã đánh giá ở Phase 6 thành pipeline research demonstration
+có registry, approval audit, inference, atomic publication và actual/error
+backfill mà không claim production readiness cho TP.HCM.
+
+### Nội dung đã triển khai
+
+- Verify top-level training checksums, model SHA, quality/model-card/bundle và
+  đủ horizon 15/30/60 trước registration hoặc inference.
+- Đăng ký deterministic model UUID; map research `CANDIDATE` sang DB
+  `VALIDATED`, append lifecycle actor/reason/time/scope và cấm auto-promote.
+- Thêm CLI `register-model`, `approve-model`, `reject-model`, `retire-model`,
+  `forecast` và `backfill-actual`.
+- Freeze operations config: research scope, 30-minute staleness, 15-minute
+  watermark delay, 90-day retention policy và 10,000-row cost guard.
+- Chỉ model `APPROVED` đúng profile/config mới inference; model artifact được
+  verify lại trước cả idempotent lookup.
+- Dự báo 15/30/60 từ persisted feature rows; enforce horizon population,
+  alignment, uniqueness, nonnegative/finite prediction và WGS84 geometry.
+- Publish forecast rows, forecast terminal state, quality và processing success
+  trong một transaction.
+- Backfill actual/error chỉ cho target đã đóng watermark; exact error và
+  terminal processing state cũng atomic.
+- Failed empty forecast header có thể retry có kiểm soát; failed processing và
+  immutable failure artifact vẫn được giữ.
+
+### Full-data evidence
+
+- Model ID `057f564e-0412-5958-9291-6af0932326d1`, version
+  `porto-hgb-v1-g500-63f545298c-f4a46557d3`, lifecycle `APPROVED`, scope
+  `RESEARCH_DEMONSTRATION`, 2 lifecycle events.
+- Official forecast run `791b9584-c448-516e-94b4-0ab50aa59e96`, processing
+  `9246ef7e-59ff-5729-8a62-a28bbe7ccfc7`: 134 cells × 3 horizons = 402 rows,
+  quality PASS, inference/publication 0.3464 seconds.
+- Identical forecast rerun returns the same IDs and 402 rows with
+  `idempotent = true`.
+- Backfill processing `3dc9620f-a94a-52cf-a492-05ad2cb1ca3e` updates 402/402
+  rows; attempt 2 observes 402 evaluated and updates zero.
+- Fault injection processing `08207750-1948-5e18-8cb9-37c9e93ae2d8` records
+  `PHASE7_INJECTED_TERMINAL_FAILURE` with zero visible forecast row. Controlled
+  attempt 2 succeeds with 402 rows under the same deterministic forecast UUID.
+
+### Validation
+
+- Python 3.11/3.12: 96 tests pass, 5 opt-in skips mặc định.
+- PostgreSQL/PostGIS suite thật: 4/4 pass.
+- Full lifecycle rehearsal trong `FORCE_ROLLBACK`: 402 forecast + 402 backfill,
+  sau đó zero persistent rehearsal rows.
+- Independent QA verify registry scope/events, run/quality status, population,
+  geometry, nonnegative values, exact errors và mọi Phase 7 artifact checksum.
+- `.env.example` của user không nằm trong commit.
+
+### Giới hạn
+
+- Porto official run dùng purpose `EVALUATION` lịch sử. `PUBLISHED` real-time
+  cần feature hiện hành khi deploy và bị chặn nếu stale quá 30 phút.
+- Retention 90 ngày đã freeze/persist trong evidence nhưng automatic destructive
+  pruning chưa bật trước khi deployment có backup và retention schedule.
+
+---
+
 ## Commit: `2ae7154` - `feat: support artifact-only sensitivity features`
 
 Branch: `codex/admin-demand-forecasting`
