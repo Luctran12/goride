@@ -39,6 +39,12 @@ Phase 7 implementation commits:
 cc2c935 fix: canonicalize idempotent forecast cutoff
 ```
 
+Phase 8 implementation commit:
+
+```text
+b9e00e2 feat: expose admin demand forecasting APIs
+```
+
 Completed scope:
 
 - eight Admin-only read endpoints under `/api/v1/admin/analytics`;

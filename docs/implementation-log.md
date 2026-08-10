@@ -6,7 +6,7 @@
 
 ---
 
-## Commit: `feat: expose admin demand forecasting APIs`
+## Commit: `b9e00e2` - `feat: expose admin demand forecasting APIs`
 
 Branch: `codex/admin-demand-forecasting`
 
