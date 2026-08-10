@@ -200,6 +200,55 @@ class AnalyticsCliTests(unittest.TestCase):
         self.assertEqual(captured["feature_run"], "source-feature-run")
         self.assertEqual(json.loads(stdout.getvalue())["qualityStatus"], "WARN")
 
+    def test_evaluate_dispatches_verified_feature_artifact(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            base = Path(temporary)
+            root = create_data_root(base / "data")
+            config_path = write_config(base / "profile.yml")
+            stdout = io.StringIO()
+            captured = {}
+
+            class Outcome:
+                artifact_run_id = "evaluation-run"
+                source_artifact_run_id = "source-feature-run"
+                feature_set_version = "feature-v1"
+                processing_run_id = uuid.UUID(int=3)
+                quality_status = "PASS"
+                raw_prediction_rows = 120
+                raw_prediction_sha256 = "c" * 64
+
+                @staticmethod
+                def to_dict():
+                    return {
+                        "artifactRunId": "evaluation-run",
+                        "evaluationArtifact": {"rawPredictionRows": 120},
+                        "qualityStatus": "PASS",
+                    }
+
+            def evaluate(_config, **kwargs):
+                captured.update(kwargs)
+                return Outcome()
+
+            with patch.dict(
+                "os.environ", {"TEST_ANALYTICS_ROOT": str(root)}, clear=False
+            ):
+                exit_code = main(
+                    [
+                        "evaluate",
+                        "--config",
+                        str(config_path),
+                        "--feature-run",
+                        "source-feature-run",
+                    ],
+                    stdout=stdout,
+                    stderr=io.StringIO(),
+                    evaluation_runner=evaluate,
+                )
+
+        self.assertEqual(exit_code, ExitCode.SUCCESS)
+        self.assertEqual(captured["feature_run"], "source-feature-run")
+        self.assertEqual(json.loads(stdout.getvalue())["qualityStatus"], "PASS")
+
 
 if __name__ == "__main__":
     unittest.main()

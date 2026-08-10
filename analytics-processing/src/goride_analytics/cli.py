@@ -10,6 +10,7 @@ from .errors import AnalyticsError, ConfigurationError, ExitCode
 from .extraction.pipeline import parse_utc_boundary, run_extraction
 from .features.pipeline import run_feature_build
 from .features.persistence import run_feature_persistence
+from .evaluation.pipeline import run_evaluation
 from .manifest import validate_dataset
 from .runs import build_run_identity
 from .stages import STAGE_COMMANDS, execute_placeholder
@@ -52,10 +53,16 @@ def build_parser() -> argparse.ArgumentParser:
     )
     persist_features.add_argument("--config", required=True)
     persist_features.add_argument("--feature-run", required=True)
+    evaluate = subparsers.add_parser(
+        "evaluate",
+        help="Evaluate immutable forecasting baselines with rolling-origin folds",
+    )
+    evaluate.add_argument("--config", required=True)
+    evaluate.add_argument("--feature-run", required=True)
     for stage in (
         stage
         for stage in STAGE_COMMANDS
-        if stage not in {"extract", "build-features", "persist-features"}
+        if stage not in {"extract", "build-features", "persist-features", "evaluate"}
     ):
         command = subparsers.add_parser(stage, help=f"Phase-gated {stage} stage")
         command.add_argument("--config", required=True)
@@ -95,6 +102,7 @@ def main(
     extraction_runner: Callable[..., Any] = run_extraction,
     feature_runner: Callable[..., Any] = run_feature_build,
     persistence_runner: Callable[..., Any] = run_feature_persistence,
+    evaluation_runner: Callable[..., Any] = run_evaluation,
 ) -> int:
     stdout = stdout or sys.stdout
     logger = JsonLogger(stderr or sys.stderr)
@@ -147,6 +155,18 @@ def main(
                 processingRunId=str(outcome.processing_run_id),
                 qualityStatus=outcome.quality_status,
                 featureSha256=outcome.sha256,
+                sourceArtifactRunId=outcome.source_artifact_run_id,
+            )
+        elif args.command == "evaluate":
+            outcome = evaluation_runner(config, feature_run=args.feature_run)
+            logger.info(
+                "analytics_evaluation_completed",
+                artifactRunId=outcome.artifact_run_id,
+                featureSetVersion=outcome.feature_set_version,
+                processingRunId=str(outcome.processing_run_id),
+                qualityStatus=outcome.quality_status,
+                rawPredictionRows=outcome.raw_prediction_rows,
+                rawPredictionSha256=outcome.raw_prediction_sha256,
                 sourceArtifactRunId=outcome.source_artifact_run_id,
             )
         elif args.command != "validate-config":
