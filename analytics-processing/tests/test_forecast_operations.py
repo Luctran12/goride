@@ -11,6 +11,7 @@ from goride_analytics.errors import DatabaseError, ExtractionError
 from goride_analytics.operations.config import OperationsConfig
 from goride_analytics.operations.forecast import (
     ForecastFeature,
+    ForecastOutcome,
     RegisteredModel,
     _quality,
     _validate_model,
@@ -48,6 +49,28 @@ class ForecastOperationsTests(unittest.TestCase):
         for value in ("2014-06-01T00:01:00Z", "2014-06-01T00:00:00"):
             with self.assertRaises(ExtractionError):
                 parse_inference_cutoff(value, 15)
+
+    def test_outcome_serializes_database_timezone_as_canonical_utc(self) -> None:
+        outcome = ForecastOutcome(
+            artifact_run_id="run",
+            processing_run_id=uuid.UUID(int=1),
+            forecast_run_id=uuid.UUID(int=2),
+            model_version_id=uuid.UUID(int=3),
+            model_version="v1",
+            inference_cutoff_utc=datetime(
+                2014, 6, 1, 7, tzinfo=timezone(timedelta(hours=7))
+            ),
+            run_purpose="EVALUATION",
+            forecast_rows=3,
+            quality_status="PASS",
+            idempotent=True,
+            attempt_no=1,
+            run_directory=None,
+        )
+        self.assertEqual(
+            outcome.to_dict()["forecastRun"]["inferenceCutoffUtc"],
+            "2014-06-01T00:00:00Z",
+        )
 
     def test_only_approved_compatible_model_can_infer(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

@@ -94,9 +94,9 @@ class ForecastOutcome:
                 "forecastRows": self.forecast_rows,
                 "forecastRunId": str(self.forecast_run_id),
                 "idempotent": self.idempotent,
-                "inferenceCutoffUtc": self.inference_cutoff_utc.isoformat().replace(
-                    "+00:00", "Z"
-                ),
+                "inferenceCutoffUtc": self.inference_cutoff_utc.astimezone(
+                    timezone.utc
+                ).isoformat().replace("+00:00", "Z"),
                 "modelVersion": self.model_version,
                 "modelVersionId": str(self.model_version_id),
                 "runPurpose": self.run_purpose,
