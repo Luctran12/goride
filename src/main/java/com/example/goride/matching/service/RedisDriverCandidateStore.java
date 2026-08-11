@@ -60,6 +60,7 @@ public class RedisDriverCandidateStore implements DriverCandidateStore {
         RedisGeoCommands.GeoRadiusCommandArgs args = RedisGeoCommands.GeoRadiusCommandArgs
                 .newGeoRadiusArgs()
                 .includeDistance()
+                .includeCoordinates()
                 .sortAscending()
                 .limit(Math.max(request.limit() * 3, request.limit()));
 
@@ -197,9 +198,15 @@ public class RedisDriverCandidateStore implements DriverCandidateStore {
         }
 
         try {
+            Point point = result.getContent().getPoint();
+            if (point == null) {
+                return Optional.empty();
+            }
             return Optional.of(new DriverCandidate(
                     Long.parseLong(driverIdValue),
                     distanceMeters(result),
+                    BigDecimal.valueOf(point.getY()),
+                    BigDecimal.valueOf(point.getX()),
                     vehicleType,
                     parseRating(meta.get("rating")),
                     stringValue(meta.get("name")),

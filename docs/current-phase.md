@@ -1,6 +1,6 @@
 # GoRide Current Phase
 
-> Last updated: 2026-08-04, Asia/Bangkok
+> Last updated: 2026-08-11, Asia/Bangkok
 >
 > Purpose: source of truth before starting or reviewing the next backend commit.
 
@@ -8,44 +8,44 @@
 
 ## 1. Repository Status
 
-- Current branch: `codex/routing-estimate-cache`.
-- Base develop commit: `caf3cd1` (`merge: gps fare filtering`).
+- Current branch: `codex/matching-route-eta-ranking`.
+- Base develop commit: `ffe9964` (`merge: routing estimate cache`).
 - Local-only config: `src/main/resources/application.yml` has environment-specific changes and must remain uncommitted.
-- Working direction: reduce repeated OSRM-compatible estimate calls before route-ETA driver ranking is introduced.
+- Working direction: rank a bounded Redis GEO shortlist by provider route ETA without making provider failure block matching.
 
 ---
 
 ## 2. Reviewed Work
 
-Commit: `perf: cache routing estimates`.
+Commit: `feat: rank matching candidates by route eta`.
 
 Scope implemented:
-- Add a Redis-backed `RouteEstimateCache` for successful provider distance/duration responses.
-- Build versioned keys from routing profile and pickup/dropoff coordinates rounded to four decimal places.
-- Store structured JSON with a configurable five-minute TTL.
-- Treat cache read/write failures as misses so Redis cache outages never block estimate or booking flows.
-- Evict malformed cache payloads and continue with the routing provider.
-- Do not cache straight-line fallback estimates, allowing a recovered provider to be used immediately.
-- Skip all cache access while routing is disabled.
-- Keep fare estimate and booking API contracts unchanged.
+- Request coordinates with the Redis GEO distance result and carry driver latitude/longitude in each matching candidate.
+- Keep Redis distance as the deterministic initial order and shortlist boundary.
+- Add a provider-only routing estimate boundary so matching never ranks a straight-line fallback as real route ETA.
+- Rank at most the configured top N by provider duration, provider distance, Redis distance and driver id.
+- Execute bounded ETA calls concurrently through a dedicated no-queue executor.
+- Fall back to the original Redis-distance order when any route is unavailable, coordinates are missing or executor capacity is exhausted.
+- Keep offer locking, retry, notification and FE contracts unchanged.
 
 ---
 
 ## 3. Runtime Configuration
 
-- `ROUTING_ESTIMATE_CACHE_ENABLED=true`
-- `ROUTING_ESTIMATE_CACHE_COORDINATE_SCALE=4`
-- `ROUTING_ESTIMATE_CACHE_TTL_SECONDS=300`
+- `MATCHING_ROUTE_ETA_ENABLED=false`
+- `MATCHING_ROUTE_ETA_CANDIDATE_LIMIT=3`
+- `MATCHING_ROUTE_ETA_EXECUTOR_THREADS=6`
+- `ROUTING_ENABLED=false`
 
-Coordinate scale accepts values from 3 to 6. These controls are backend-only; FE continues using the existing fare-estimate contract.
+Route-ETA ranking is opt-in until a controlled OSRM-compatible endpoint is available. Enabling it also requires routing to be enabled. These settings are backend-only; FE continues receiving the same offer payloads.
 
 ---
 
 ## 4. Validation
 
-- Targeted routing/cache/properties/Spring context suite: pass 22 tests.
-- Covers cache hit, rounded key stability, TTL, malformed payload eviction, disabled cache, Redis outage, provider success, provider fallback and cache write failure.
-- Full `./mvnw.cmd test`: 584 tests, 3 baseline failures and 18 Docker/Testcontainers initialization errors; routing cache tests have no failures.
-- `git diff --check`: pass; Windows CRLF conversion warnings only.
+- Targeted matching/routing/cache/properties suite: pass 41 tests.
+- Spring application context starts with the primary route-ETA strategy and dedicated executor.
+- Covers ETA ordering, provider-distance tie break, candidate limit, missing route/coordinates, disabled mode, provider exception, executor rejection and Redis coordinate mapping.
+- Full `./mvnw.cmd test`: 597 tests, 3 baseline failures and 18 Docker/Testcontainers initialization errors; route-ETA tests have no failures.
+- `git diff --check`: pass.
 - User and internal reviews completed; CodeRabbit CLI is unavailable in PATH.
-- Next routing task: enrich the Redis GEO top-N candidates with coordinates and rank the shortlist by provider route ETA.
