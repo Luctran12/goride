@@ -198,6 +198,39 @@ class RoutingDistanceServiceTests {
     }
 
     @Test
+    void providerOnlyEstimateReturnsEmptyWhenRoutingIsDisabled() {
+        RouteEstimateCache cache = emptyCache();
+        RoutingDistanceService service = service(new RoutingProperties(), cache);
+
+        Optional<DistanceEstimate> estimate = service.estimateProviderRoute(PICKUP, DROPOFF);
+
+        assertThat(estimate).isEmpty();
+        verify(cache, never()).find(anyString(), any(Location.class), any(Location.class));
+    }
+
+    @Test
+    void providerOnlyEstimateDoesNotReturnConfiguredFallback() throws Exception {
+        HttpServer server = startServer(exchange -> {
+            byte[] body = """
+                    {"code":"NoRoute","routes":[]}
+                    """.getBytes(StandardCharsets.UTF_8);
+            exchange.getResponseHeaders().add("Content-Type", "application/json");
+            exchange.sendResponseHeaders(200, body.length);
+            exchange.getResponseBody().write(body);
+            exchange.close();
+        });
+        try {
+            RoutingDistanceService service = service(enabledProperties(server), emptyCache());
+
+            Optional<DistanceEstimate> estimate = service.estimateProviderRoute(PICKUP, DROPOFF);
+
+            assertThat(estimate).isEmpty();
+        } finally {
+            server.stop(0);
+        }
+    }
+
+    @Test
     void failsFastWhenEnabledProviderConfigurationIsInvalid() {
         RoutingProperties properties = new RoutingProperties();
         properties.setEnabled(true);

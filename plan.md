@@ -1,19 +1,19 @@
 # GoRide Project Completion Plan
 
-Last updated: 2026-08-04, Asia/Bangkok
+Last updated: 2026-08-11, Asia/Bangkok
 
 ## Project Snapshot
 
 | Item | Status |
 | --- | --- |
-| Working branch | `codex/routing-estimate-cache` |
-| Latest merged feature on develop | GPS fare filtering via `caf3cd1` |
-| Develop base commit for this feature | `caf3cd1` (`merge: gps fare filtering`) |
-| Current feature | Redis cache for successful routing distance/duration estimates |
-| Test status | Targeted routing/cache/properties/context suite passed 22 tests; full Maven ran 584 tests with 3 baseline failures and 18 Docker/Testcontainers errors |
+| Working branch | `codex/matching-route-eta-ranking` |
+| Latest merged feature on develop | Routing estimate cache via `ffe9964` |
+| Develop base commit for this feature | `ffe9964` (`merge: routing estimate cache`) |
+| Current feature | Redis GEO shortlist ranked by bounded provider route ETA |
+| Test status | Targeted matching/routing/cache/properties suite passed 41 tests; Spring context passed; full Maven ran 597 tests with 3 baseline failures and 18 Docker/Testcontainers errors |
 | Diff hygiene | `git diff --check` passed; Windows line-ending warnings only |
 | Code review | User and internal reviews completed; CodeRabbit CLI is unavailable in PATH |
-| Publish status | Routing cache is approved for commit and merge into `develop`; not pushed |
+| Publish status | Route-ETA ranking is approved and committed on the feature branch; not merged or pushed |
 | Local config | `src/main/resources/application.yml` is environment-specific and must stay uncommitted |
 
 ## Completed Backend Modules
@@ -29,7 +29,7 @@ Last updated: 2026-08-04, Asia/Bangkok
 | Three-word location | Authenticated gateway to custom Python coordinate/three-word conversion, normalized mobile DTOs and stable provider errors | `GET /api/v1/locations/to-words`, `GET /api/v1/locations/to-coordinate` | Provider is disabled by default; coordinates remain booking/routing source of truth. |
 | Booking | Create booking, scheduled booking, booking detail, passenger history/listing, cancellation rules/status updates | `/api/v1/bookings` and related detail/cancel/list endpoints | Booking lifecycle is connected to matching and trip creation; scheduled bookings stay `SCHEDULED` until dispatch window opens. |
 | Trip lifecycle | Driver response, arrived/start/complete transitions, passenger/driver trip history, payment confirmation hooks | `/api/v1/drivers/trips/{tripId}/respond`, `/status`, `/payment-confirm` | Trip completion can compute final fare from tracking history. |
-| Matching | Nearby driver lookup, offer dispatch, accept/reject handling, timeout handling, retry/no-driver flow, rematch on driver availability, scheduled ride dispatch into matching | Internal matching services, scheduled ride scheduler and driver availability events | Initial no-candidate booking remains `SEARCHING`; driver reject/offer timeout also keeps the trip searchable when no immediate next driver is available; scheduled rides open matching at the configured dispatch lead time; driver online/heartbeat events retry unmatched searching trips and dispatch offers when a candidate becomes available; passenger cancellation clears active matching state/driver lock and dismisses the stale driver offer. |
+| Matching | Redis GEO nearby shortlist with coordinates, opt-in bounded route-ETA ranking, distance fallback, offer dispatch, accept/reject, timeout, retry/no-driver, rematch on availability and scheduled dispatch | Internal matching services, Redis GEO, routing provider/cache, scheduled ride scheduler and driver availability events | When enabled, top candidates are ranked by provider ETA using bounded concurrent calls. Any missing route/coordinates or provider/executor failure restores deterministic Redis-distance order. Offer payload, locking, retry and cancellation behavior remain unchanged. |
 | WebSocket security | JWT-authenticated STOMP `CONNECT`, trip topic authorization, user-specific messaging, SockJS/native endpoint compatibility | `/ws` for SockJS, `/ws-native` for native STOMP, trip subscription topics | `GET /ws/info` is supported for SockJS clients while native clients retain a dedicated endpoint. |
 | Realtime tracking | Driver location updates from accepted trip onward, accept-time bootstrap from the latest valid online heartbeat, REST fallback for latest location/history, trip location notifications | `POST /api/v1/tracking/trips/{tripId}/driver-location`, `/api/v1/tracking/trips/{tripId}/driver-location`, WebSocket driver location channel | Immediately after accept, backend maps the driver's valid Redis GEO heartbeat to the trip, caches it and broadcasts it; later trip-scoped updates continue for `ACCEPTED`, `ARRIVED`, `IN_PROGRESS`, while fare history is persisted only during `IN_PROGRESS`. |
 | In-trip messaging | Passenger-driver trip chat, persisted message history, REST send/history fallback, STOMP send and trip topic broadcast with subscription authorization | `GET/POST /api/v1/trips/{tripId}/messages`, `/app/trip.message`, `/topic/trip/{tripId}/messages` | Passenger and assigned driver can send during `ACCEPTED`, `ARRIVED`, `IN_PROGRESS`; admin can read/subscribe for support but cannot send as a participant. |
@@ -53,7 +53,7 @@ Last updated: 2026-08-04, Asia/Bangkok
 | P0 | Webhook sandbox handling | Run real sandbox callback tests for MoMo and VNPAY and persist session evidence through admin sandbox E2E endpoints; service-level success/failure/stale callback coverage is implemented | Sandbox callback payloads and merchant test accounts | Sandbox success/failure statuses map to internal payment states, provider acknowledgements meet real gateway expectations, and replay/freshness checks are marked passed in recorded session and aggregate UAT evidence. |
 | P1 | E2E/integration tests | Core backend flows and protected signed-callback automation are implemented; run it for both providers and add real merchant checkout evidence | Sandbox merchant accounts, fresh signed payloads, two pending payments per run | Workflow passes for MoMo/VNPAY, artifacts remain sanitized, and separate real wallet/bank-app UAT confirms gateway-originated callbacks. |
 | P1 | GPS fare filtering calibration | GPS jitter/speed/gap/timestamp filtering is implemented; tune thresholds against real device traces and add operational rejected-segment metrics | Staging trips across vehicle types, device GPS traces and fare reconciliation samples | Filtered actual distance does not overcharge spike/noise scenarios, legitimate route distance remains within agreed tolerance, and fallback-to-estimate frequency is monitored. |
-| P1 | Route-ETA driver ranking | Redis GEO already returns a nearby shortlist; enrich candidates with coordinates and rank the top N by provider route ETA while preserving straight-line fallback ordering | Stable/self-hosted routing provider, candidate coordinates and latency/rate metrics | Matching selects the fastest reachable driver from a bounded shortlist, provider calls stay bounded, and provider/cache failure falls back to Redis distance ordering. |
+| P1 | Route-ETA driver ranking UAT | Implementation is ready: Redis GEO includes coordinates, top N provider calls are bounded/concurrent, and every incomplete ranking falls back to Redis distance; keep disabled until controlled-provider UAT | Stable/self-hosted routing provider plus matching latency, executor saturation, cache and fallback metrics | Enable in staging, verify fastest-route selection against real roads, confirm matching latency stays within target under concurrency, then enable for production. |
 | P1 | Production hardening | OTLP exporter/config/startup/smoke gates and shared Redis rate limiting are code-ready; deploy collector/log shipping/dashboards and soak-test multi-replica staging | Managed Redis, OTLP collector/backend, log collector, Prometheus/Grafana-equivalent and multi-replica staging | Traces correlate with requestId/traceId, logs and metrics are centralized, shared quota remains correct and strict smoke passes without store/exporter errors. |
 | P2 | Upload storage production UAT | Cloudflare R2/S3-compatible provider is implemented; provision bucket/API token/public base URL, verify real upload/read access and decide private document access policy | Cloudflare account, R2 bucket, custom/public domain or signed URL policy, deployment secrets | Uploaded files survive redeploys and scale-out; avatar/document URLs are stable; credentials stay outside Git; failed R2 writes return structured `FILE_STORAGE_ERROR`. |
 | P2 | Surge pricing tuning | Dynamic surge rules foundation is implemented; tune thresholds, city/time policies and monitoring in staging | Staging demand/supply data, admin operations policy | Fare estimate exposes transparent surge breakdown, trips snapshot the effective multiplier, and admin can adjust rules safely during UAT. |
@@ -93,7 +93,7 @@ Last updated: 2026-08-04, Asia/Bangkok
 | Phase | Goal | Main Deliverables |
 | --- | --- | --- |
 | Phase 1 | Payment provider completion | MoMo/VNPAY sandbox E2E validation, session-level admin evidence API implemented, `/methods` `consumerEnabled` gate implemented, provider-specific freshness-window tuning, service-level callback contract coverage and real merchant callback tests. |
-| Phase 2 | Real-world routing | Fare estimation, Redis estimate cache, driver pickup/dropoff routing, straight-line fallback and GPS fare filtering are implemented; route-ETA candidate ranking, production endpoint UAT, metrics and timeout tuning remain. |
+| Phase 2 | Real-world routing | Fare estimation/cache, driver pickup/dropoff routing/fallback, GPS fare filtering and opt-in route-ETA candidate ranking are implemented; controlled-provider UAT, metrics and timeout/executor tuning remain. |
 | Phase 3 | Driver availability reliability | Heartbeat API, Redis TTL refresh and automatic database offline timeout implemented; production interval tuning and Redis/database soak testing remain. |
 | Phase 4 | Production readiness | Firebase config, structured logs, Redis rate limits, Prometheus/Actuator, OTLP tracing config/correlation/startup/smoke gates and SQL release guards are implemented; collector deployment, dashboards, soak tests and final UAT remain. |
 | Phase 5 | Integration confidence | Testcontainers PostGIS/Redis foundation, auth flow, booking-to-matching-to-pickup/dropoff-routing flow, trip completion, tracking fallback, cash payment confirmation, notification inbox/FCM token flow, admin flow and backend CI workflow are implemented; provider sandbox E2E validation remains. |

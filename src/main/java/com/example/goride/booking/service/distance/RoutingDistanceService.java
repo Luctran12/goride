@@ -18,7 +18,7 @@ import java.util.List;
 import java.util.Optional;
 
 @Service
-public class RoutingDistanceService implements DistanceService {
+public class RoutingDistanceService implements DistanceService, ProviderRouteEstimateService {
     private static final Logger log = LoggerFactory.getLogger(RoutingDistanceService.class);
     private static final double EARTH_RADIUS_KM = 6371.0;
     private static final double ROAD_FACTOR = 1.25;
@@ -63,6 +63,26 @@ public class RoutingDistanceService implements DistanceService {
             return fallbackEstimate(pickup, dropoff);
         }
 
+        Optional<DistanceEstimate> providerEstimate = estimateProviderRoute(pickup, dropoff);
+        if (providerEstimate.isPresent()) {
+            return providerEstimate.get();
+        }
+        if (routingProperties.isFallbackEnabled()) {
+            log.warn("Routing provider unavailable; using configured distance fallback");
+            return fallbackEstimate(pickup, dropoff);
+        }
+        throw new BusinessException(
+                ErrorCode.ROUTING_PROVIDER_ERROR,
+                "Unable to estimate route distance and duration"
+        );
+    }
+
+    @Override
+    public Optional<DistanceEstimate> estimateProviderRoute(Location pickup, Location dropoff) {
+        if (!routingProperties.isEnabled()) {
+            return Optional.empty();
+        }
+
         String routingProfile = routingProperties.normalizedProfile();
         Optional<DistanceEstimate> cachedEstimate = findCachedEstimate(
                 routingProfile,
@@ -70,7 +90,7 @@ public class RoutingDistanceService implements DistanceService {
                 dropoff
         );
         if (cachedEstimate.isPresent()) {
-            return cachedEstimate.get();
+            return cachedEstimate;
         }
 
         try {
@@ -80,9 +100,10 @@ public class RoutingDistanceService implements DistanceService {
                     .body(OsrmRouteResponse.class);
             DistanceEstimate estimate = routeEstimate(response);
             cacheEstimate(routingProfile, pickup, dropoff, estimate);
-            return estimate;
+            return Optional.of(estimate);
         } catch (RestClientException | IllegalArgumentException exception) {
-            return fallbackOrThrow(pickup, dropoff, exception);
+            log.warn("Routing provider estimate failed error={}", exception.getMessage());
+            return Optional.empty();
         }
     }
 
@@ -150,22 +171,6 @@ public class RoutingDistanceService implements DistanceService {
                 .divide(BigDecimal.valueOf(1000), 2, RoundingMode.HALF_UP);
         int durationMinutes = Math.max(1, (int) Math.ceil(route.duration() / 60));
         return new DistanceEstimate(distanceKm, durationMinutes);
-    }
-
-    private DistanceEstimate fallbackOrThrow(
-            Location pickup,
-            Location dropoff,
-            RuntimeException providerFailure
-    ) {
-        if (routingProperties.isFallbackEnabled()) {
-            log.warn("Routing provider failed; using configured distance fallback: {}",
-                    providerFailure.getMessage());
-            return fallbackEstimate(pickup, dropoff);
-        }
-        throw new BusinessException(
-                ErrorCode.ROUTING_PROVIDER_ERROR,
-                "Unable to estimate route distance and duration"
-        );
     }
 
     private DistanceEstimate fallbackEstimate(Location pickup, Location dropoff) {

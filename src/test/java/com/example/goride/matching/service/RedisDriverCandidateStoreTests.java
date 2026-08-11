@@ -88,6 +88,8 @@ class RedisDriverCandidateStoreTests {
         assertThat(candidates).hasSize(1);
         assertThat(candidates.get(0).driverId()).isEqualTo(10L);
         assertThat(candidates.get(0).distanceMeters()).isEqualTo(250L);
+        assertThat(candidates.get(0).latitude()).isEqualByComparingTo("10.7769");
+        assertThat(candidates.get(0).longitude()).isEqualByComparingTo("106.7009");
         assertThat(candidates.get(0).vehicleType()).isEqualTo(VehicleType.CAR_4_SEAT);
         assertThat(candidates.get(0).rating()).isEqualByComparingTo(BigDecimal.valueOf(4.8));
     }

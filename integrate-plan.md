@@ -267,6 +267,8 @@ type PaymentSandboxUatStatus = "NOT_RUN" | "BLOCKED" | "FAILED" | "PASSED";
 ### Matching
 
 - [x] Sau khi booking tuc thi created, backend tu dong tim driver gan nhat trong Redis.
+- [x] Redis GEO candidate gom distance va current coordinates; khi route-ETA enabled, backend rank top N theo provider ETA/route distance truoc khi gui offer.
+- [x] Route-ETA ranking co bounded concurrent executor; bat ky route/toa do bi thieu, provider/cache loi hoac executor busy thi giu nguyen Redis-distance order.
 - [x] Scheduled booking khong gui offer ngay; scheduler chuyen `SCHEDULED -> SEARCHING` truoc gio don theo config roi kich hoat matching.
 - [x] Gui offer toi driver qua WebSocket user queue.
 - [x] Khi passenger huy booking dang co offer active, backend clear matching state/driver lock va gui dismiss payload toi driver qua WebSocket user queue.
@@ -415,6 +417,7 @@ type PaymentSandboxUatStatus = "NOT_RUN" | "BLOCKED" | "FAILED" | "PASSED";
 
 - [x] Da thay mock distance bean bang OSRM-compatible routing provider cho estimate/create booking.
 - [x] Provider estimate thanh cong duoc cache Redis theo routing profile va pickup/dropoff lam tron; cache outage khong chan booking.
+- [x] Top N driver gan nhat co the duoc rank theo provider route ETA tu driver den pickup; mac dinh opt-in va fallback atomic ve Redis-distance order.
 - [x] Da co driver trip routing API tu current GPS den pickup/dropoff theo trip status.
 - [ ] Can UAT routing endpoint production/self-hosted va theo doi tan suat fallback truoc khi launch.
 
@@ -472,12 +475,20 @@ app:
       enabled: ${ROUTING_ESTIMATE_CACHE_ENABLED:true}
       coordinate-scale: ${ROUTING_ESTIMATE_CACHE_COORDINATE_SCALE:4}
       ttl-seconds: ${ROUTING_ESTIMATE_CACHE_TTL_SECONDS:300}
+  matching:
+    route-eta:
+      enabled: ${MATCHING_ROUTE_ETA_ENABLED:false}
+      candidate-limit: ${MATCHING_ROUTE_ETA_CANDIDATE_LIMIT:3}
+      executor-threads: ${MATCHING_ROUTE_ETA_EXECUTOR_THREADS:6}
 ```
 
 - Khi enabled, backend gui pickup/dropoff theo OSRM order `longitude,latitude`.
 - Provider distance meter duoc tra ve FE thanh km; duration giay duoc lam tron len thanh phut.
 - Provider result thanh cong duoc cache Redis mac dinh 5 phut bang pickup/dropoff lam tron 4 chu so thap phan va routing profile.
 - Cache hit/miss hoan toan transparent voi FE. Redis cache loi hoac payload sai thi backend goi provider; fallback estimate khong duoc cache.
+- Route-ETA matching cung transparent voi FE: offer payload va WebSocket queue khong doi; FE khong goi routing provider de chon driver.
+- Chi bat `MATCHING_ROUTE_ETA_ENABLED=true` khi `ROUTING_ENABLED=true` va backend dang dung controlled/self-hosted provider. Mac dinh `false` de public OSRM khong bi dung cho moi matching.
+- Backend chi route toi da `candidate-limit` tai xe va chay song song tren pool khong queue. Neu mot ETA that khong co hoac pool ban, backend giu toan bo Redis-distance order thay vi tron ket qua provider voi fallback.
 - FE van nen debounce estimate khi user keo map pin; cache khong thay the request-rate control.
 - Neu fallback enabled, timeout/HTTP error/`NoRoute` tu provider se dung Haversine estimate de booking flow khong bi dung.
 - Neu fallback disabled, estimate/create booking tra `ROUTING_PROVIDER_ERROR` HTTP 502; FE hien thong bao khong the tinh lo trinh va cho retry.

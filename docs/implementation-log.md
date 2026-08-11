@@ -6,6 +6,43 @@
 
 ---
 
+## Commit: `feat: rank matching candidates by route eta`
+
+Branch: `codex/matching-route-eta-ranking`
+
+Phase: Production hardening / matching quality
+
+### Muc tieu
+
+Chon tai xe theo ETA duong bo trong shortlist Redis GEO, nhung khong de routing provider loi hoac qua tai lam dung flow matching.
+
+### Noi dung da trien khai
+
+- Redis GEO query tra ca distance va driver coordinates.
+- `DriverCandidate` mang latitude/longitude de routing tu vi tri tai xe den pickup.
+- Them `ProviderRouteEstimateService`; matching chi dung provider/cache result that, khong dung Haversine fallback de xep hang.
+- `RouteEtaDriverStrategy` giu Redis distance lam shortlist va fallback order.
+- Top N duoc xep theo provider duration, provider route distance, Redis distance va driver id.
+- ETA calls chay dong thoi tren executor co gioi han va khong queue task stale.
+- Neu bat ky candidate thieu ETA/toa do, provider loi hoac executor het capacity, ca shortlist quay ve Redis-distance order.
+- Feature mac dinh disabled cho den khi co controlled OSRM-compatible endpoint.
+- Khong doi offer payload, locking, retry, WebSocket hoac FE contract.
+
+### Cau hinh
+
+- `MATCHING_ROUTE_ETA_ENABLED=false`
+- `MATCHING_ROUTE_ETA_CANDIDATE_LIMIT=3`
+- `MATCHING_ROUTE_ETA_EXECUTOR_THREADS=6`
+- Can `ROUTING_ENABLED=true` de lay provider ETA.
+
+### Kiem thu
+
+- Targeted matching/routing/cache/properties suite: pass 41 tests.
+- Spring context: pass.
+- Full Maven: 597 tests, 3 baseline failures va 18 Docker/Testcontainers initialization errors; khong co failure moi tu route-ETA ranking.
+- `git diff --check`: pass; internal review complete; CodeRabbit CLI khong co trong PATH.
+- User review: completed; approved for commit. Feature chua merge vao `develop`.
+
 ## Commit: `perf: cache routing estimates`
 
 Branch: `codex/routing-estimate-cache`
