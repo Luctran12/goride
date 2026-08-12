@@ -1,6 +1,7 @@
 package com.example.goride.booking.controller;
 
 import com.example.goride.booking.domain.TripStatus;
+import com.example.goride.booking.dto.AdminTripRouteResponse;
 import com.example.goride.booking.dto.TripResponse;
 import com.example.goride.booking.service.AdminTripService;
 import com.example.goride.common.api.ApiResponse;
@@ -11,6 +12,7 @@ import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -37,5 +39,10 @@ public class AdminTripController {
             @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size
     ) {
         return ApiResponse.ok(adminTripService.listTrips(status, from, to, page, size));
+    }
+
+    @GetMapping("/{tripId}/route")
+    public ApiResponse<AdminTripRouteResponse> getActualRoute(@PathVariable Long tripId) {
+        return ApiResponse.ok(adminTripService.getActualRoute(tripId));
     }
 }

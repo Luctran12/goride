@@ -10,6 +10,8 @@ import com.example.goride.common.error.ErrorCode;
 import com.example.goride.driver.domain.VehicleType;
 import com.example.goride.user.domain.User;
 import com.example.goride.user.domain.UserRole;
+import com.example.goride.tracking.domain.TripLocationHistory;
+import com.example.goride.tracking.repository.TripLocationHistoryRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -43,11 +45,14 @@ class AdminTripServiceTests {
     @Mock
     private TripRepository tripRepository;
 
+    @Mock
+    private TripLocationHistoryRepository tripLocationHistoryRepository;
+
     private AdminTripService service;
 
     @BeforeEach
     void setUp() {
-        service = new AdminTripService(tripRepository);
+        service = new AdminTripService(tripRepository, tripLocationHistoryRepository);
     }
 
     @Test
@@ -104,6 +109,72 @@ class AdminTripServiceTests {
         verifyNoInteractions(tripRepository);
     }
 
+    @Test
+    void returnsOrderedActualRouteAsGeoJsonLineString() {
+        Trip trip = sampleTrip(passenger(10L));
+        TripLocationHistory first = routePoint(
+                trip,
+                106.7001,
+                10.7701,
+                "2026-06-05T10:05:00Z"
+        );
+        TripLocationHistory second = routePoint(
+                trip,
+                106.7012,
+                10.7713,
+                "2026-06-05T10:05:05Z"
+        );
+        when(tripRepository.findByIdAndDeletedAtIsNull(99L)).thenReturn(java.util.Optional.of(trip));
+        when(tripLocationHistoryRepository.findByTripIdAndTripDeletedAtIsNullOrderByRecordedAtAsc(99L))
+                .thenReturn(List.of(first, second));
+
+        var response = service.getActualRoute(99L);
+
+        assertThat(response.routeType()).isEqualTo(
+                com.example.goride.booking.dto.AdminTripRouteResponse.RouteType.ACTUAL
+        );
+        assertThat(response.geometry()).isNotNull();
+        assertThat(response.geometry().type()).isEqualTo("LineString");
+        assertThat(response.geometry().coordinates()).containsExactly(
+                List.of(BigDecimal.valueOf(106.7001), BigDecimal.valueOf(10.7701)),
+                List.of(BigDecimal.valueOf(106.7012), BigDecimal.valueOf(10.7713))
+        );
+        assertThat(response.points()).extracting(point -> point.recordedAt()).containsExactly(
+                Instant.parse("2026-06-05T10:05:00Z"),
+                Instant.parse("2026-06-05T10:05:05Z")
+        );
+    }
+
+    @Test
+    void returnsUnavailableWithoutFabricatingRouteGeometry() {
+        Trip trip = sampleTrip(passenger(10L));
+        when(tripRepository.findByIdAndDeletedAtIsNull(99L)).thenReturn(java.util.Optional.of(trip));
+        when(tripLocationHistoryRepository.findByTripIdAndTripDeletedAtIsNullOrderByRecordedAtAsc(99L))
+                .thenReturn(List.of());
+
+        var response = service.getActualRoute(99L);
+
+        assertThat(response.routeType()).isEqualTo(
+                com.example.goride.booking.dto.AdminTripRouteResponse.RouteType.UNAVAILABLE
+        );
+        assertThat(response.geometry()).isNull();
+        assertThat(response.points()).isEmpty();
+        assertThat(response.pickup().lat()).isEqualByComparingTo("10.77");
+        assertThat(response.dropoff().lng()).isEqualByComparingTo("106.665");
+    }
+
+    @Test
+    void rejectsRouteLookupForMissingTripBeforeReadingHistory() {
+        when(tripRepository.findByIdAndDeletedAtIsNull(404L)).thenReturn(java.util.Optional.empty());
+
+        assertThatThrownBy(() -> service.getActualRoute(404L))
+                .isInstanceOfSatisfying(BusinessException.class, exception ->
+                        assertThat(exception.errorCode()).isEqualTo(ErrorCode.TRIP_NOT_FOUND)
+                );
+
+        verifyNoInteractions(tripLocationHistoryRepository);
+    }
+
     private Trip sampleTrip(User passenger) {
         Trip trip = Trip.create(
                 passenger,
@@ -139,6 +210,22 @@ class AdminTripServiceTests {
         User user = User.create("Passenger", "0900000000", null, "hash", Set.of(UserRole.PASSENGER));
         ReflectionTestUtils.setField(user, "id", id);
         return user;
+    }
+
+    private TripLocationHistory routePoint(
+            Trip trip,
+            double longitude,
+            double latitude,
+            String recordedAt
+    ) {
+        TripLocationHistory history = TripLocationHistory.record(
+                trip,
+                point(longitude, latitude),
+                BigDecimal.valueOf(90),
+                BigDecimal.valueOf(25)
+        );
+        ReflectionTestUtils.setField(history, "recordedAt", Instant.parse(recordedAt));
+        return history;
     }
 
     private static org.locationtech.jts.geom.Point point(double longitude, double latitude) {

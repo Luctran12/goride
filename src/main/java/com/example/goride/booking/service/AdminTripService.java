@@ -2,11 +2,13 @@ package com.example.goride.booking.service;
 
 import com.example.goride.booking.domain.Trip;
 import com.example.goride.booking.domain.TripStatus;
+import com.example.goride.booking.dto.AdminTripRouteResponse;
 import com.example.goride.booking.dto.TripResponse;
 import com.example.goride.booking.repository.TripRepository;
 import com.example.goride.common.api.PageResponse;
 import com.example.goride.common.error.BusinessException;
 import com.example.goride.common.error.ErrorCode;
+import com.example.goride.tracking.repository.TripLocationHistoryRepository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -21,9 +23,25 @@ public class AdminTripService {
     private static final int MAX_PAGE_SIZE = 100;
 
     private final TripRepository tripRepository;
+    private final TripLocationHistoryRepository tripLocationHistoryRepository;
 
-    public AdminTripService(TripRepository tripRepository) {
+    public AdminTripService(
+            TripRepository tripRepository,
+            TripLocationHistoryRepository tripLocationHistoryRepository
+    ) {
         this.tripRepository = tripRepository;
+        this.tripLocationHistoryRepository = tripLocationHistoryRepository;
+    }
+
+    @Transactional(readOnly = true)
+    public AdminTripRouteResponse getActualRoute(Long tripId) {
+        Trip trip = tripRepository.findByIdAndDeletedAtIsNull(tripId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.TRIP_NOT_FOUND));
+        return AdminTripRouteResponse.from(
+                trip,
+                tripLocationHistoryRepository
+                        .findByTripIdAndTripDeletedAtIsNullOrderByRecordedAtAsc(tripId)
+        );
     }
 
     @Transactional(readOnly = true)
