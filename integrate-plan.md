@@ -323,6 +323,10 @@ type PaymentSandboxUatStatus = "NOT_RUN" | "BLOCKED" | "FAILED" | "PASSED";
 - [x] Backend luu message history vao `trip_messages`.
 - [x] FE lay lich su qua `GET /api/v1/trips/{tripId}/messages`.
 - [x] Backend broadcast message realtime qua `/topic/trip/{tripId}/messages`.
+- [x] Backend idempotent retry bang `clientMessageId` va unique constraint.
+- [x] Backend cursor sync initial/older/newer cho reconnect.
+- [x] Backend read cursor, unread count va `/topic/trip/{tripId}/message-read`.
+- [x] Backend STOMP ACK/error queue, FCM message notification va chat-specific rate limit.
 - [x] Subscribe topic messages dung cung authorization voi trip status/location: passenger cua trip, driver cua trip hoac admin.
 - [x] Chi cho gui khi trip status la `ACCEPTED`, `ARRIVED` hoac `IN_PROGRESS`; status khac tra `TRIP_MESSAGE_NOT_AVAILABLE`.
 
@@ -1356,7 +1360,7 @@ Backend actual-fare GPS filtering:
 ---
 ### 4.6.1 In-trip messaging
 
-Dung cho hop thoai passenger-driver trong active trip. FE nen load history qua REST khi mo trip detail, sau do subscribe WebSocket topic de nhan message moi.
+Dung cho hop thoai passenger-driver trong active trip. Flow de tranh race: FE connect STOMP va subscribe topic truoc, sau do goi API `messages/sync`; message nhan tu hai nguon phai de-duplicate theo `id` va `clientMessageId`.
 
 #### Lay lich su message
 
@@ -1375,6 +1379,7 @@ Response `data`: `PageResponse<TripMessageResponse>`.
       "tripId": 99,
       "senderId": 10,
       "senderRole": "PASSENGER",
+      "clientMessageId": "81100000-0000-0000-0000-000000000001",
       "body": "Toi dang dung o cong A",
       "sentAt": "2026-07-01T10:00:00Z"
     }
@@ -1389,7 +1394,7 @@ Response `data`: `PageResponse<TripMessageResponse>`.
 ```
 
 FE action:
-- Goi khi mo trip detail/chat panel hoac reconnect app.
+- Endpoint page nay giu de tuong thich/admin support. Chat mobile moi nen dung cursor sync ben duoi.
 - `page` la 1-based; backend clamp `size` tu 1 den 100.
 - Response sap xep message moi nhat truoc; FE co the dao nguoc list de render timeline cu -> moi.
 - Passenger/driver chi xem duoc trip cua minh; admin co the xem de support.
@@ -1406,6 +1411,7 @@ Request:
 
 ```json
 {
+  "clientMessageId": "81100000-0000-0000-0000-000000000001",
   "body": "Toi dang den trong 2 phut"
 }
 ```
@@ -1413,6 +1419,8 @@ Request:
 Response `201 Created`, `data`: `TripMessageResponse`.
 
 FE action:
+- Tao UUID moi mot lan khi user bam gui; giu nguyen UUID do cho moi lan retry cho den khi nhan response/ACK.
+- Cung `(tripId, senderId, clientMessageId)` luon tra message da luu dau tien, khong broadcast/push lan hai.
 - Disable input neu trip chua co driver hoac status khong nam trong `ACCEPTED`, `ARRIVED`, `IN_PROGRESS`.
 - Body khong rong sau trim va toi da 1000 ky tu.
 - Neu response `TRIP_MESSAGE_NOT_AVAILABLE`, refresh trip status va khoa input.
@@ -1429,13 +1437,14 @@ Payload:
 ```json
 {
   "tripId": 99,
+  "clientMessageId": "81100000-0000-0000-0000-000000000001",
   "body": "Toi dang den trong 2 phut"
 }
 ```
 
 FE action:
 - Chi gui STOMP sau khi `CONNECT` thanh cong voi bearer token.
-- Neu app can delivery confirmation ro rang, uu tien REST `POST` va de WebSocket chi lam realtime fan-out.
+- Canonical mobile send nen dung REST `POST`. Neu gui STOMP, subscribe `/user/queue/trip-message-acks` va `/user/queue/trip-message-errors` truoc khi SEND.
 - Backend van save DB va broadcast message da luu, nen FE nen de-dupe theo `id` neu vua POST vua nhan lai qua topic.
 
 #### Subscribe message realtime
@@ -1450,6 +1459,56 @@ FE action:
 - Subscribe cung luc voi trip status/location trong active trip screen.
 - Topic nay chi cho passenger cua trip, assigned driver hoac admin subscribe; subscribe nham trip se bi backend reject.
 - Khi nhan message moi, append vao chat panel neu `id` chua ton tai.
+
+#### Cursor sync va reconnect
+
+```http
+GET /api/v1/trips/{tripId}/messages/sync?limit=50
+GET /api/v1/trips/{tripId}/messages/sync?beforeId={oldestMessageId}&limit=50
+GET /api/v1/trips/{tripId}/messages/sync?afterId={latestMessageId}&limit=100
+```
+
+Response `data`:
+
+```json
+{
+  "items": [],
+  "mode": "INITIAL",
+  "hasMore": false,
+  "nextCursor": null
+}
+```
+
+- `INITIAL` va `OLDER` tra item theo thu tu cu -> moi; `nextCursor` la id cu nhat de tai tiep `beforeId`.
+- `NEWER` tra item theo thu tu cu -> moi; `nextCursor` la id moi nhat de goi tiep `afterId` neu `hasMore=true`.
+- Khong gui cung luc `beforeId` va `afterId`; cursor phai duong; `limit` tu 1 den 100.
+- Reconnect: subscribe topic truoc, goi `afterId` tu message cuoi local, merge/de-duplicate, lap lai neu `hasMore=true`.
+
+#### Read state va unread count
+
+```http
+PUT /api/v1/trips/{tripId}/messages/read-state
+Content-Type: application/json
+
+{ "lastReadMessageId": 501 }
+```
+
+```http
+GET /api/v1/trips/{tripId}/messages/unread-count
+```
+
+- Read cursor chi tien toi, nen request tu thiet bi cu khong keo lui trang thai da doc.
+- Unread chi dem message cua nguoi con lai sau cursor, khong dem message user tu gui.
+- Subscribe `/topic/trip/{tripId}/message-read` de nhan `TripMessageReadStateResponse` va hien read receipt.
+- Goi `PUT read-state` khi chat dang visible va message moi nhat da render; debounce de tranh gui moi message mot request.
+
+#### STOMP ACK, error va push
+
+- `/user/queue/trip-message-acks`: payload `{ clientMessageId, message }` sau khi message da commit.
+- `/user/queue/trip-message-errors`: payload `{ code, message, details }` cho business error nhu `TRIP_MESSAGE_NOT_AVAILABLE` hoac `RATE_LIMIT_EXCEEDED`.
+- FCM notification type `TRIP_MESSAGE_RECEIVED` chua `tripId`, `messageId`, `clientMessageId`, `senderId`, `senderRole` khi FCM duoc bat.
+- Chat rate limit mac dinh 30 message/phut/user; khi REST tra 429 hoac STOMP error `RATE_LIMIT_EXCEEDED`, dung retry den `retryAfterSeconds`.
+- Chi chat trong `ACCEPTED`, `ARRIVED`, `IN_PROGRESS`; history/read van truy cap duoc sau khi trip ket thuc cho participant.
 
 ---
 
@@ -2913,7 +2972,7 @@ ull`/bo field.
   - `ARRIVED`: hien driver da den.
   - `IN_PROGRESS`: hien map tracking, subscribe location.
   - `COMPLETED`: hien final fare.
-- [ ] Chat panel: load `GET /api/v1/trips/{tripId}/messages`, subscribe `/topic/trip/{tripId}/messages`, gui message khi trip active.
+- [ ] Chat panel: subscribe message/read topics, initial cursor sync, REST send voi stable `clientMessageId`, reconnect `afterId`, unread/read-state va FCM deep-link.
 - [ ] Payment done screen: doi `PAYMENT_COMPLETED`.
 - [ ] Rating screen: post rating.
 - [ ] Trip history: list bookings.
@@ -2928,7 +2987,7 @@ ull`/bo field.
 - [ ] Offer modal from `/user/queue/trip-requests`, including `TRIP_CANCELLED`/`DISMISS` payload to close stale offers.
 - [ ] Driver navigation: goi `POST /api/v1/drivers/trips/{tripId}/route`, ve GeoJSON route den pickup/dropoff va debounce re-route.
 - [ ] Driver three-word lookup: mo sheet `Tim bang 3 tu`, preview marker/bounds va chi dan duong sau khi driver xac nhan.
-- [ ] Chat panel: load/send/subscribe trip messages nhu passenger app.
+- [ ] Chat panel: cung contract idempotent send/cursor sync/read-state nhu passenger app; disable input khi trip khong active.
 - [ ] Trip workflow buttons: arrived/start/complete.
 - [ ] Location sender while `IN_PROGRESS`.
 - [ ] Cash confirmation screen.

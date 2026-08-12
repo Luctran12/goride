@@ -959,11 +959,16 @@ Backend co module `chat` cho message text theo tung trip.
 
 REST contract:
 - `GET /api/v1/trips/{tripId}/messages?page=1&size=50`: passenger/driver cua trip va admin xem lich su, tra `PageResponse<TripMessageResponse>` sap xep moi nhat truoc.
-- `POST /api/v1/trips/{tripId}/messages`: passenger/assigned driver gui message text, tra `201 Created` va message da luu.
+- `POST /api/v1/trips/{tripId}/messages`: passenger/assigned driver gui `{clientMessageId, body}`; retry cung UUID tra message da luu va khong fan-out lan hai.
+- `GET /api/v1/trips/{tripId}/messages/sync`: initial/older/newer cursor sync qua `beforeId` hoac `afterId`.
+- `PUT /api/v1/trips/{tripId}/messages/read-state`: tien read cursor toi `lastReadMessageId`.
+- `GET /api/v1/trips/{tripId}/messages/unread-count`: dem message cua participant con lai sau read cursor.
 
 WebSocket contract:
-- FE gui `SEND /app/trip.message` voi `{ "tripId": 99, "body": "..." }`.
+- FE gui `SEND /app/trip.message` voi `{ "tripId": 99, "clientMessageId": "<uuid>", "body": "..." }`.
 - Backend broadcast message da luu qua `/topic/trip/{tripId}/messages`.
+- Backend broadcast read cursor qua `/topic/trip/{tripId}/message-read`.
+- STOMP ACK qua `/user/queue/trip-message-acks`; business error qua `/user/queue/trip-message-errors`.
 - `TripTopicSubscriptionAuthorizer` cho `/topic/trip/{tripId}/messages` dung chung rule voi status/location: passenger cua trip, driver cua trip hoac admin moi subscribe duoc.
 
 Rule nghiep vu:
@@ -974,6 +979,13 @@ Rule nghiep vu:
 
 Database:
 - SQL release `db/releases/20260701-trip-messages` tao bang `trip_messages` voi FK den `trips` va `users`.
+- SQL release `db/releases/20260811-trip-messaging-reliability` them idempotency UUID, unique constraint va bang `trip_message_read_states`.
+
+Reliability/security:
+- Chat rate limit mac dinh 30 message/phut/user va dung cung memory/Redis store voi global rate limiting.
+- WebSocket endpoint dung CORS allowlist, khong con wildcard origin.
+- FCM type `TRIP_MESSAGE_RECEIVED` duoc gui cho recipient khi Firebase channel enabled.
+- Simple Broker hien tai chi dam bao realtime trong mot backend replica; scale ngang can broker relay/shared fan-out, con REST cursor sync la recovery path.
 
 ---
 ## 12. Error Codes

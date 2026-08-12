@@ -1,6 +1,7 @@
 package com.example.goride.notification.dto;
 
 import com.example.goride.booking.domain.Trip;
+import com.example.goride.chat.dto.TripMessageResponse;
 import com.example.goride.notification.domain.NotificationType;
 import com.example.goride.payment.domain.Payment;
 
@@ -88,6 +89,26 @@ public record UserNotification(
                 "Your payment has been completed",
                 data,
                 Instant.now()
+        );
+    }
+
+    public static UserNotification tripMessage(TripMessageResponse message) {
+        String sender = message.senderRole().name().equals("DRIVER") ? "driver" : "passenger";
+        String body = message.body().length() <= 200
+                ? message.body()
+                : message.body().substring(0, 197) + "...";
+        return new UserNotification(
+                NotificationType.TRIP_MESSAGE_RECEIVED,
+                "New message from " + sender,
+                body,
+                Map.of(
+                        "tripId", message.tripId(),
+                        "messageId", message.id(),
+                        "clientMessageId", message.clientMessageId(),
+                        "senderId", message.senderId(),
+                        "senderRole", message.senderRole().name()
+                ),
+                message.sentAt()
         );
     }
 

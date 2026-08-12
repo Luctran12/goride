@@ -6,6 +6,52 @@
 
 ---
 
+## Planned commit: `feat: complete reliable trip messaging`
+
+Branch: `codex/trip-messaging-production`
+
+Phase: Product completion / passenger-driver communication
+
+### Muc tieu
+
+Hoan thien chat text theo trip de FE mobile co the retry, reconnect, dem unread va cap nhat da doc ma khong tao duplicate hoac bo sot message.
+
+### Noi dung da trien khai
+
+- Them UUID `clientMessageId` vao REST/STOMP request, response va `trip_messages`.
+- Unique constraint `(trip_id, sender_id, client_message_id)` ket hop pessimistic trip lock de idempotent retry tra dung message cu.
+- Retry khong broadcast lai va khong gui push lai.
+- Them `GET /api/v1/trips/{tripId}/messages/sync`:
+  - Khong cursor: lay batch moi nhat theo timeline cu den moi.
+  - `beforeId`: tai message cu hon.
+  - `afterId`: dong bo message moi sau reconnect.
+- Them `trip_message_read_states`, `PUT /messages/read-state` va `GET /messages/unread-count`.
+- Read cursor chi tien toi va unread count bo qua message do chinh user gui.
+- Them realtime topic `/topic/trip/{tripId}/message-read` cung participant/admin subscription authorization.
+- STOMP send tra ACK qua `/user/queue/trip-message-acks`; business error qua `/user/queue/trip-message-errors`.
+- Them notification type `TRIP_MESSAGE_RECEIVED` va FCM recipient notification qua Firebase channel hien co.
+- Them chat-specific user rate limit, mac dinh 30 message/phut, dung chung memory/Redis store da cau hinh.
+- WebSocket `/ws` va `/ws-native` dung CORS allowlist thay cho wildcard origin.
+- Them SQL release `db/releases/20260811-trip-messaging-reliability` gom manifest/precheck/apply/verify/rollback.
+- Chuyen datasource duoc track trong `application.yml` sang `DATABASE_*` env defaults va loai Supabase credential khoi working tree; local override duoc giu ngoai commit.
+
+### Kiem thu
+
+- Targeted chat/security suite: pass 26 tests.
+- `TripMessagingFlowIntegrationTests`: pass voi PostgreSQL/PostGIS + Redis that qua Testcontainers.
+- `TripMessagingReleaseIntegrationTests`: apply/verify/rollback SQL release pass.
+- `scripts/validate-db-release.ps1`: pass cho release `20260811-trip-messaging-reliability`.
+- Full `./mvnw.cmd test`: pass 616 tests.
+- `git diff --check`: pass; internal diff review khong thay blocker trong scope chat.
+- CodeRabbit CLI khong co trong local PATH; cho user review truoc khi commit/merge.
+
+### Gioi han trien khai
+
+- Spring Simple Broker hien tai phu hop mot WebSocket backend replica.
+- Truoc khi scale nhieu replica, can managed STOMP broker relay hoac shared fan-out; REST `afterId` sync la recovery path trong thoi gian realtime gian doan.
+
+---
+
 ## Commit: `feat: rank matching candidates by route eta`
 
 Branch: `codex/matching-route-eta-ranking`

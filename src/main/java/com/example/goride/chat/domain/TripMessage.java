@@ -15,12 +15,18 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 
 import java.time.Instant;
+import java.util.UUID;
 
 @Entity
 @Table(
         name = "trip_messages",
+        uniqueConstraints = @UniqueConstraint(
+                name = "uk_trip_messages_trip_sender_client",
+                columnNames = {"trip_id", "sender_id", "client_message_id"}
+        ),
         indexes = {
                 @Index(name = "idx_trip_messages_trip_sent_at", columnList = "trip_id, sent_at"),
                 @Index(name = "idx_trip_messages_sender_sent_at", columnList = "sender_id, sent_at")
@@ -43,6 +49,9 @@ public class TripMessage {
     @Column(name = "sender_role", nullable = false, length = 20)
     private TripMessageSenderRole senderRole;
 
+    @Column(name = "client_message_id", nullable = false, updatable = false, columnDefinition = "uuid")
+    private UUID clientMessageId;
+
     @Column(nullable = false, length = 1000)
     private String body;
 
@@ -52,11 +61,18 @@ public class TripMessage {
     protected TripMessage() {
     }
 
-    public static TripMessage create(Trip trip, User sender, TripMessageSenderRole senderRole, String body) {
+    public static TripMessage create(
+            Trip trip,
+            User sender,
+            TripMessageSenderRole senderRole,
+            UUID clientMessageId,
+            String body
+    ) {
         TripMessage message = new TripMessage();
         message.trip = requireNonNull(trip, "trip");
         message.sender = requireNonNull(sender, "sender");
         message.senderRole = requireNonNull(senderRole, "senderRole");
+        message.clientMessageId = requireNonNull(clientMessageId, "clientMessageId");
         message.body = requireBody(body);
         message.sentAt = Instant.now();
         return message;
@@ -83,6 +99,10 @@ public class TripMessage {
 
     public TripMessageSenderRole getSenderRole() {
         return senderRole;
+    }
+
+    public UUID getClientMessageId() {
+        return clientMessageId;
     }
 
     public String getBody() {

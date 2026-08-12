@@ -1,5 +1,6 @@
 package com.example.goride.common.config;
 
+import com.example.goride.auth.config.CorsProperties;
 import com.example.goride.common.security.StompJwtAuthenticationInterceptor;
 import org.junit.jupiter.api.Test;
 import org.springframework.web.socket.config.annotation.StompEndpointRegistry;
@@ -9,6 +10,8 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.util.List;
+
 class WebSocketConfigTests {
     @Test
     void registersSockJsAndNativeWebSocketEndpoints() {
@@ -17,13 +20,22 @@ class WebSocketConfigTests {
         StompWebSocketEndpointRegistration sockJsEndpoint = mock(StompWebSocketEndpointRegistration.class);
         StompWebSocketEndpointRegistration nativeEndpoint = mock(StompWebSocketEndpointRegistration.class);
         when(registry.addEndpoint("/ws")).thenReturn(sockJsEndpoint);
-        when(sockJsEndpoint.setAllowedOriginPatterns("*")).thenReturn(sockJsEndpoint);
+        when(sockJsEndpoint.setAllowedOrigins("http://localhost:5173")).thenReturn(sockJsEndpoint);
         when(registry.addEndpoint("/ws-native")).thenReturn(nativeEndpoint);
-        when(nativeEndpoint.setAllowedOriginPatterns("*")).thenReturn(nativeEndpoint);
+        when(nativeEndpoint.setAllowedOrigins("http://localhost:5173")).thenReturn(nativeEndpoint);
 
-        new WebSocketConfig(interceptor).registerStompEndpoints(registry);
+        CorsProperties cors = new CorsProperties(
+                List.of("http://localhost:5173"),
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(),
+                false,
+                3600
+        );
+        new WebSocketConfig(interceptor, cors).registerStompEndpoints(registry);
 
         verify(sockJsEndpoint).withSockJS();
-        verify(nativeEndpoint).setAllowedOriginPatterns("*");
+        verify(nativeEndpoint).setAllowedOrigins("http://localhost:5173");
     }
 }

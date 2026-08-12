@@ -5,6 +5,7 @@ import com.example.goride.chat.dto.TripMessageCreateRequest;
 import com.example.goride.chat.dto.TripMessageResponse;
 import com.example.goride.chat.dto.TripMessageSendRequest;
 import com.example.goride.chat.service.TripMessageService;
+import com.example.goride.chat.service.TripMessageReadService;
 import com.example.goride.common.api.PageResponse;
 import com.example.goride.common.security.CurrentUser;
 import org.junit.jupiter.api.Test;
@@ -14,6 +15,7 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import java.security.Principal;
 import java.time.Instant;
 import java.util.List;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
@@ -26,11 +28,14 @@ class TripMessageControllerTests {
         TripMessageService service = mock(TripMessageService.class);
         CurrentUser currentUser = mock(CurrentUser.class);
         var authentication = authentication("10", "ROLE_PASSENGER");
-        var request = new TripMessageCreateRequest("Hello");
+        var request = new TripMessageCreateRequest(
+                UUID.fromString("11111111-1111-1111-1111-111111111111"),
+                "Hello"
+        );
         var expected = response();
         when(currentUser.requireUserId(authentication)).thenReturn(10L);
         when(service.sendMessage(10L, 99L, request)).thenReturn(expected);
-        TripMessageController controller = new TripMessageController(service, currentUser);
+        TripMessageController controller = new TripMessageController(service, mock(TripMessageReadService.class), currentUser);
 
         var response = controller.sendMessage(authentication, 99L, request);
 
@@ -48,7 +53,7 @@ class TripMessageControllerTests {
         var page = PageResponse.of(List.of(response()), 1, 50, 1);
         when(currentUser.requireUserId(authentication)).thenReturn(1L);
         when(service.listMessages(1L, true, 99L, 1, 50)).thenReturn(page);
-        TripMessageController controller = new TripMessageController(service, currentUser);
+        TripMessageController controller = new TripMessageController(service, mock(TripMessageReadService.class), currentUser);
 
         var response = controller.listMessages(authentication, 99L, 1, 50);
 
@@ -70,6 +75,7 @@ class TripMessageControllerTests {
                 99L,
                 10L,
                 TripMessageSenderRole.PASSENGER,
+                UUID.fromString("11111111-1111-1111-1111-111111111111"),
                 "Hello",
                 Instant.parse("2026-07-01T10:00:00Z")
         );

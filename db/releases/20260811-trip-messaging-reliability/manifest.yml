@@ -1,0 +1,26 @@
+release_id: 20260811-trip-messaging-reliability
+title: Add reliable trip message delivery and read state
+author: Codex
+created_at: 2026-08-11
+risk: medium
+transactional: true
+requires_downtime: false
+applies_after:
+  - 20260729-admin-analytics-materialized
+related_commit: pending
+environments:
+  - staging
+  - production
+objects:
+  - trip_messages.client_message_id
+  - trip_message_read_states
+pre_deploy_checks:
+  - Run precheck.sql and confirm trip_messages exists and trip_message_read_states does not.
+deploy_steps:
+  - Run apply.sql in a transaction before deploying the chat reliability application release.
+post_deploy_checks:
+  - Run verify.sql and confirm the UUID column, unique constraint, foreign keys and indexes exist.
+rollback_plan:
+  - Run rollback.sql only while the application version still accepts messages without clientMessageId.
+notes:
+  - Existing messages receive deterministic UUIDs derived from their primary keys.

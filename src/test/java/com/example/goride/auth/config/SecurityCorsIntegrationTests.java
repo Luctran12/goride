@@ -9,6 +9,7 @@ import com.example.goride.booking.repository.SurgePricingRuleRepository;
 import com.example.goride.booking.repository.TripRepository;
 import com.example.goride.booking.repository.TripStatusHistoryRepository;
 import com.example.goride.chat.repository.TripMessageRepository;
+import com.example.goride.chat.repository.TripMessageReadStateRepository;
 import com.example.goride.driver.repository.DriverProfileRepository;
 import com.example.goride.location.config.ThreeWordLocationProperties;
 import com.example.goride.notification.repository.NotificationRepository;
@@ -80,6 +81,9 @@ class SecurityCorsIntegrationTests {
 
     @MockitoBean
     private TripMessageRepository tripMessageRepository;
+
+    @MockitoBean
+    private TripMessageReadStateRepository tripMessageReadStateRepository;
 
     @MockitoBean
     private MatchingRunRepository matchingRunRepository;

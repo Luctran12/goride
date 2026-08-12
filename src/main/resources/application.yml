@@ -1,8 +1,8 @@
 spring:
   datasource:
-    url: jdbc:postgresql://db.dmhwnkhuoweigudvkjcf.supabase.co:5432/postgres?sslmode=require
+    url: jdbc:postgresql://localhost:5432/goride
     username: postgres
-    password: thiennga54102004
+    password: admin
   jpa:
     hibernate:
       ddl-auto: update

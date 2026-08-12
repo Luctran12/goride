@@ -15,7 +15,7 @@ import java.util.regex.Pattern;
 @Component
 public class TripTopicSubscriptionAuthorizer implements StompSubscriptionAuthorizer {
     private static final Pattern TRIP_TOPIC_PATTERN =
-            Pattern.compile("^/topic/trip/(\\d+)/(status|location|messages)$");
+            Pattern.compile("^/topic/trip/(\\d+)/(status|location|messages|message-read)$");
 
     private final TripRepository tripRepository;
     private final OfferedTripAccessService offeredTripAccessService;

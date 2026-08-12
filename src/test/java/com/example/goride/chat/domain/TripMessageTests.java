@@ -14,19 +14,27 @@ import org.locationtech.jts.geom.PrecisionModel;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.Set;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class TripMessageTests {
     private static final GeometryFactory GEOMETRY_FACTORY = new GeometryFactory(new PrecisionModel(), 4326);
+    private static final UUID CLIENT_MESSAGE_ID = UUID.fromString("11111111-1111-1111-1111-111111111111");
 
     @Test
     void createNormalizesMessageBody() {
         Trip trip = sampleTrip();
         User passenger = trip.getPassenger();
 
-        TripMessage message = TripMessage.create(trip, passenger, TripMessageSenderRole.PASSENGER, "  Hello driver  ");
+        TripMessage message = TripMessage.create(
+                trip,
+                passenger,
+                TripMessageSenderRole.PASSENGER,
+                CLIENT_MESSAGE_ID,
+                "  Hello driver  "
+        );
 
         assertThat(message.getTrip()).isSameAs(trip);
         assertThat(message.getSender()).isSameAs(passenger);
@@ -43,6 +51,7 @@ class TripMessageTests {
                 trip,
                 trip.getPassenger(),
                 TripMessageSenderRole.PASSENGER,
+                CLIENT_MESSAGE_ID,
                 "   "
         ))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -58,6 +67,7 @@ class TripMessageTests {
                 trip,
                 trip.getPassenger(),
                 TripMessageSenderRole.PASSENGER,
+                CLIENT_MESSAGE_ID,
                 body
         ))
                 .isInstanceOf(IllegalArgumentException.class)

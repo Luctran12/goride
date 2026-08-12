@@ -32,18 +32,21 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class TripMessageServiceTests {
     private static final GeometryFactory GEOMETRY_FACTORY = new GeometryFactory(new PrecisionModel(), 4326);
+    private static final UUID CLIENT_MESSAGE_ID = UUID.fromString("11111111-1111-1111-1111-111111111111");
 
     @Mock
     private TripRepository tripRepository;
@@ -54,24 +57,41 @@ class TripMessageServiceTests {
     @Mock
     private TripMessageRealtimeNotifier tripMessageRealtimeNotifier;
 
+    @Mock
+    private TripMessageRateLimiter tripMessageRateLimiter;
+
+    @Mock
+    private TripMessagePushNotifier tripMessagePushNotifier;
+
     private TripMessageService service;
 
     @BeforeEach
     void setUp() {
-        service = new TripMessageService(tripRepository, tripMessageRepository, tripMessageRealtimeNotifier);
+        service = new TripMessageService(
+                tripRepository,
+                tripMessageRepository,
+                tripMessageRealtimeNotifier,
+                tripMessageRateLimiter,
+                tripMessagePushNotifier
+        );
     }
 
     @Test
     void passengerCanSendMessageToAcceptedTrip() {
         Trip trip = acceptedTrip();
-        when(tripRepository.findByIdAndDeletedAtIsNull(99L)).thenReturn(Optional.of(trip));
+        when(tripRepository.findActiveByIdForUpdate(99L)).thenReturn(Optional.of(trip));
         when(tripMessageRepository.save(any(TripMessage.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        var response = service.sendMessage(10L, 99L, new TripMessageCreateRequest("  I am waiting at gate A  "));
+        var response = service.sendMessage(
+                10L,
+                99L,
+                new TripMessageCreateRequest(CLIENT_MESSAGE_ID, "  I am waiting at gate A  ")
+        );
 
         ArgumentCaptor<TripMessage> messageCaptor = ArgumentCaptor.forClass(TripMessage.class);
         verify(tripMessageRepository).save(messageCaptor.capture());
         verify(tripMessageRealtimeNotifier).broadcastTripMessage(99L, response);
+        verify(tripMessagePushNotifier).notifyRecipient(20L, response);
         assertThat(response.tripId()).isEqualTo(99L);
         assertThat(response.senderId()).isEqualTo(10L);
         assertThat(response.senderRole()).isEqualTo(TripMessageSenderRole.PASSENGER);
@@ -82,40 +102,97 @@ class TripMessageServiceTests {
     @Test
     void assignedDriverCanSendMessageFromStompRequest() {
         Trip trip = acceptedTrip();
-        when(tripRepository.findByIdAndDeletedAtIsNull(99L)).thenReturn(Optional.of(trip));
+        when(tripRepository.findActiveByIdForUpdate(99L)).thenReturn(Optional.of(trip));
         when(tripMessageRepository.save(any(TripMessage.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        var response = service.sendMessage(20L, new TripMessageSendRequest(99L, "I am arriving"));
+        var response = service.sendMessage(20L, new TripMessageSendRequest(99L, CLIENT_MESSAGE_ID, "I am arriving"));
 
         assertThat(response.senderId()).isEqualTo(20L);
         assertThat(response.senderRole()).isEqualTo(TripMessageSenderRole.DRIVER);
         verify(tripMessageRealtimeNotifier).broadcastTripMessage(99L, response);
+        verify(tripMessagePushNotifier).notifyRecipient(10L, response);
     }
 
     @Test
     void rejectsMessageFromUserOutsideTrip() {
         Trip trip = acceptedTrip();
-        when(tripRepository.findByIdAndDeletedAtIsNull(99L)).thenReturn(Optional.of(trip));
+        when(tripRepository.findActiveByIdForUpdate(99L)).thenReturn(Optional.of(trip));
 
-        assertThatThrownBy(() -> service.sendMessage(30L, 99L, new TripMessageCreateRequest("Hello")))
+        assertThatThrownBy(() -> service.sendMessage(
+                30L,
+                99L,
+                new TripMessageCreateRequest(CLIENT_MESSAGE_ID, "Hello")
+        ))
                 .isInstanceOfSatisfying(BusinessException.class, exception ->
                         assertThat(exception.errorCode()).isEqualTo(ErrorCode.FORBIDDEN)
                 );
 
-        verifyNoInteractions(tripMessageRepository, tripMessageRealtimeNotifier);
+        verifyNoInteractions(tripMessageRepository, tripMessageRealtimeNotifier, tripMessagePushNotifier);
+    }
+
+    @Test
+    void returnsExistingMessageForIdempotentRetryWithoutBroadcastingAgain() {
+        Trip trip = acceptedTrip();
+        TripMessage existing = TripMessage.create(
+                trip,
+                trip.getPassenger(),
+                TripMessageSenderRole.PASSENGER,
+                CLIENT_MESSAGE_ID,
+                "Original body"
+        );
+        ReflectionTestUtils.setField(existing, "id", 501L);
+        when(tripRepository.findActiveByIdForUpdate(99L)).thenReturn(Optional.of(trip));
+        when(tripMessageRepository.findByTripIdAndSenderIdAndClientMessageId(
+                99L,
+                10L,
+                CLIENT_MESSAGE_ID
+        )).thenReturn(Optional.of(existing));
+
+        var response = service.sendMessage(
+                10L,
+                99L,
+                new TripMessageCreateRequest(CLIENT_MESSAGE_ID, "Changed retry body")
+        );
+
+        assertThat(response.id()).isEqualTo(501L);
+        assertThat(response.body()).isEqualTo("Original body");
+        verify(tripMessageRepository, never()).save(any(TripMessage.class));
+        verifyNoInteractions(tripMessageRealtimeNotifier, tripMessagePushNotifier);
+    }
+
+    @Test
+    void syncsNewerMessagesInAscendingOrderWithCursor() {
+        Trip trip = acceptedTrip();
+        TripMessage first = message(trip, 501L, "First");
+        TripMessage second = message(trip, 502L, "Second");
+        when(tripRepository.findByIdAndDeletedAtIsNull(99L)).thenReturn(Optional.of(trip));
+        when(tripMessageRepository.findByTripIdAndIdGreaterThanOrderByIdAsc(eq(99L), eq(500L), any(Pageable.class)))
+                .thenReturn(List.of(first, second));
+
+        var response = service.syncMessages(10L, false, 99L, null, 500L, 10);
+
+        assertThat(response.items()).extracting(item -> item.id()).containsExactly(501L, 502L);
+        assertThat(response.nextCursor()).isEqualTo(502L);
+        assertThat(response.hasMore()).isFalse();
     }
 
     @Test
     void rejectsMessageBeforeDriverAcceptsTrip() {
         Trip trip = sampleTrip();
-        when(tripRepository.findByIdAndDeletedAtIsNull(99L)).thenReturn(Optional.of(trip));
+        when(tripRepository.findActiveByIdForUpdate(99L)).thenReturn(Optional.of(trip));
 
-        assertThatThrownBy(() -> service.sendMessage(10L, 99L, new TripMessageCreateRequest("Hello")))
+        assertThatThrownBy(() -> service.sendMessage(
+                10L,
+                99L,
+                new TripMessageCreateRequest(CLIENT_MESSAGE_ID, "Hello")
+        ))
                 .isInstanceOfSatisfying(BusinessException.class, exception ->
                         assertThat(exception.errorCode()).isEqualTo(ErrorCode.TRIP_MESSAGE_NOT_AVAILABLE)
                 );
 
-        verifyNoInteractions(tripMessageRepository, tripMessageRealtimeNotifier);
+        verify(tripMessageRepository).findByTripIdAndSenderIdAndClientMessageId(99L, 10L, CLIENT_MESSAGE_ID);
+        verify(tripMessageRepository, never()).save(any(TripMessage.class));
+        verifyNoInteractions(tripMessageRealtimeNotifier, tripMessagePushNotifier);
     }
 
     @Test
@@ -125,6 +202,7 @@ class TripMessageServiceTests {
                 trip,
                 trip.getDriver(),
                 TripMessageSenderRole.DRIVER,
+                CLIENT_MESSAGE_ID,
                 "I am arriving"
         );
         when(tripRepository.findByIdAndDeletedAtIsNull(99L)).thenReturn(Optional.of(trip));
@@ -156,6 +234,18 @@ class TripMessageServiceTests {
         Trip trip = sampleTrip();
         trip.accept(driver(20L));
         return trip;
+    }
+
+    private TripMessage message(Trip trip, Long id, String body) {
+        TripMessage message = TripMessage.create(
+                trip,
+                trip.getDriver(),
+                TripMessageSenderRole.DRIVER,
+                UUID.randomUUID(),
+                body
+        );
+        ReflectionTestUtils.setField(message, "id", id);
+        return message;
     }
 
     private Trip sampleTrip() {

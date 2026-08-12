@@ -43,6 +43,15 @@ class TripTopicSubscriptionAuthorizerTests {
     }
 
     @Test
+    void allowsParticipantToSubscribeToMessageReadTopic() {
+        when(tripRepository.existsAccessibleTripTopicByUserId(99L, 10L)).thenReturn(true);
+
+        authorizer.authorize(authentication("10", "ROLE_PASSENGER"), "/topic/trip/99/message-read");
+
+        verify(tripRepository).existsAccessibleTripTopicByUserId(99L, 10L);
+    }
+
+    @Test
     void rejectsUserWhoIsNotPassengerOrDriverOfTripTopic() {
         when(tripRepository.existsAccessibleTripTopicByUserId(99L, 10L)).thenReturn(false);
 
