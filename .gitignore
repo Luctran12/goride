@@ -45,4 +45,16 @@ uploads/
 output/
 
 tmp/
-docs/images
+
+### Analytics processing local artifacts ###
+analytics-processing/.venv/
+analytics-processing/.venv-*/
+analytics-processing/.test-deps-*/
+analytics-processing/.coverage
+analytics-processing/.pytest_cache/
+analytics-processing/**/__pycache__/
+analytics-processing/**/*.egg-info/
+analytics-processing/build/
+analytics-processing/dist/
+analytics-processing/data/
+analytics-processing/model-artifacts/

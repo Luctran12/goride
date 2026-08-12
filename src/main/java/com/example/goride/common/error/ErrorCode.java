@@ -50,6 +50,7 @@ public enum ErrorCode {
     MATCHING_OFFER_EXPIRED(HttpStatus.UNPROCESSABLE_ENTITY, "Matching offer has expired"),
     ANALYTICS_RANGE_TOO_LARGE(HttpStatus.BAD_REQUEST, "Analytics time range is too large"),
     ANALYTICS_RESULT_TOO_LARGE(HttpStatus.BAD_REQUEST, "Analytics result is too large"),
+    ANALYTICS_RUN_NOT_FOUND(HttpStatus.NOT_FOUND, "Analytics processing run was not found"),
     ANALYTICS_DATA_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "Analytics data is unavailable"),
     RATE_LIMIT_EXCEEDED(HttpStatus.TOO_MANY_REQUESTS, "Too many requests"),
     RATE_LIMIT_STORE_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "Rate limit service is unavailable"),

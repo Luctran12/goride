@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "measuredAtUtc": "2026-08-10T15:39:28.508455800Z",
+  "scope": "SYNTHETIC_TESTCONTAINER_INTEGRATION",
+  "claimBoundary": "Performance plumbing evidence; not Porto thesis accuracy",
+  "samplesPerEndpoint": 100,
+  "demand": {
+    "maximumMilliseconds": 13.733,
+    "p50Milliseconds": 4.294,
+    "p95Milliseconds": 8.241,
+    "payloadBytes": 1894
+  },
+  "hotspots": {
+    "maximumMilliseconds": 19.122,
+    "p50Milliseconds": 4.505,
+    "p95Milliseconds": 9.524,
+    "payloadBytes": 1718
+  },
+  "storage": {
+    "demandForecastTableBytes": 172032,
+    "demandForecastRows": 2
+  },
+  "freshnessContract": "HISTORICAL_EVALUATION"
+}

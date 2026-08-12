@@ -1,0 +1,58 @@
+{
+  "artifactRunId": "20260810T153807249207Z-phase11-verification",
+  "claimScope": "RESEARCH_DEMONSTRATION",
+  "configHash": "4cf869ca75a0375b5b9df91dd9f720789ba4cb09fd7591b2b0b5315db6d4253e",
+  "contractSha256": "1c41721e33c2b78148c1f9d84cbf39b29b0620a3f1ea5dcb4f9c86dc222b4e94",
+  "dataset": {
+    "license": "CC BY 4.0",
+    "name": "porto-taxi",
+    "sha256": "210dd0a20da66a8fc2de3440aecd84670921bc257591f8365a4475e31453c5ea",
+    "version": "porto-2013-07_2014-06-v1"
+  },
+  "limitations": [
+    "Porto is historical research evidence, not a live Ho Chi Minh City model.",
+    "Synthetic smoke evidence validates integration only.",
+    "The selected candidate does not beat historical mean on every final metric."
+  ],
+  "lineage": {
+    "backfilledRows": 402,
+    "cellSizesMeters": [500, 1000, 2000],
+    "experimentHash": "63f545298cd5fa879876efd0a82252c6aea4fccea9f95ab5e37ed6134eeb0788",
+    "forecastRows": 402,
+    "forecastRunId": "791b9584-c448-516e-94b4-0ab50aa59e96",
+    "horizonsMinutes": [15, 30, 60],
+    "minimumAggregateCount": 3,
+    "modelSha256": "8643527f721db9e86c8721bd2262b36a5587ac0b13ccd68ad4feb563114db5b4",
+    "modelVersion": "porto-hgb-v1-g500-63f545298c-f4a46557d3",
+    "rollbackFailureCode": "PHASE7_INJECTED_TERMINAL_FAILURE"
+  },
+  "privacy": {
+    "forbiddenApiFields": ["artifactUri", "driverId", "email", "passengerId", "phone", "tripId", "userId"],
+    "minimumAggregateCount": 3
+  },
+  "profile": "porto-thesis",
+  "schemaVersion": 1,
+  "status": "PASS",
+  "storage": {
+    "byRole": {
+      "backfill": {"path": "runs/actual-backfill/20260810T102748599113Z-cc2c935f50cc-porto-thesis-4cf869ca75a0", "verifiedBytes": 1609, "verifiedFiles": 4},
+      "baseline-g1000": {"path": "runs/evaluation/20260810T092314641438Z-2ae7154c60d3-porto-thesis-4cf869ca75a0", "verifiedBytes": 22607461, "verifiedFiles": 18},
+      "baseline-g2000": {"path": "runs/evaluation/20260810T093742000671Z-2ae7154c60d3-porto-thesis-4cf869ca75a0", "verifiedBytes": 8696755, "verifiedFiles": 18},
+      "baseline-g500": {"path": "runs/evaluation/20260810T075446729084Z-3c08e4269888-porto-thesis-4cf869ca75a0", "verifiedBytes": 61908691, "verifiedFiles": 18},
+      "candidate-g1000": {"path": "runs/training/20260810T092802643667Z-2ae7154c60d3-porto-thesis-4cf869ca75a0", "verifiedBytes": 130106253, "verifiedFiles": 56},
+      "candidate-g2000": {"path": "runs/training/20260810T093827894213Z-2ae7154c60d3-porto-thesis-4cf869ca75a0", "verifiedBytes": 49768422, "verifiedFiles": 56},
+      "candidate-g500": {"path": "runs/training/20260810T083830837344Z-f4a46557d3fd-porto-thesis-4cf869ca75a0", "verifiedBytes": 324359721, "verifiedFiles": 56},
+      "extraction": {"path": "runs/extraction/20260809T153055870946Z-6f2ea5e3b834-porto-thesis-4cf869ca75a0", "verifiedBytes": 758212945, "verifiedFiles": 5},
+      "feature-g1000": {"path": "runs/feature-build/20260810T091335355060Z-2ae7154c60d3-porto-thesis-4cf869ca75a0", "verifiedBytes": 47644058, "verifiedFiles": 18},
+      "feature-g2000": {"path": "runs/feature-build/20260810T093527097412Z-2ae7154c60d3-porto-thesis-4cf869ca75a0", "verifiedBytes": 18657468, "verifiedFiles": 18},
+      "feature-g500": {"path": "runs/feature-build/20260809T153840318116Z-6f2ea5e3b834-porto-thesis-4cf869ca75a0", "verifiedBytes": 118882281, "verifiedFiles": 18},
+      "forecast": {"path": "runs/forecast/20260810T102601474464Z-9177be915f0a-porto-thesis-4cf869ca75a0", "verifiedBytes": 2797, "verifiedFiles": 5},
+      "rollback-failure": {"path": "runs/forecast/20260810T103126533716Z-cc2c935f50cc-porto-thesis-4cf869ca75a0", "verifiedBytes": 2136, "verifiedFiles": 4}
+    },
+    "datasetSourceBytes": 533605607,
+    "evidenceContractBytes": 3063,
+    "verifiedBytes": 2074459267,
+    "verifiedFiles": 296
+  },
+  "verifiedAtUtc": "2026-08-10T15:38:07.249207Z"
+}

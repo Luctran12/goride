@@ -1,0 +1,70 @@
+schema_version: 1
+frozen: true
+claim_scope: RESEARCH_DEMONSTRATION
+dataset_sha256: 210dd0a20da66a8fc2de3440aecd84670921bc257591f8365a4475e31453c5ea
+minimum_aggregate_count: 3
+expected:
+  cell_sizes_meters: [500, 1000, 2000]
+  horizons_minutes: [15, 30, 60]
+  experiment_hash: 63f545298cd5fa879876efd0a82252c6aea4fccea9f95ab5e37ed6134eeb0788
+  model_version: porto-hgb-v1-g500-63f545298c-f4a46557d3
+  forecast_run_id: 791b9584-c448-516e-94b4-0ab50aa59e96
+  rollback_failure_code: PHASE7_INJECTED_TERMINAL_FAILURE
+runs:
+  - role: extraction
+    path: runs/extraction/20260809T153055870946Z-6f2ea5e3b834-porto-thesis-4cf869ca75a0
+    manifest: extraction-summary.json
+  - role: feature-g500
+    path: runs/feature-build/20260809T153840318116Z-6f2ea5e3b834-porto-thesis-4cf869ca75a0
+    manifest: feature-manifest.json
+    nested_manifests: [feature-manifest.json]
+  - role: feature-g1000
+    path: runs/feature-build/20260810T091335355060Z-2ae7154c60d3-porto-thesis-4cf869ca75a0
+    manifest: feature-manifest.json
+    nested_manifests: [feature-manifest.json]
+  - role: feature-g2000
+    path: runs/feature-build/20260810T093527097412Z-2ae7154c60d3-porto-thesis-4cf869ca75a0
+    manifest: feature-manifest.json
+    nested_manifests: [feature-manifest.json]
+  - role: baseline-g500
+    path: runs/evaluation/20260810T075446729084Z-3c08e4269888-porto-thesis-4cf869ca75a0
+    manifest: evaluation-manifest.json
+    nested_manifests: [raw-predictions-manifest.json]
+  - role: baseline-g1000
+    path: runs/evaluation/20260810T092314641438Z-2ae7154c60d3-porto-thesis-4cf869ca75a0
+    manifest: evaluation-manifest.json
+    nested_manifests: [raw-predictions-manifest.json]
+  - role: baseline-g2000
+    path: runs/evaluation/20260810T093742000671Z-2ae7154c60d3-porto-thesis-4cf869ca75a0
+    manifest: evaluation-manifest.json
+    nested_manifests: [raw-predictions-manifest.json]
+  - role: candidate-g500
+    path: runs/training/20260810T083830837344Z-f4a46557d3fd-porto-thesis-4cf869ca75a0
+    manifest: training-manifest.json
+    nested_manifests: [candidate-predictions-manifest.json]
+  - role: candidate-g1000
+    path: runs/training/20260810T092802643667Z-2ae7154c60d3-porto-thesis-4cf869ca75a0
+    manifest: training-manifest.json
+    nested_manifests: [candidate-predictions-manifest.json]
+  - role: candidate-g2000
+    path: runs/training/20260810T093827894213Z-2ae7154c60d3-porto-thesis-4cf869ca75a0
+    manifest: training-manifest.json
+    nested_manifests: [candidate-predictions-manifest.json]
+  - role: forecast
+    path: runs/forecast/20260810T102601474464Z-9177be915f0a-porto-thesis-4cf869ca75a0
+    manifest: forecast-manifest.json
+  - role: backfill
+    path: runs/actual-backfill/20260810T102748599113Z-cc2c935f50cc-porto-thesis-4cf869ca75a0
+    manifest: backfill-manifest.json
+  - role: rollback-failure
+    path: runs/forecast/20260810T103126533716Z-cc2c935f50cc-porto-thesis-4cf869ca75a0
+    manifest: failure.json
+privacy:
+  forbidden_api_fields:
+    - tripId
+    - userId
+    - driverId
+    - passengerId
+    - email
+    - phone
+    - artifactUri

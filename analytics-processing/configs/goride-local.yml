@@ -1,0 +1,62 @@
+profile:
+  name: goride-local
+  purpose: system-integration
+  random_seed: 5537
+
+dataset:
+  name: goride-operational
+  version: local
+  source_type: postgresql
+  database_env_prefix: ANALYTICS_DATABASE
+  expected_source_crs: EPSG:4326
+  expected_timezone: Asia/Ho_Chi_Minh
+
+spatial:
+  source_srid: 4326
+  projected_srid: 32648
+  grid_version: square-zero-floor-v1
+  grid_origin_x_meters: 0
+  grid_origin_y_meters: 0
+  study_bounds_wgs84:
+    minimum_longitude: 106.45
+    minimum_latitude: 10.55
+    maximum_longitude: 107.05
+    maximum_latitude: 11.05
+  primary_cell_size_meters: 500
+  evaluation_cell_sizes_meters: [250, 500, 1000, 2000]
+
+temporal:
+  source_timezone: Asia/Ho_Chi_Minh
+  storage_timezone: UTC
+  bucket_minutes: 15
+  forecast_horizons_minutes: [15, 30, 60]
+
+quality:
+  reject_missing_trajectory: false
+  reject_invalid_coordinate: true
+  reject_future_timestamp: true
+  maximum_duplicate_ratio: 0
+  minimum_history_buckets: 672
+  fail_on_checksum_mismatch: false
+
+features:
+  demand_lags: [1, 2, 4, 96, 672]
+  rolling_windows: [4, 12, 96, 672]
+  training_demand_coverage: 1.0
+  include_temporal_features: true
+  include_spatial_neighbors: true
+  include_supply_features: true
+
+evaluation:
+  strategy: rolling_origin
+  metrics: [MAE, RMSE, WAPE]
+
+artifacts:
+  feature_format: parquet
+  compression: zstd
+  feature_partition: target_month_utc
+  maximum_rows_per_partition: 1500000
+  maximum_rows_per_run: 15000000
+  write_raw_predictions: true
+  write_run_manifest: true
+  checksum_algorithm: sha256

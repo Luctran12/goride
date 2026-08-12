@@ -7,7 +7,8 @@ import org.springframework.context.annotation.Configuration;
 @EnableConfigurationProperties({
         AnalyticsTelemetryProperties.class,
         AnalyticsSpatialProperties.class,
-        AnalyticsMaterializedProperties.class
+        AnalyticsMaterializedProperties.class,
+        DemandForecastServingProperties.class
 })
 public class AnalyticsTelemetryConfig {
 }
