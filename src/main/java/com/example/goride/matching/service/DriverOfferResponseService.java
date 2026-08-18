@@ -8,6 +8,8 @@ import com.example.goride.booking.repository.TripStatusHistoryRepository;
 import com.example.goride.common.error.BusinessException;
 import com.example.goride.common.error.ErrorCode;
 import com.example.goride.driver.dto.DriverTripResponse;
+import com.example.goride.driver.dto.AssignedDriverResponse;
+import com.example.goride.driver.repository.DriverProfileRepository;
 import com.example.goride.matching.domain.DriverOffer;
 import com.example.goride.matching.domain.DriverOfferDecision;
 import com.example.goride.matching.domain.MatchingRequest;
@@ -40,6 +42,7 @@ public class DriverOfferResponseService {
     private final TripRepository tripRepository;
     private final TripStatusHistoryRepository tripStatusHistoryRepository;
     private final UserRepository userRepository;
+    private final DriverProfileRepository driverProfileRepository;
     private final DriverCandidateStore candidateStore;
     private final MatchingService matchingService;
     private final DriverOfferNotifier driverOfferNotifier;
@@ -52,6 +55,7 @@ public class DriverOfferResponseService {
             TripRepository tripRepository,
             TripStatusHistoryRepository tripStatusHistoryRepository,
             UserRepository userRepository,
+            DriverProfileRepository driverProfileRepository,
             DriverCandidateStore candidateStore,
             MatchingService matchingService,
             DriverOfferNotifier driverOfferNotifier,
@@ -63,6 +67,7 @@ public class DriverOfferResponseService {
         this.tripRepository = tripRepository;
         this.tripStatusHistoryRepository = tripStatusHistoryRepository;
         this.userRepository = userRepository;
+        this.driverProfileRepository = driverProfileRepository;
         this.candidateStore = candidateStore;
         this.matchingService = matchingService;
         this.driverOfferNotifier = driverOfferNotifier;
@@ -112,7 +117,11 @@ public class DriverOfferResponseService {
             candidateStore.releaseCandidateLock(driverId);
             candidateStore.clearTripMatching(tripId);
         });
-        notifyPassengerTripAccepted(savedTrip);
+        AssignedDriverResponse assignedDriver = driverProfileRepository
+                .findByUserIdAndUserDeletedAtIsNull(driverId)
+                .map(AssignedDriverResponse::from)
+                .orElseThrow(() -> new BusinessException(ErrorCode.DRIVER_PROFILE_NOT_FOUND));
+        notifyPassengerTripAccepted(savedTrip, assignedDriver);
         return response(savedTrip);
     }
 
@@ -132,10 +141,10 @@ public class DriverOfferResponseService {
         return response(trip);
     }
 
-    private void notifyPassengerTripAccepted(Trip trip) {
+    private void notifyPassengerTripAccepted(Trip trip, AssignedDriverResponse driver) {
         Long tripId = trip.getId();
         Long passengerId = trip.getPassenger().getId();
-        UserNotification notification = UserNotification.tripAccepted(trip);
+        UserNotification notification = UserNotification.tripAccepted(trip, driver);
         TripStatusNotification statusNotification = TripStatusNotification.from(trip);
         runAfterCommit(() -> {
             tripRealtimeNotifier.notifyPassenger(passengerId, notification);

@@ -21,6 +21,8 @@ import com.example.goride.booking.service.distance.DistanceService;
 import com.example.goride.booking.service.SurgePricingService.SurgePricingQuote;
 import com.example.goride.common.error.BusinessException;
 import com.example.goride.common.error.ErrorCode;
+import com.example.goride.driver.dto.AssignedDriverResponse;
+import com.example.goride.driver.repository.DriverProfileRepository;
 import com.example.goride.matching.telemetry.MatchingTelemetryPort;
 import com.example.goride.matching.telemetry.MatchingTelemetryFailureReporter;
 import com.example.goride.payment.service.PaymentMethodService;
@@ -43,6 +45,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -53,6 +56,7 @@ public class BookingService {
     private static final GeometryFactory GEOMETRY_FACTORY = new GeometryFactory(new PrecisionModel(), 4326);
 
     private final UserRepository userRepository;
+    private final DriverProfileRepository driverProfileRepository;
     private final PricingConfigRepository pricingConfigRepository;
     private final TripRepository tripRepository;
     private final TripStatusHistoryRepository tripStatusHistoryRepository;
@@ -68,6 +72,7 @@ public class BookingService {
 
     public BookingService(
             UserRepository userRepository,
+            DriverProfileRepository driverProfileRepository,
             PricingConfigRepository pricingConfigRepository,
             TripRepository tripRepository,
             TripStatusHistoryRepository tripStatusHistoryRepository,
@@ -82,6 +87,7 @@ public class BookingService {
             MatchingTelemetryFailureReporter matchingTelemetryFailureReporter
     ) {
         this.userRepository = userRepository;
+        this.driverProfileRepository = driverProfileRepository;
         this.pricingConfigRepository = pricingConfigRepository;
         this.tripRepository = tripRepository;
         this.tripStatusHistoryRepository = tripStatusHistoryRepository;
@@ -145,7 +151,7 @@ public class BookingService {
         if (initialStatus == TripStatus.SEARCHING) {
             publishAfterCommit(BookingCreatedEvent.from(savedTrip));
         }
-        return TripResponse.from(savedTrip);
+        return responseFrom(savedTrip);
     }
 
     @Transactional(readOnly = true)
@@ -158,7 +164,7 @@ public class BookingService {
                 .stream()
                 .map(TripStatusHistoryResponse::from)
                 .toList();
-        return TripResponse.from(trip, statusHistory);
+        return responseFrom(trip, statusHistory);
     }
 
     @Transactional(readOnly = true)
@@ -180,7 +186,10 @@ public class BookingService {
 
         List<Trip> trips = new ArrayList<>(tripsById.values());
         trips.sort(Comparator.comparing(Trip::getRequestedAt, Comparator.nullsLast(Comparator.reverseOrder())));
-        return trips.stream().map(TripResponse::from).toList();
+        Map<Long, AssignedDriverResponse> driversById = assignedDriversById(trips);
+        return trips.stream()
+                .map(trip -> TripResponse.from(trip, assignedDriver(trip, driversById)))
+                .toList();
     }
 
     @Transactional
@@ -204,7 +213,51 @@ public class BookingService {
         ));
         cancelMatchingRun(savedTrip);
         publishAfterCommit(BookingCancelledEvent.from(savedTrip));
-        return TripResponse.from(savedTrip);
+        return responseFrom(savedTrip);
+    }
+
+    private TripResponse responseFrom(Trip trip) {
+        return TripResponse.from(trip, assignedDriver(trip));
+    }
+
+    private TripResponse responseFrom(Trip trip, List<TripStatusHistoryResponse> statusHistory) {
+        return TripResponse.from(trip, assignedDriver(trip), statusHistory);
+    }
+
+    private AssignedDriverResponse assignedDriver(Trip trip) {
+        if (trip.getDriver() == null) {
+            return null;
+        }
+        return driverProfileRepository.findByUserIdAndUserDeletedAtIsNull(trip.getDriver().getId())
+                .map(AssignedDriverResponse::from)
+                .orElse(null);
+    }
+
+    private Map<Long, AssignedDriverResponse> assignedDriversById(List<Trip> trips) {
+        List<Long> driverIds = trips.stream()
+                .map(Trip::getDriver)
+                .filter(Objects::nonNull)
+                .map(User::getId)
+                .distinct()
+                .toList();
+        if (driverIds.isEmpty()) {
+            return Map.of();
+        }
+
+        Map<Long, AssignedDriverResponse> driversById = new HashMap<>();
+        driverProfileRepository.findByUserIdInAndUserDeletedAtIsNull(driverIds)
+                .forEach(profile -> driversById.put(
+                        profile.getUser().getId(),
+                        AssignedDriverResponse.from(profile)
+                ));
+        return driversById;
+    }
+
+    private AssignedDriverResponse assignedDriver(
+            Trip trip,
+            Map<Long, AssignedDriverResponse> driversById
+    ) {
+        return trip.getDriver() == null ? null : driversById.get(trip.getDriver().getId());
     }
 
     private void cancelMatchingRun(Trip trip) {

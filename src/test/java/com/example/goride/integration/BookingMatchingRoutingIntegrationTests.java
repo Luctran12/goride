@@ -122,6 +122,21 @@ class BookingMatchingRoutingIntegrationTests extends PostgresRedisIntegrationTes
                 .andExpect(jsonPath("$.data.tripId").value(tripId))
                 .andExpect(jsonPath("$.data.status").value("ACCEPTED"));
 
+        mockMvc.perform(get("/api/v1/bookings/{tripId}", tripId)
+                        .header("Authorization", bearer(passenger.accessToken())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.driverId").value(driver.userId()))
+                .andExpect(jsonPath("$.data.driver.id").value(driver.userId()))
+                .andExpect(jsonPath("$.data.driver.fullName").value("Flow Driver"))
+                .andExpect(jsonPath("$.data.driver.portraitUrl").value("https://example.com/flow-driver.jpg"))
+                .andExpect(jsonPath("$.data.driver.vehiclePlate").value("59-FLOW-001"))
+                .andExpect(jsonPath("$.data.driver.vehicleType").value("MOTORBIKE"))
+                .andExpect(jsonPath("$.data.driver.vehicleBrand").value("Honda"))
+                .andExpect(jsonPath("$.data.driver.vehicleModel").value("Wave"))
+                .andExpect(jsonPath("$.data.driver.vehicleColor").value("Blue"))
+                .andExpect(jsonPath("$.data.driver.licenseNumber").doesNotExist())
+                .andExpect(jsonPath("$.data.driver.idCardNumber").doesNotExist());
+
         mockMvc.perform(post("/api/v1/drivers/trips/{tripId}/route", tripId)
                         .header("Authorization", bearer(driver.accessToken()))
                         .contentType(MediaType.APPLICATION_JSON)

@@ -20,7 +20,9 @@ import com.example.goride.booking.service.distance.Location;
 import com.example.goride.booking.service.SurgePricingService.SurgePricingQuote;
 import com.example.goride.common.error.BusinessException;
 import com.example.goride.common.error.ErrorCode;
+import com.example.goride.driver.domain.DriverProfile;
 import com.example.goride.driver.domain.VehicleType;
+import com.example.goride.driver.repository.DriverProfileRepository;
 import com.example.goride.matching.telemetry.MatchingTelemetryPort;
 import com.example.goride.matching.telemetry.MatchingTelemetryFailureReporter;
 import com.example.goride.payment.service.PaymentMethodService;
@@ -41,6 +43,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -58,6 +61,9 @@ import static org.mockito.Mockito.when;
 class BookingServiceTests {
     @Mock
     private UserRepository userRepository;
+
+    @Mock
+    private DriverProfileRepository driverProfileRepository;
 
     @Mock
     private PricingConfigRepository pricingConfigRepository;
@@ -339,6 +345,36 @@ class BookingServiceTests {
     }
 
     @Test
+    void getMyBookingReturnsSafeAssignedDriverDetails() {
+        User passenger = withUserId(
+                User.create("Passenger", "0900000000", null, "hash", Set.of(UserRole.PASSENGER)),
+                10L
+        );
+        User driver = withUserId(
+                User.create("Driver Nguyen", "0900000001", null, "hash", Set.of(UserRole.DRIVER)),
+                20L
+        );
+        Trip trip = withTripId(sampleTrip(passenger), 99L);
+        trip.accept(driver);
+        when(userRepository.findByIdAndDeletedAtIsNull(10L)).thenReturn(Optional.of(passenger));
+        when(tripRepository.findByIdAndDeletedAtIsNull(99L)).thenReturn(Optional.of(trip));
+        when(tripStatusHistoryRepository.findByTripIdOrderByChangedAtAsc(99L)).thenReturn(List.of());
+        when(driverProfileRepository.findByUserIdAndUserDeletedAtIsNull(20L))
+                .thenReturn(Optional.of(driverProfile(driver)));
+
+        var response = bookingService.getMyBooking(10L, 99L);
+
+        assertThat(response.driverId()).isEqualTo(20L);
+        assertThat(response.driver().id()).isEqualTo(20L);
+        assertThat(response.driver().fullName()).isEqualTo("Driver Nguyen");
+        assertThat(response.driver().portraitUrl()).isEqualTo("https://example.com/driver.jpg");
+        assertThat(response.driver().vehiclePlate()).isEqualTo("59-A1 123.45");
+        assertThat(response.driver().vehicleBrand()).isEqualTo("Honda");
+        assertThat(response.driver().vehicleModel()).isEqualTo("Wave");
+        assertThat(response.driver().vehicleColor()).isEqualTo("Blue");
+    }
+
+    @Test
     void listMyBookingsCombinesPassengerAndDriverTripsNewestFirst() {
         User riderDriver = withUserId(
                 User.create("Rider Driver", "0900000000", null, "hash", Set.of(UserRole.PASSENGER, UserRole.DRIVER)),
@@ -502,6 +538,22 @@ class BookingServiceTests {
     private User withUserId(User user, Long id) {
         ReflectionTestUtils.setField(user, "id", id);
         return user;
+    }
+
+    private DriverProfile driverProfile(User driver) {
+        return DriverProfile.create(
+                driver,
+                "GPLX-20",
+                LocalDate.of(2030, 12, 31),
+                "CCCD-20",
+                "https://example.com/driver.jpg",
+                "59-A1 123.45",
+                VehicleType.MOTORBIKE,
+                "Honda",
+                "Wave",
+                "Blue",
+                (short) 2024
+        );
     }
 
     private Trip withTripId(Trip trip, Long id) {

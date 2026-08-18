@@ -46,6 +46,8 @@ output/
 
 tmp/
 
+/docs/images
+
 ### Analytics processing local artifacts ###
 analytics-processing/.venv/
 analytics-processing/.venv-*/

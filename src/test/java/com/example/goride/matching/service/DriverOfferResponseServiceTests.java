@@ -10,6 +10,8 @@ import com.example.goride.booking.repository.TripStatusHistoryRepository;
 import com.example.goride.common.error.BusinessException;
 import com.example.goride.common.error.ErrorCode;
 import com.example.goride.driver.domain.VehicleType;
+import com.example.goride.driver.domain.DriverProfile;
+import com.example.goride.driver.repository.DriverProfileRepository;
 import com.example.goride.matching.domain.DriverCandidate;
 import com.example.goride.matching.domain.DriverOffer;
 import com.example.goride.matching.domain.DriverOfferDecision;
@@ -40,6 +42,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.Optional;
 import java.util.Set;
 
@@ -64,6 +67,9 @@ class DriverOfferResponseServiceTests {
 
     @Mock
     private UserRepository userRepository;
+
+    @Mock
+    private DriverProfileRepository driverProfileRepository;
 
     @Mock
     private DriverCandidateStore candidateStore;
@@ -91,6 +97,7 @@ class DriverOfferResponseServiceTests {
                 tripRepository,
                 tripStatusHistoryRepository,
                 userRepository,
+                driverProfileRepository,
                 candidateStore,
                 matchingService,
                 driverOfferNotifier,
@@ -108,6 +115,8 @@ class DriverOfferResponseServiceTests {
         when(candidateStore.findTripMatching(99L)).thenReturn(Optional.of(state(20L, 1, Set.of())));
         when(tripRepository.findActiveByIdForUpdate(99L)).thenReturn(Optional.of(trip));
         when(userRepository.findByIdAndDeletedAtIsNull(20L)).thenReturn(Optional.of(driver));
+        when(driverProfileRepository.findByUserIdAndUserDeletedAtIsNull(20L))
+                .thenReturn(Optional.of(driverProfile(driver)));
         when(tripRepository.save(any(Trip.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         var response = service.respondToOffer(20L, 99L, DriverOfferDecision.ACCEPT);
@@ -244,7 +253,11 @@ class DriverOfferResponseServiceTests {
         verify(tripRealtimeNotifier).broadcastTripStatus(eq(99L), statusCaptor.capture());
         assertThat(notificationCaptor.getValue().data())
                 .containsEntry("tripId", 99L)
-                .containsEntry("status", status.name());
+                .containsEntry("status", status.name())
+                .containsEntry("driverId", 20L)
+                .containsEntry("driverName", "Driver")
+                .containsEntry("vehiclePlate", "59-A1 123.45")
+                .containsEntry("vehicleBrand", "Honda");
         assertThat(statusCaptor.getValue().tripId()).isEqualTo(99L);
         assertThat(statusCaptor.getValue().status()).isEqualTo(status);
     }
@@ -308,6 +321,22 @@ class DriverOfferResponseServiceTests {
         User user = User.create("Driver", "0900000001", null, "hash", Set.of(UserRole.DRIVER));
         ReflectionTestUtils.setField(user, "id", id);
         return user;
+    }
+
+    private DriverProfile driverProfile(User driver) {
+        return DriverProfile.create(
+                driver,
+                "GPLX-20",
+                LocalDate.of(2030, 12, 31),
+                "CCCD-20",
+                "https://example.com/driver.jpg",
+                "59-A1 123.45",
+                VehicleType.MOTORBIKE,
+                "Honda",
+                "Wave",
+                "Blue",
+                (short) 2024
+        );
     }
 
     private static org.locationtech.jts.geom.Point point(double longitude, double latitude) {

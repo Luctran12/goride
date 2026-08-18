@@ -5,6 +5,7 @@ import com.example.goride.booking.domain.PricingConfig;
 import com.example.goride.booking.domain.Trip;
 import com.example.goride.booking.domain.TripStatus;
 import com.example.goride.driver.domain.VehicleType;
+import com.example.goride.driver.dto.AssignedDriverResponse;
 import com.example.goride.user.domain.User;
 import com.example.goride.user.domain.UserRole;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -57,6 +58,34 @@ class TripResponseJsonTests {
 
         assertThat(json.path("statusHistory").isArray()).isTrue();
         assertThat(json.path("statusHistory")).isEmpty();
+    }
+
+    @Test
+    void serializesSafeAssignedDriverDetails() {
+        AssignedDriverResponse driver = new AssignedDriverResponse(
+                20L,
+                "Nguyen Van Driver",
+                "https://example.com/driver.jpg",
+                BigDecimal.valueOf(4.9),
+                120,
+                350,
+                "59-A1 123.45",
+                VehicleType.MOTORBIKE,
+                "Honda",
+                "Wave",
+                "Blue",
+                (short) 2024
+        );
+
+        JsonNode json = objectMapper.valueToTree(TripResponse.from(sampleTrip(), driver));
+
+        assertThat(json.at("/driver/id").asLong()).isEqualTo(20L);
+        assertThat(json.at("/driver/fullName").asText()).isEqualTo("Nguyen Van Driver");
+        assertThat(json.at("/driver/vehiclePlate").asText()).isEqualTo("59-A1 123.45");
+        assertThat(json.at("/driver/vehicleBrand").asText()).isEqualTo("Honda");
+        assertThat(json.at("/driver/averageRating").decimalValue()).isEqualByComparingTo("4.9");
+        assertThat(json.at("/driver/licenseNumber").isMissingNode()).isTrue();
+        assertThat(json.at("/driver/idCardNumber").isMissingNode()).isTrue();
     }
 
     private Trip sampleTrip() {

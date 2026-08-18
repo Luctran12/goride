@@ -2,6 +2,7 @@ package com.example.goride.notification.dto;
 
 import com.example.goride.booking.domain.Trip;
 import com.example.goride.chat.dto.TripMessageResponse;
+import com.example.goride.driver.dto.AssignedDriverResponse;
 import com.example.goride.notification.domain.NotificationType;
 import com.example.goride.payment.domain.Payment;
 
@@ -21,16 +22,27 @@ public record UserNotification(
         createdAt = createdAt == null ? Instant.now() : createdAt;
     }
 
-    public static UserNotification tripAccepted(Trip trip) {
+    public static UserNotification tripAccepted(Trip trip, AssignedDriverResponse driver) {
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("tripId", trip.getId());
+        data.put("status", trip.getStatus().name());
+        data.put("driverId", driver.id());
+        data.put("driverName", driver.fullName());
+        putIfNotNull(data, "driverPortraitUrl", driver.portraitUrl());
+        putIfNotNull(data, "driverAverageRating", driver.averageRating());
+        data.put("driverTotalRatings", driver.totalRatings());
+        data.put("driverTotalTrips", driver.totalTrips());
+        data.put("vehiclePlate", driver.vehiclePlate());
+        data.put("vehicleType", driver.vehicleType().name());
+        putIfNotNull(data, "vehicleBrand", driver.vehicleBrand());
+        putIfNotNull(data, "vehicleModel", driver.vehicleModel());
+        putIfNotNull(data, "vehicleColor", driver.vehicleColor());
+        putIfNotNull(data, "vehicleYear", driver.vehicleYear());
         return new UserNotification(
                 NotificationType.TRIP_ACCEPTED,
                 "Trip accepted",
                 "Your driver is on the way",
-                Map.of(
-                        "tripId", trip.getId(),
-                        "status", trip.getStatus().name(),
-                        "driverId", trip.getDriver().getId()
-                ),
+                data,
                 Instant.now()
         );
     }
@@ -135,5 +147,11 @@ public record UserNotification(
                 data,
                 Instant.now()
         );
+    }
+
+    private static void putIfNotNull(Map<String, Object> data, String key, Object value) {
+        if (value != null) {
+            data.put(key, value);
+        }
     }
 }

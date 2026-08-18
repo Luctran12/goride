@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import com.example.goride.booking.domain.PaymentMethod;
 import com.example.goride.booking.domain.Trip;
 import com.example.goride.booking.domain.TripStatus;
+import com.example.goride.driver.dto.AssignedDriverResponse;
 import com.example.goride.driver.domain.VehicleType;
 
 import java.math.BigDecimal;
@@ -14,6 +15,8 @@ public record TripResponse(
         Long id,
         Long passengerId,
         Long driverId,
+        @JsonInclude(JsonInclude.Include.NON_NULL)
+        AssignedDriverResponse driver,
         TripStatus status,
         VehicleType vehicleType,
         PaymentMethod paymentMethod,
@@ -36,10 +39,22 @@ public record TripResponse(
         List<TripStatusHistoryResponse> statusHistory
 ) {
     public static TripResponse from(Trip trip) {
-        return from(trip, null);
+        return from(trip, null, null);
     }
 
     public static TripResponse from(Trip trip, List<TripStatusHistoryResponse> statusHistory) {
+        return from(trip, null, statusHistory);
+    }
+
+    public static TripResponse from(Trip trip, AssignedDriverResponse driver) {
+        return from(trip, driver, null);
+    }
+
+    public static TripResponse from(
+            Trip trip,
+            AssignedDriverResponse driver,
+            List<TripStatusHistoryResponse> statusHistory
+    ) {
         Long driverId = trip.getDriver() == null ? null : trip.getDriver().getId();
         List<TripStatusHistoryResponse> detailStatusHistory = statusHistory == null
                 ? null
@@ -48,6 +63,7 @@ public record TripResponse(
                 trip.getId(),
                 trip.getPassenger().getId(),
                 driverId,
+                driver,
                 trip.getStatus(),
                 trip.getVehicleType(),
                 trip.getPaymentMethod(),
